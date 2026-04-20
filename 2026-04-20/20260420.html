@@ -58,24 +58,21 @@ canvas#scene{position:fixed;inset:0;z-index:1}
 .typing-zone{position:fixed;bottom:0;left:0;right:0;z-index:10;background:rgba(8,18,28,0.92);border-top:1px solid #33ff3322;padding:8px 14px 12px}
 
 .toast-area{
-  position:fixed;bottom:85px;left:50%;transform:translateX(-50%);z-index:12;
-  display:flex;flex-direction:column;align-items:center;gap:4px;
-  pointer-events:none;max-width:520px;width:90vw;
+  margin-top:4px;display:flex;flex-direction:column;align-items:center;gap:2px;
 }
 .toast{
-  padding:8px 16px;border-radius:6px;
-  font-family:'Noto Sans KR',sans-serif;font-size:0.7rem;font-weight:700;
+  font-family:'Noto Sans KR',sans-serif;font-size:0.65rem;font-weight:700;
   text-align:center;line-height:1.4;
-  animation:toastIn 0.3s ease,toastOut 0.4s ease 2.8s forwards;
-  white-space:pre-line;
+  padding:2px 0;
+  animation:toastIn 0.3s ease,toastOut 0.5s ease 3s forwards;
 }
-.toast.success{background:rgba(51,255,51,0.12);border:1px solid #33ff3344;color:#33ff33}
-.toast.fail{background:rgba(255,68,68,0.12);border:1px solid #ff444444;color:#ff4444}
-.toast.neutral{background:rgba(255,170,51,0.12);border:1px solid #ffaa3344;color:#ffaa33}
-.toast .toast-title{font-size:0.85rem;margin-bottom:2px}
-.toast .toast-stmt{font-size:0.6rem;opacity:0.7;margin-top:2px}
-@keyframes toastIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
-@keyframes toastOut{to{opacity:0;transform:translateY(-10px)}}
+.toast.success{color:#33ff33}
+.toast.fail{color:#ff4444}
+.toast.neutral{color:#ffaa33}
+.toast .toast-title{font-size:0.7rem}
+.toast .toast-stmt{font-size:0.55rem;opacity:0.6;margin-top:1px}
+@keyframes toastIn{from{opacity:0;transform:translateY(-5px)}to{opacity:1;transform:translateY(0)}}
+@keyframes toastOut{to{opacity:0}}
 .typing-label{text-align:center;margin-bottom:4px;font-size:clamp(0.8rem,2vw,1.2rem);font-weight:700;font-family:'Noto Sans KR',sans-serif;min-height:1.4em;color:#ffaa33;text-shadow:0 0 5px rgba(255,170,51,0.2)}
 .typing-input-wrap{display:flex;align-items:center;justify-content:center;max-width:480px;margin:0 auto}
 #typing-input{width:100%;padding:7px 12px;background:#0b1622;border:1px solid #33ff3344;border-radius:4px;color:#33ff33;font-family:'Noto Sans KR','Share Tech Mono',monospace;font-size:clamp(0.9rem,2.2vw,1.3rem);font-weight:700;outline:none;text-align:center;caret-color:#33ff33}
@@ -173,8 +170,7 @@ canvas#scene{position:fixed;inset:0;z-index:1}
   <div><span class="label">HP</span><br><span class="hp" id="hp">♥♥♥</span></div>
   <div><span class="label">NEXT SHIFT</span><br><span class="timer" id="timer">2</span><span style="color:#ffaa3344">척</span></div>
 </div>
-<div class="allies-bar"><div class="ab-title">▸ ALLIED NATIONS 동맹국 ◂</div><div class="ab-list" id="ab-list"></div><div class="ab-changes" id="ab-changes"></div></div>
-<div class="toast-area" id="toast-area"></div>
+<div class="allies-bar"><div class="ab-title">▸ ALLIED NATIONS 동맹국 ◂</div><div class="ab-list" id="ab-list"></div><div class="ab-changes" id="ab-changes"></div><div class="toast-area" id="toast-area"></div></div>
 <div class="typing-zone">
   <div class="typing-label" id="typing-label">선박 대기 중…</div>
   <div class="typing-input-wrap"><input type="text" id="typing-input" placeholder="선박명 입력" autocomplete="off" autofocus></div>
