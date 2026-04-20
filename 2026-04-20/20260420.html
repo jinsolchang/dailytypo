@@ -1371,20 +1371,6 @@ function renderShips(){
         toast.innerHTML=`<div class="toast-title">${s.flag} 이란 선박 자동 통과</div>`;
         area.appendChild(toast);
         setTimeout(()=>{if(toast.parentNode)toast.remove();},2500);
-      // Israel — auto artillery strike on sight
-      } else if(s.country.name==='이스라엘'){
-        s.state='sinking';s.sinkTimer=0;s.flash=1;
-        score+=50;updateHUD();
-        const fp=s.pos();
-        const batteries=[[0.48,0.33],[0.54,0.34],[0.60,0.34],[0.44,0.34],[0.38,0.31]];
-        const nearest=batteries.reduce((best,b)=>{const d=Math.hypot(b[0]*W-fp.x,b[1]*H-fp.y);return d<best.d?{d,b}:best;},{d:Infinity,b:batteries[0]});
-        flyingObjects.push({type:'shell',x:nearest.b[0]*W,y:nearest.b[1]*H,targetX:fp.x,targetY:fp.y,speed:8,victim:s,phase:'flying',timer:0});
-        const area=document.getElementById('toast-area');
-        const toast=document.createElement('div');toast.className='toast fail';
-        toast.innerHTML=`<div class="toast-title">🔥 ${s.flag} 이스라엘 선박 포격! +50점</div>`;
-        area.appendChild(toast);
-        setTimeout(()=>{if(toast.parentNode)toast.remove();},3000);
-        reindexQueue();
       } else {
         s.state='queuing';s.t=s.gateT-0.02;reindexQueue();
       }
