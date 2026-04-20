@@ -311,7 +311,7 @@ const COUNTRIES=[
   {name:'이스라엘',en:'ISRAEL',flag:'🇮🇱'},{name:'파키스탄',en:'PAKISTAN',flag:'🇵🇰'},
   {name:'이집트',en:'EGYPT',flag:'🇪🇬'},{name:'브라질',en:'BRAZIL',flag:'🇧🇷'},
   {name:'호주',en:'AUSTRALIA',flag:'🇦🇺'},{name:'북한',en:'DPRK',flag:'🇰🇵'},
-  {name:'UAE',en:'UAE',flag:'🇦🇪'},{name:'카타르',en:'QATAR',flag:'🇶🇦'},
+  {name:'아랍에미리트',en:'UAE',flag:'🇦🇪'},{name:'카타르',en:'QATAR',flag:'🇶🇦'},
 ];
 const WORDS_KO=['석유','원유','제재','봉쇄','핵','미사일','외교','협상','휴전','나포','압박','동맹','패권','안보'];
 const SIZES=[
@@ -772,7 +772,7 @@ function checkTrumpEvent(){
       if(targets.length>0){
         const victim=targets[Math.floor(Math.random()*targets.length)];
         const vp=victim.pos();
-        flyingObjects.push({type:'missile',x:W+20,y:H*0.15,targetX:vp.x,targetY:vp.y,speed:6,victim:victim,phase:'flying',timer:0});
+        flyingObjects.push({type:'missile',x:W+20,y:H*0.15,targetX:vp.x,targetY:vp.y,speed:2.5,victim:victim,phase:'flying',timer:0});
       }
     } else if(eff==='blockade'){
       gateOpen=false;gateOpenTimer=0;
@@ -797,11 +797,11 @@ function updateFlyingObjects(){
     if(f.type==='missile'){
       const dx=f.targetX-f.x,dy=f.targetY-f.y;
       const dist=Math.sqrt(dx*dx+dy*dy);
-      if(dist<10){
-        // Impact!
-        if(f.victim&&f.victim.state==='queuing'){
-          for(let j=0;j<30;j++){
-            missileParticles.push({x:f.targetX,y:f.targetY,vx:(Math.random()-0.5)*5,vy:(Math.random()-0.5)*5,life:50+Math.random()*30,age:0,size:2+Math.random()*5,color:['#ff4444','#ffaa33','#ff6600','#ffcc00'][Math.floor(Math.random()*4)]});
+      if(dist<15){
+        // Impact — big explosion
+        if(f.victim&&(f.victim.state==='queuing'||f.victim.state==='approaching')){
+          for(let j=0;j<60;j++){
+            missileParticles.push({x:f.targetX+(Math.random()-0.5)*20,y:f.targetY+(Math.random()-0.5)*20,vx:(Math.random()-0.5)*7,vy:(Math.random()-0.5)*7,life:70+Math.random()*40,age:0,size:3+Math.random()*6,color:['#ff4444','#ffaa33','#ff6600','#ffcc00','#ff0000'][Math.floor(Math.random()*5)]});
           }
           f.victim.state='gone';f.victim.opacity=0;
           score+=5;updateHUD();reindexQueue();
@@ -809,17 +809,29 @@ function updateFlyingObjects(){
           const t2=document.createElement('div');t2.className='toast fail';
           t2.innerHTML=`<div class="toast-title">💥 ${f.victim.flag} ${f.victim.label} 격침!</div>`;
           area.appendChild(t2);setTimeout(()=>{if(t2.parentNode)t2.remove();},3000);
-          if(typeof confetti==='function') confetti({particleCount:50,spread:80,origin:{y:0.5},colors:['#ff4444','#ff6600','#ffaa33']});
+          if(typeof confetti==='function') confetti({particleCount:80,spread:100,origin:{y:0.5},colors:['#ff4444','#ff6600','#ffaa33']});
         }
         flyingObjects.splice(i,1);continue;
       }
       f.x+=dx/dist*f.speed;f.y+=dy/dist*f.speed;
-      // Trail
-      missileParticles.push({x:f.x,y:f.y,vx:(Math.random()-0.5)*0.5,vy:Math.random()*0.5,life:15,age:0,size:1.5,color:'#ffaa33'});
-      // Draw missile
+      // Thick trail
+      for(let tr=0;tr<2;tr++){
+        missileParticles.push({x:f.x+(Math.random()-0.5)*3,y:f.y+(Math.random()-0.5)*3,vx:(Math.random()-0.5)*0.8,vy:Math.random()*0.8,life:25,age:0,size:2+Math.random()*2,color:Math.random()>0.5?'#ffaa33':'#ff6600'});
+      }
+      // Draw missile — bigger
       const angle=Math.atan2(dy,dx);
       cx.save();cx.translate(f.x,f.y);cx.rotate(angle);
-      cx.fillStyle='#ff4444';cx.beginPath();cx.moveTo(8,0);cx.lineTo(-4,-3);cx.lineTo(-4,3);cx.closePath();cx.fill();
+      // Body
+      cx.fillStyle='#ccc';
+      cx.beginPath();cx.moveTo(16,0);cx.lineTo(-8,-5);cx.lineTo(-12,0);cx.lineTo(-8,5);cx.closePath();cx.fill();
+      cx.strokeStyle='#ff4444';cx.lineWidth=1;cx.stroke();
+      // Fins
+      cx.fillStyle='#ff4444';
+      cx.beginPath();cx.moveTo(-8,-5);cx.lineTo(-14,-9);cx.lineTo(-12,-3);cx.closePath();cx.fill();
+      cx.beginPath();cx.moveTo(-8,5);cx.lineTo(-14,9);cx.lineTo(-12,3);cx.closePath();cx.fill();
+      // Flame
+      cx.fillStyle='#ffaa33';
+      cx.beginPath();cx.moveTo(-12,0);cx.lineTo(-20,-3);cx.lineTo(-18,0);cx.lineTo(-20,3);cx.closePath();cx.fill();
       cx.restore();
     } else if(f.type==='bomber'){
       if(f.phase==='approach'){
