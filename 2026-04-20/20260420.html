@@ -329,6 +329,7 @@ let gameOver=false,alliancePhase=false;
 let allianceTimer=60,lastAllianceTick=Date.now();
 let shipId=0,spawnAcc=0,gateOpen=false,gateAnim=0,seizedCount=0;
 let smokeParticles=[];
+let radarAngle=0;
 let processedCount=0;
 const SHIPS_PER_ALLIANCE=2;
 let nextAllianceAt=SHIPS_PER_ALLIANCE;
@@ -441,28 +442,32 @@ function showAllianceOverlay(){
   const toBreak=currentAllies.sort(()=>Math.random()-0.5).slice(0,Math.min(breakCount,currentAllies.length));
   const toAdd=nonAllies.sort(()=>Math.random()-0.5).slice(0,Math.min(newCount,nonAllies.length));
 
-  // Animate out removed allies
-  const items=document.querySelectorAll('.ab-item');
-  items.forEach(el=>{
-    if(toBreak.includes(el.textContent)){
-      if(typeof gsap!=='undefined'){
-        gsap.to(el,{opacity:0,scale:0.5,y:-10,duration:0.4,onComplete:()=>{
-          toBreak.forEach(n=>allies.delete(n));
-          toAdd.forEach(n=>allies.add(n));
-          updateAlliesBar();
-          // Animate in new allies
-          const newItems=document.querySelectorAll('.ab-item');
-          newItems.forEach(nel=>{
-            if(toAdd.includes(nel.textContent)){
-              nel.style.borderColor='#ffaa3355';nel.style.color='#ffaa33';
-              gsap.from(nel,{opacity:0,scale:0.5,y:10,duration:0.4});
-              setTimeout(()=>{nel.style.borderColor='';nel.style.color='';},2000);
-            }
-          });
-        }});
-      }
-    }
-  });
+  // Show small tag on right side of allies bar
+  const bar=document.querySelector('.allies-bar');
+  const tag=document.createElement('span');
+  tag.style.cssText='position:absolute;right:8px;top:50%;transform:translateY(-50%);font-size:0.5rem;color:#ffaa33;letter-spacing:0.1em;animation:blink 0.5s 3';
+  tag.textContent='⚡재편';
+  bar.style.position='relative';
+  bar.appendChild(tag);
+  setTimeout(()=>{if(tag.parentNode)tag.remove();},3000);
+
+  // Baffle the entire allies list
+  const listEl=document.getElementById('ab-list');
+  if(typeof baffle!=='undefined'){
+    const b=baffle(listEl,{characters:'█▓▒░◆■',speed:60});
+    b.start();
+    // After scramble, apply changes and reveal
+    setTimeout(()=>{
+      toBreak.forEach(n=>allies.delete(n));
+      toAdd.forEach(n=>allies.add(n));
+      updateAlliesBar();
+      b.reveal(800);
+    },800);
+  } else {
+    toBreak.forEach(n=>allies.delete(n));
+    toAdd.forEach(n=>allies.add(n));
+    updateAlliesBar();
+  }
 
   // Toast notification
   const area=document.getElementById('toast-area');
@@ -472,7 +477,6 @@ function showAllianceOverlay(){
   const addText=toAdd.map(n=>`✓${n}`).join(' ');
   toast.innerHTML=`<div class="toast-title">🔄 동맹 재편</div><div class="toast-stmt"><span style="color:#ff4444">${breakText}</span> <span style="color:#33ff33">${addText}</span></div>`;
   area.appendChild(toast);
-  if(typeof baffle!=='undefined'){const b=baffle(toast.querySelector('.toast-title'),{characters:'░▒▓',speed:40});b.start();setTimeout(()=>b.reveal(400),50);}
   setTimeout(()=>{if(toast.parentNode)toast.remove();},3500);
 }
 
@@ -521,10 +525,44 @@ function executeAction(action){
   gateOpenTimer=90; // ~1.5 seconds at 60fps
 
   if(action==='pass'){
+    // Israel pass = instant game over
+    if(first.country.name==='이스라엘'){
+      showSpecialAnnounce('💀 치명적 실수','🇮🇱 이스라엘 선박을 통과시켰습니다!\n해협 방어 실패 — 즉시 패배','#ff0000');
+      first.state='transiting';gateOpen=true;gateOpenTimer=90;
+      // Massive explosion at gate
+      const gp={x:GATE.x*W,y:(GATE.topY+GATE.botY)/2*H};
+      for(let j=0;j<50;j++){
+        missileParticles.push({x:gp.x+(Math.random()-0.5)*30,y:gp.y+(Math.random()-0.5)*30,vx:(Math.random()-0.5)*6,vy:(Math.random()-0.5)*6,life:70+Math.random()*40,age:0,size:3+Math.random()*5,color:['#ff4444','#ff6600','#ffaa33','#ff0000'][Math.floor(Math.random()*4)]});
+      }
+      if(typeof confetti==='function') confetti({particleCount:100,spread:120,origin:{y:0.5},colors:['#ff0000','#ff4444','#ff6600']});
+      clearInput();updateHUD();updateLabel();
+      setTimeout(()=>endGame(),1500);
+      return;
+    }
     if(first.isAlly()){score+=10;showAnnounce('pass-ally',first);}
     else{hp--;first.flash=1;showAnnounce('pass-enemy',first);}
     first.state='transiting';
   } else {
+    // Israel seize = artillery strike, sink in place
+    if(first.country.name==='이스라엘'){
+      score+=50;
+      first.flash=1;
+      // Fire from nearest battery
+      const fp=first.pos();
+      const batteries=[[0.48,0.33],[0.54,0.34],[0.60,0.34],[0.44,0.34],[0.38,0.31]];
+      const nearest=batteries.reduce((best,b)=>{
+        const d=Math.hypot(b[0]*W-fp.x,b[1]*H-fp.y);
+        return d<best.d?{d,b}:best;
+      },{d:Infinity,b:batteries[0]});
+      // Artillery shell flying
+      flyingObjects.push({type:'shell',x:nearest.b[0]*W,y:nearest.b[1]*H,targetX:fp.x,targetY:fp.y,speed:8,victim:first,phase:'flying',timer:0});
+      showAnnounce('seize-enemy',first);
+      // Don't move to Iran — will sink in place after shell hits
+      first.state='sinking';first.sinkTimer=0;
+      clearInput();reindexQueue();updateHUD();updateLabel();
+      if(hp<=0)endGame();
+      return;
+    }
     if(!first.isAlly()){score+=20*trumpBonusMultiplier;showAnnounce('seize-enemy',first);}
     else{hp--;showAnnounce('seize-ally',first);}
     first.state='seized';first.flash=1;
@@ -980,11 +1018,38 @@ function drawMap(){
   }
   cx.setLineDash([]);
 
-  // Radar sweep
-  const t=Date.now()*0.001,sa=(t*0.3)%(Math.PI*2);
-  cx.save();cx.globalAlpha=0.02;
-  cx.beginPath();cx.moveTo(W*0.535,H*0.46);cx.arc(W*0.535,H*0.46,W*0.3,sa,sa+0.2);cx.closePath();
+  // Radar sweep — 1 revolution per second with slight acceleration
+  const t=Date.now()*0.001;
+  const radarSpeed=Math.PI*2; // 1 rev/sec
+  const accel=Math.sin(t*0.7)*0.3; // slight speed variation
+  radarAngle=(t*(radarSpeed+accel))%(Math.PI*2);
+  const rCx=W*0.535,rCy=H*0.46,rR=W*0.35;
+
+  // Sweep cone
+  cx.save();cx.globalAlpha=0.05;
+  cx.beginPath();cx.moveTo(rCx,rCy);cx.arc(rCx,rCy,rR,radarAngle,radarAngle+0.3);cx.closePath();
   cx.fillStyle='#33ff33';cx.fill();cx.restore();
+
+  // Fading trail
+  for(let i=1;i<=4;i++){
+    cx.save();cx.globalAlpha=0.015*(1-i/5);
+    cx.beginPath();cx.moveTo(rCx,rCy);cx.arc(rCx,rCy,rR,radarAngle-i*0.15,radarAngle-(i-1)*0.15);cx.closePath();
+    cx.fillStyle='#33ff33';cx.fill();cx.restore();
+  }
+
+  // Radar line
+  cx.save();cx.globalAlpha=0.15;
+  cx.strokeStyle='#33ff33';cx.lineWidth=1;
+  cx.beginPath();cx.moveTo(rCx,rCy);
+  cx.lineTo(rCx+Math.cos(radarAngle)*rR,rCy+Math.sin(radarAngle)*rR);
+  cx.stroke();cx.restore();
+
+  // Radar circle outline
+  cx.save();cx.globalAlpha=0.04;
+  cx.strokeStyle='#33ff33';cx.lineWidth=0.5;
+  cx.beginPath();cx.arc(rCx,rCy,rR,0,Math.PI*2);cx.stroke();
+  cx.beginPath();cx.arc(rCx,rCy,rR*0.5,0,Math.PI*2);cx.stroke();
+  cx.restore();
 
   // Iran artillery batteries along coast
   const batteries=[[0.48,0.33],[0.54,0.34],[0.60,0.34],[0.44,0.34],[0.38,0.31]];
@@ -1247,6 +1312,18 @@ function renderShips(){
       }
     }
     else if(s.state==='transiting'){s.t+=s.baseSpeed*2.5;if(s.t>1.05)s.state='gone';}
+    else if(s.state==='sinking'){
+      s.sinkTimer=(s.sinkTimer||0)+1;
+      s.flash=Math.max(0,s.flash-0.005);
+      s.sinkY+=0.3;
+      s.opacity-=0.008;
+      // Bubbles
+      if(Math.random()<0.2){
+        const sp=s.pos();
+        smokeParticles.push({x:sp.x+(Math.random()-0.5)*10,y:sp.y,vx:(Math.random()-0.5)*0.3,vy:-0.5-Math.random()*0.3,life:30,age:0,size:1+Math.random()*2});
+      }
+      if(s.opacity<=0) s.state='gone';
+    }
     else if(s.state==='seized'){
       s.flash=Math.max(0,s.flash-0.008);
       if(!s.seizeTargetX){
@@ -1296,14 +1373,28 @@ function renderShips(){
       cx.textAlign='center';
       cx.fillStyle=s.flash>0?'#ff4444':(isF?'#ffaa33':'#33ff33aa');
 
-      // Scramble effect — reveal based on proximity to gate
+      // Scramble effect — reveal only when radar sweeps over or in strait zone
       let displayLabel=s.label;
       const GLITCH='█▓▒░◆◇■□▲△';
       if(s.state==='approaching'||s.state==='deferring'){
-        // How close to gate (0=far, 1=at gate)
-        const reveal=Math.max(0,Math.min(1, s.t / (s.gateT-0.02)));
+        // Check if radar has recently swept this ship
+        const sp=s.pos();
+        const rCx=W*0.535,rCy=H*0.46,rR=W*0.35;
+        const dx=sp.x-rCx,dy=sp.y-rCy;
+        const dist=Math.sqrt(dx*dx+dy*dy);
+        const shipAngle=(Math.atan2(dy,dx)+Math.PI*2)%(Math.PI*2);
+        const angleDiff=((shipAngle-radarAngle)%(Math.PI*2)+Math.PI*2)%(Math.PI*2);
+
+        // Ship is "detected" if radar swept it recently (within last 0.5 rad) AND within radar range
+        const detected=dist<rR && angleDiff>Math.PI*1.5; // radar just passed
+        // Also detect if very close to gate
+        const nearGate=s.t/(s.gateT-0.02);
+
+        if(!s.radarDetected && detected) s.radarDetected=true;
+
+        const reveal=s.radarDetected ? Math.max(nearGate, 0.5) : Math.min(nearGate, 0.15);
+        const revealCount=Math.floor(Math.max(0,Math.min(1,reveal))*s.label.length);
         const chars=[...s.label];
-        const revealCount=Math.floor(reveal*chars.length);
         for(let ci=revealCount;ci<chars.length;ci++){
           if(chars[ci]!==' ') chars[ci]=GLITCH[Math.floor(Math.random()*GLITCH.length)];
         }
