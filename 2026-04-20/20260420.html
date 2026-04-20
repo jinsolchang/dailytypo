@@ -49,6 +49,7 @@ canvas#scene{position:fixed;inset:0;z-index:1}
 .allies-bar .ab-title{font-size:0.5rem;color:#33ff3355;letter-spacing:0.18em;margin-bottom:4px}
 .allies-bar .ab-list{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
 .allies-bar .ab-item{padding:3px 10px;border:1px solid #33ff3555;border-radius:3px;font-size:clamp(0.65rem,1.3vw,0.8rem);color:#33ff33;font-weight:700;font-family:'Noto Sans KR','Share Tech Mono',sans-serif;text-shadow:0 0 5px rgba(51,255,51,0.25);transition:all 0.4s}
+.ab-scramble{padding:3px 10px;font-size:clamp(0.65rem,1.3vw,0.8rem);color:#33ff33;font-weight:700;font-family:'Noto Sans KR','Share Tech Mono',sans-serif}
 .allies-bar .ab-item.removing{border-color:#ff444455;color:#ff4444;text-decoration:line-through;opacity:0;transform:translateY(-10px)}
 .allies-bar .ab-item.adding{animation:slideDown 0.4s ease}
 @keyframes slideDown{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:translateY(0)}}
@@ -451,24 +452,32 @@ function showAllianceOverlay(){
   bar.appendChild(tag);
   setTimeout(()=>{if(tag.parentNode)tag.remove();},3000);
 
-  // Baffle each ally item individually (keeps border/badge, scrambles text only)
+  // Remove badges, show scramble text in their place, then rebuild
+  const listEl=document.getElementById('ab-list');
+  const allNames=[...allies]; // current before change
+  // Replace badges with plain scramble text
+  listEl.innerHTML=allNames.map(n=>`<span class="ab-scramble">${n}</span>`).join('');
+
   if(typeof baffle!=='undefined'){
-    const items=document.querySelectorAll('.ab-item');
-    items.forEach(el=>{
-      const b=baffle(el,{characters:'█▓▒░◆■',speed:50});
+    const scramblers=document.querySelectorAll('.ab-scramble');
+    scramblers.forEach(el=>{
+      const b=baffle(el,{characters:'█▓▒░◆■□',speed:40});
       b.start();
     });
     setTimeout(()=>{
       toBreak.forEach(n=>allies.delete(n));
       toAdd.forEach(n=>allies.add(n));
-      updateAlliesBar();
-      // Reveal new items
-      const newItems=document.querySelectorAll('.ab-item');
-      newItems.forEach(el=>{
-        const b2=baffle(el,{characters:'█▓▒░◆■',speed:50});
+      // Rebuild with new names as scramble text
+      const newNames=[...allies];
+      listEl.innerHTML=newNames.map(n=>`<span class="ab-scramble">${n}</span>`).join('');
+      const newScramblers=document.querySelectorAll('.ab-scramble');
+      newScramblers.forEach(el=>{
+        const b2=baffle(el,{characters:'█▓▒░◆■□',speed:40});
         b2.start();b2.reveal(600);
       });
-    },700);
+      // After reveal, restore proper badges
+      setTimeout(()=>{ updateAlliesBar(); },700);
+    },600);
   } else {
     toBreak.forEach(n=>allies.delete(n));
     toAdd.forEach(n=>allies.add(n));
