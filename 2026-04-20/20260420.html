@@ -58,12 +58,13 @@ canvas#scene{position:fixed;inset:0;z-index:1}
 .typing-zone{position:fixed;bottom:0;left:0;right:0;z-index:10;background:rgba(8,18,28,0.92);border-top:1px solid #33ff3322;padding:8px 14px 12px}
 
 .toast-area{
-  margin-top:4px;display:flex;flex-direction:column;align-items:center;gap:2px;
+  position:fixed;top:52px;left:50%;transform:translateX(-50%);z-index:11;
+  pointer-events:none;text-align:center;
+  max-width:400px;width:90vw;
 }
 .toast{
   font-family:'Noto Sans KR',sans-serif;font-size:0.65rem;font-weight:700;
-  text-align:center;line-height:1.4;
-  padding:2px 0;
+  text-align:center;line-height:1.4;padding:2px 0;
   animation:toastIn 0.3s ease,toastOut 0.5s ease 3s forwards;
 }
 .toast.success{color:#33ff33}
@@ -170,7 +171,8 @@ canvas#scene{position:fixed;inset:0;z-index:1}
   <div><span class="label">HP</span><br><span class="hp" id="hp">♥♥♥</span></div>
   <div><span class="label">NEXT SHIFT</span><br><span class="timer" id="timer">2</span><span style="color:#ffaa3344">척</span></div>
 </div>
-<div class="allies-bar"><div class="ab-title">▸ ALLIED NATIONS 동맹국 ◂</div><div class="ab-list" id="ab-list"></div><div class="ab-changes" id="ab-changes"></div><div class="toast-area" id="toast-area"></div></div>
+<div class="allies-bar"><div class="ab-title">▸ ALLIED NATIONS 동맹국 ◂</div><div class="ab-list" id="ab-list"></div></div>
+<div class="toast-area" id="toast-area"></div>
 <div class="typing-zone">
   <div class="typing-label" id="typing-label">선박 대기 중…</div>
   <div class="typing-input-wrap"><input type="text" id="typing-input" placeholder="선박명 입력" autocomplete="off" autofocus></div>
@@ -465,11 +467,6 @@ function showAllianceOverlay(){
   area.appendChild(toast);
   if(typeof baffle!=='undefined'){const b=baffle(toast.querySelector('.toast-title'),{characters:'░▒▓',speed:40});b.start();setTimeout(()=>b.reveal(400),50);}
   setTimeout(()=>{if(toast.parentNode)toast.remove();},3500);
-
-  // Show changes below allies bar
-  const changesEl=document.getElementById('ab-changes');
-  changesEl.innerHTML=`<span class="ch-break">${breakText}</span> <span class="ch-new">${addText}</span>`;
-  setTimeout(()=>{changesEl.innerHTML='';},4000);
 }
 
 // ═══════════════════════════════════════
@@ -661,58 +658,131 @@ const TRUMP_TWEETS=[
 let lastTrumpAt=0;
 let trumpBonusMultiplier=1;
 let missileParticles=[];
+let flyingObjects=[]; // missiles, bombers flying across screen
+let trumpWarned=false;
 
 function checkTrumpEvent(){
   if(alliancePhase) return;
   const queueCount=ships.filter(s=>s.state==='queuing').length;
-  if(queueCount>=3 && processedCount-lastTrumpAt>=4){
+
+  // 20+ ships: bomber destroys gate, game over
+  if(queueCount>=20){
+    // Spawn bomber
+    flyingObjects.push({type:'bomber',x:-100,y:H*0.2,targetX:GATE.x*W,targetY:GATE.topY*H,speed:4,phase:'approach',timer:0});
+    showSpecialAnnounce('🇺🇸 TRUTH SOCIAL','🇺🇸 트럼프: "ENOUGH! B-52 출격! 해협을 날려버려라!"','#ff0000');
+    return;
+  }
+
+  // 15+ ships: warning
+  if(queueCount>=15 && !trumpWarned){
+    trumpWarned=true;
+    const warns=[
+      '🇺🇸 트럼프: "배가 너무 많다! 10초 안에 정리 안 하면 폭격한다!"',
+      '🇺🇸 트럼프: "WARNING! 해협이 막히고 있다! LAST CHANCE!"',
+      '🇺🇸 트럼프: "이건 참을 수 없다! 폭격기 대기 중! HURRY UP!"',
+    ];
+    showSpecialAnnounce('🇺🇸 TRUTH SOCIAL',warns[Math.floor(Math.random()*warns.length)],'#ff6600');
+  }
+  if(queueCount<12) trumpWarned=false;
+
+  // Regular trump events (missile, sanction, blockade)
+  if(queueCount>=3 && processedCount-lastTrumpAt>=5){
     lastTrumpAt=processedCount;
     const tweet=TRUMP_TWEETS[Math.floor(Math.random()*TRUMP_TWEETS.length)];
     showSpecialAnnounce('🇺🇸 TRUTH SOCIAL',tweet.text,'#ff6600');
 
-    // Apply effect immediately
     const eff=tweet.effect;
     if(eff==='missile'){
+      // Launch missile from right side
       const targets=ships.filter(s=>s.state==='queuing');
       if(targets.length>0){
         const victim=targets[Math.floor(Math.random()*targets.length)];
         const vp=victim.pos();
-        // Explosion particles
-        for(let i=0;i<30;i++){
-          missileParticles.push({
-            x:vp.x,y:vp.y,
-            vx:(Math.random()-0.5)*5,vy:(Math.random()-0.5)*5,
-            life:50+Math.random()*30,age:0,
-            size:2+Math.random()*5,
-            color:['#ff4444','#ffaa33','#ff6600','#ffcc00'][Math.floor(Math.random()*4)],
-          });
-        }
-        victim.state='gone';victim.opacity=0;
-        score+=5;updateHUD();reindexQueue();
-        // Toast for the hit
-        const area=document.getElementById('toast-area');
-        const t2=document.createElement('div');t2.className='toast fail';
-        t2.innerHTML=`<div class="toast-title">💥 ${victim.flag} ${victim.label} 격침!</div>`;
-        area.appendChild(t2);
-        setTimeout(()=>{if(t2.parentNode)t2.remove();},3000);
-        if(typeof confetti==='function') confetti({particleCount:50,spread:80,origin:{y:0.5},colors:['#ff4444','#ff6600','#ffaa33']});
+        flyingObjects.push({type:'missile',x:W+20,y:H*0.15,targetX:vp.x,targetY:vp.y,speed:6,victim:victim,phase:'flying',timer:0});
       }
     } else if(eff==='blockade'){
       gateOpen=false;gateOpenTimer=0;
-      // Toast
       const area=document.getElementById('toast-area');
       const t2=document.createElement('div');t2.className='toast fail';
       t2.innerHTML=`<div class="toast-title">🚫 해협 강제 봉쇄!</div>`;
-      area.appendChild(t2);
-      setTimeout(()=>{if(t2.parentNode)t2.remove();},3000);
+      area.appendChild(t2);setTimeout(()=>{if(t2.parentNode)t2.remove();},3000);
     } else if(eff==='sanction'){
       trumpBonusMultiplier=2;
       const area=document.getElementById('toast-area');
       const t2=document.createElement('div');t2.className='toast success';
       t2.innerHTML=`<div class="toast-title">💰 제재 강화! 나포 점수 2배 (15초)</div>`;
-      area.appendChild(t2);
-      setTimeout(()=>{if(t2.parentNode)t2.remove();},3000);
+      area.appendChild(t2);setTimeout(()=>{if(t2.parentNode)t2.remove();},3000);
       setTimeout(()=>{trumpBonusMultiplier=1;},15000);
+    }
+  }
+}
+
+function updateFlyingObjects(){
+  for(let i=flyingObjects.length-1;i>=0;i--){
+    const f=flyingObjects[i];
+    if(f.type==='missile'){
+      const dx=f.targetX-f.x,dy=f.targetY-f.y;
+      const dist=Math.sqrt(dx*dx+dy*dy);
+      if(dist<10){
+        // Impact!
+        if(f.victim&&f.victim.state==='queuing'){
+          for(let j=0;j<30;j++){
+            missileParticles.push({x:f.targetX,y:f.targetY,vx:(Math.random()-0.5)*5,vy:(Math.random()-0.5)*5,life:50+Math.random()*30,age:0,size:2+Math.random()*5,color:['#ff4444','#ffaa33','#ff6600','#ffcc00'][Math.floor(Math.random()*4)]});
+          }
+          f.victim.state='gone';f.victim.opacity=0;
+          score+=5;updateHUD();reindexQueue();
+          const area=document.getElementById('toast-area');
+          const t2=document.createElement('div');t2.className='toast fail';
+          t2.innerHTML=`<div class="toast-title">💥 ${f.victim.flag} ${f.victim.label} 격침!</div>`;
+          area.appendChild(t2);setTimeout(()=>{if(t2.parentNode)t2.remove();},3000);
+          if(typeof confetti==='function') confetti({particleCount:50,spread:80,origin:{y:0.5},colors:['#ff4444','#ff6600','#ffaa33']});
+        }
+        flyingObjects.splice(i,1);continue;
+      }
+      f.x+=dx/dist*f.speed;f.y+=dy/dist*f.speed;
+      // Trail
+      missileParticles.push({x:f.x,y:f.y,vx:(Math.random()-0.5)*0.5,vy:Math.random()*0.5,life:15,age:0,size:1.5,color:'#ffaa33'});
+      // Draw missile
+      const angle=Math.atan2(dy,dx);
+      cx.save();cx.translate(f.x,f.y);cx.rotate(angle);
+      cx.fillStyle='#ff4444';cx.beginPath();cx.moveTo(8,0);cx.lineTo(-4,-3);cx.lineTo(-4,3);cx.closePath();cx.fill();
+      cx.restore();
+    } else if(f.type==='bomber'){
+      if(f.phase==='approach'){
+        const dx=f.targetX-f.x,dy=f.targetY-f.y;
+        const dist=Math.sqrt(dx*dx+dy*dy);
+        f.x+=dx/dist*f.speed;f.y+=dy/dist*f.speed;
+        // Draw bomber
+        cx.save();cx.translate(f.x,f.y);
+        cx.fillStyle='#888';
+        cx.beginPath();cx.moveTo(20,0);cx.lineTo(-10,-12);cx.lineTo(-15,0);cx.lineTo(-10,12);cx.closePath();cx.fill();
+        cx.fillStyle='#666';cx.fillRect(-15,-2,8,4);
+        cx.restore();
+        // Engine trail
+        missileParticles.push({x:f.x-15,y:f.y,vx:-1-Math.random(),vy:(Math.random()-0.5)*0.5,life:20,age:0,size:2,color:'#ffaa33'});
+        if(dist<30){
+          f.phase='bombing';f.timer=0;
+          // Massive explosion at gate
+          for(let j=0;j<60;j++){
+            missileParticles.push({x:f.targetX+(Math.random()-0.5)*40,y:f.targetY+(Math.random()-0.5)*40,vx:(Math.random()-0.5)*8,vy:(Math.random()-0.5)*8,life:80+Math.random()*40,age:0,size:3+Math.random()*6,color:['#ff4444','#ffaa33','#ff6600','#ffcc00','#ff0000'][Math.floor(Math.random()*5)]});
+          }
+          if(typeof confetti==='function'){
+            confetti({particleCount:150,spread:120,origin:{y:0.4},colors:['#ff0000','#ff4444','#ff6600','#ffaa33']});
+          }
+        }
+      } else if(f.phase==='bombing'){
+        f.timer++;
+        // Bomber flies away
+        f.x+=3;f.y-=1;
+        cx.save();cx.translate(f.x,f.y);
+        cx.fillStyle='#888';cx.beginPath();cx.moveTo(20,0);cx.lineTo(-10,-12);cx.lineTo(-15,0);cx.lineTo(-10,12);cx.closePath();cx.fill();
+        cx.restore();
+        if(f.timer>60){
+          flyingObjects.splice(i,1);
+          // Game over
+          endGame();
+        }
+      }
     }
   }
 }
@@ -1267,7 +1337,7 @@ function loop(){
       // Clear expired effects
       if(activeEffect && Date.now()>effectEndTime) activeEffect=null;
       spawnAcc++;
-      const rate=Math.max(120,300-score*0.8);
+      const rate=Math.max(200,450-score*0.6);
       if(spawnAcc>=rate){spawnAcc=0;spawnShip();}
       // Trump check — independent of announce state
       checkTrumpEvent();
@@ -1279,7 +1349,7 @@ function loop(){
     gateOpenTimer--;
     if(gateOpenTimer<=0) gateOpen=false;
   }
-  drawMap();drawGate();renderShips();
+  drawMap();drawGate();renderShips();updateFlyingObjects();
   requestAnimationFrame(loop);
 }
 
