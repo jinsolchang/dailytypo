@@ -1179,10 +1179,25 @@ function renderShips(){
       cx.font=`700 ${fs}px "Noto Sans KR","Share Tech Mono",sans-serif`;
       cx.textAlign='center';
       cx.fillStyle=s.flash>0?'#ff4444':(isF?'#ffaa33':'#33ff33aa');
-      cx.fillText(`${s.flag} ${s.label}`,p.x,p.y-12*s.sz.s);
+
+      // Scramble effect — reveal based on proximity to gate
+      let displayLabel=s.label;
+      const GLITCH='█▓▒░◆◇■□▲△';
+      if(s.state==='approaching'||s.state==='deferring'){
+        // How close to gate (0=far, 1=at gate)
+        const reveal=Math.max(0,Math.min(1, s.t / (s.gateT-0.02)));
+        const chars=[...s.label];
+        const revealCount=Math.floor(reveal*chars.length);
+        for(let ci=revealCount;ci<chars.length;ci++){
+          if(chars[ci]!==' ') chars[ci]=GLITCH[Math.floor(Math.random()*GLITCH.length)];
+        }
+        displayLabel=chars.join('');
+      }
+
+      cx.fillText(`${s.flag} ${displayLabel}`,p.x,p.y-12*s.sz.s);
       if(isF&&Math.sin(t*6)>0){
         cx.fillStyle='#ffaa33';cx.beginPath();
-        cx.arc(p.x-cx.measureText(`${s.flag} ${s.label}`).width/2-6,p.y-12*s.sz.s,2.5,0,Math.PI*2);cx.fill();
+        cx.arc(p.x-cx.measureText(`${s.flag} ${displayLabel}`).width/2-6,p.y-12*s.sz.s,2.5,0,Math.PI*2);cx.fill();
       }
     }
     cx.restore();
