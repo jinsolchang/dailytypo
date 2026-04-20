@@ -484,15 +484,7 @@ function showAllianceOverlay(){
     updateAlliesBar();
   }
 
-  // Toast notification
-  const area=document.getElementById('toast-area');
-  const toast=document.createElement('div');
-  toast.className='toast neutral';
-  const breakText=toBreak.map(n=>`✕${n}`).join(' ');
-  const addText=toAdd.map(n=>`✓${n}`).join(' ');
-  toast.innerHTML=`<div class="toast-title">🔄 동맹 재편</div><div class="toast-stmt"><span style="color:#ff4444">${breakText}</span> <span style="color:#33ff33">${addText}</span></div>`;
-  area.appendChild(toast);
-  setTimeout(()=>{if(toast.parentNode)toast.remove();},3500);
+  // No toast for alliance change — scramble effect is enough
 }
 
 // ═══════════════════════════════════════
