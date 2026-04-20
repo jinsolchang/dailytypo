@@ -58,6 +58,47 @@ canvas#scene{position:fixed;inset:0;z-index:1}
   animation:seizeIn 0.3s ease;
 }
 @keyframes seizeIn{from{transform:translateX(-20px);opacity:0}to{transform:translateX(0);opacity:1}}
+
+.announce-overlay{
+  position:fixed;inset:0;z-index:150;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  background:rgba(0,0,0,0.88);
+  opacity:0;pointer-events:none;transition:opacity 0.3s;
+}
+.announce-overlay.show{opacity:1;pointer-events:auto}
+.ann-badge{
+  font-size:0.6rem;letter-spacing:0.2em;padding:4px 14px;
+  border-radius:3px;margin-bottom:10px;font-weight:700;
+}
+.ann-badge.success{background:#33ff3333;color:#33ff33;border:1px solid #33ff3355}
+.ann-badge.fail{background:#ff444433;color:#ff4444;border:1px solid #ff444455}
+.ann-title{
+  font-family:'Noto Sans KR',sans-serif;font-weight:900;
+  font-size:clamp(1.5rem,4vw,2.8rem);
+  text-align:center;line-height:1.2;
+}
+.ann-title.success{color:#33ff33;text-shadow:0 0 30px rgba(51,255,51,0.5)}
+.ann-title.fail{color:#ff4444;text-shadow:0 0 30px rgba(255,68,68,0.5)}
+.ann-sub{
+  font-size:0.75rem;margin-top:6px;
+  font-family:'Noto Sans KR',sans-serif;
+}
+.ann-sub.success{color:#33ff3388}
+.ann-sub.fail{color:#ff444488}
+.ann-statements{
+  margin-top:16px;display:flex;flex-direction:column;gap:4px;
+  max-width:500px;width:90vw;
+}
+.ann-stmt{
+  font-size:0.7rem;padding:5px 10px;border-radius:3px;
+  font-family:'Noto Sans KR',sans-serif;
+  opacity:0;transform:translateY(10px);
+}
+.ann-stmt.ally{background:rgba(51,255,51,0.06);color:#33ff33aa;border-left:2px solid #33ff3344}
+.ann-stmt.enemy{background:rgba(255,68,68,0.06);color:#ff4444aa;border-left:2px solid #ff444444}
+.ann-stmt.neutral{background:rgba(255,170,51,0.06);color:#ffaa33aa;border-left:2px solid #ffaa3344}
+.ann-dismiss{margin-top:16px;font-size:0.55rem;color:#ffffff33;letter-spacing:0.1em;animation:blink 1.5s infinite}
+@keyframes blink{0%,100%{opacity:0.3}50%{opacity:0.8}}
 </style>
 </head>
 <body>
@@ -66,7 +107,7 @@ canvas#scene{position:fixed;inset:0;z-index:1}
 <div class="hud-tr">
   <div><span class="label">SCORE</span><br><span class="val" id="score">0</span></div>
   <div><span class="label">HP</span><br><span class="hp" id="hp">♥♥♥</span></div>
-  <div><span class="label">ALLIANCE</span><br><span class="timer" id="timer">60</span><span style="color:#ffaa3344">s</span></div>
+  <div><span class="label">NEXT SHIFT</span><br><span class="timer" id="timer">2</span><span style="color:#ffaa3344">척</span></div>
 </div>
 <div class="allies-bar"><div class="ab-title">▸ ALLIED NATIONS 동맹국 ◂</div><div class="ab-list" id="ab-list"></div></div>
 <div class="typing-zone">
@@ -83,11 +124,20 @@ canvas#scene{position:fixed;inset:0;z-index:1}
   <div class="ao-title">⚠ 동맹 재편</div><div class="ao-subtitle">ALLIANCE RESTRUCTURING</div>
   <div class="ao-list" id="ao-list"></div><div class="ao-timer" id="ao-timer"></div>
 </div>
+<div class="announce-overlay" id="announce-overlay">
+  <div class="ann-badge" id="ann-badge"></div>
+  <div class="ann-title" id="ann-title"></div>
+  <div class="ann-sub" id="ann-sub"></div>
+  <div class="ann-statements" id="ann-statements"></div>
+  <div class="ann-dismiss">Enter를 눌러 계속</div>
+</div>
 <div class="gameover" id="gameover">
   <div class="go-title">GAME OVER</div><div class="go-sub">해협 통제 실패</div>
   <div class="go-score" id="go-score"></div>
   <button class="go-restart" onclick="location.reload()">다시 시작</button>
 </div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
 <script>
 const cv=document.getElementById('scene'),cx=cv.getContext('2d');
 let W,H;
@@ -192,17 +242,38 @@ const COUNTRIES=[
 ];
 const WORDS_KO=['석유','원유','제재','봉쇄','핵','미사일','외교','협상','휴전','나포','압박','동맹','패권','안보'];
 const SIZES=[
-  {s:0.5,r:12,spd:1.8},{s:0.7,r:16,spd:1.4},
-  {s:1.0,r:22,spd:1.0},{s:1.3,r:28,spd:0.7},{s:1.7,r:36,spd:0.45},
+  {s:0.35,r:8,spd:2.5},   // 소형 쾌속정
+  {s:0.55,r:13,spd:1.8},  // 어선
+  {s:0.9,r:20,spd:1.0},   // 화물선
+  {s:1.5,r:32,spd:0.55},  // 컨테이너선
+  {s:2.2,r:48,spd:0.25},  // 초대형 유조선
 ];
 
 // ═══════════════════════════════════════
 // STATE
 // ═══════════════════════════════════════
 let allies=new Set(),ships=[],score=0,hp=3;
-let gameOver=false,alliancePhase=false;
+let gameOver=false,alliancePhase=false,announcePause=false;
 let allianceTimer=60,lastAllianceTick=Date.now();
-let shipId=0,spawnAcc=0,gateOpen=true,gateAnim=1;
+let shipId=0,spawnAcc=0,gateOpen=false,gateAnim=0,seizedCount=0;
+let smokeParticles=[];
+let processedCount=0;
+const SHIPS_PER_ALLIANCE=2;
+let nextAllianceAt=SHIPS_PER_ALLIANCE;
+let nextEventAt=5; // special event every ~5 ships
+
+// Special events
+const SPECIAL_EVENTS=[
+  {title:'🏴‍☠️ 해적 출현!',sub:'소말리아 해적이 해협에 나타났습니다',effect:'pirates',duration:3000},
+  {title:'🛢️ 유조선 좌초!',sub:'초대형 유조선이 해협에서 좌초 — 통행 지연',effect:'slowdown',duration:3000},
+  {title:'🚨 긴급 구조 요청',sub:'조난 선박 발견 — 다음 배 통과 시 보너스 2배',effect:'bonus',duration:3000},
+  {title:'🎖️ VIP 호위 임무',sub:'다음 동맹국 선박 통과 시 +30점',effect:'vip',duration:3000},
+  {title:'⚡ 전자전 교란',sub:'3초간 선박명이 글리치됩니다',effect:'glitch',duration:3000},
+  {title:'🌊 태풍 접근',sub:'모든 선박 속도 2배 — 빠르게 판단하세요!',effect:'storm',duration:5000},
+];
+let activeEffect=null;
+let effectEndTime=0;
+let gateOpenTimer=0; // frames gate stays open
 
 // ═══════════════════════════════════════
 // SHIP
@@ -222,9 +293,13 @@ class Ship{
     this.ox=0;this.oy=0;this.vox=0;this.voy=0;
     this.bobPhase=Math.random()*Math.PI*2;
     this.baseSpeed=0.0005*this.sz.spd;
+    this.seizeTargetX=0;this.seizeTargetY=0; // coast destination when seized
   }
   isAlly(){return allies.has(this.country.name);}
   pos(){
+    if(this.state==='seized' && this.seizeTargetX){
+      return{x:this.seizeTargetX, y:this.seizeTargetY};
+    }
     const p=laneScr(this.lane,Math.max(0,this.t));
     return{
       x:p.x+this.ox+Math.sin(Date.now()*0.0008+this.bobPhase)*1.5,
@@ -284,12 +359,45 @@ function pickAllies(){
 function updateAlliesBar(){document.getElementById('ab-list').innerHTML=[...allies].map(a=>`<div class="ab-item">${a}</div>`).join('');}
 function showAllianceOverlay(){
   alliancePhase=true;gateOpen=false;
-  document.getElementById('typing-input').blur();pickAllies();
+  document.getElementById('typing-input').blur();
+
+  // Partial alliance change: 1-3 break, 1-3 new
+  const currentAllies=[...allies];
+  const nonAllies=COUNTRIES.filter(c=>!allies.has(c.name)).map(c=>c.name);
+  const breakCount=1+Math.floor(Math.random()*3);
+  const newCount=1+Math.floor(Math.random()*3);
+
+  // Shuffle and pick
+  const toBreak=currentAllies.sort(()=>Math.random()-0.5).slice(0,Math.min(breakCount,currentAllies.length));
+  const toAdd=nonAllies.sort(()=>Math.random()-0.5).slice(0,Math.min(newCount,nonAllies.length));
+
+  toBreak.forEach(n=>allies.delete(n));
+  toAdd.forEach(n=>allies.add(n));
+
   const list=document.getElementById('ao-list');list.innerHTML='';
-  let i=0;for(const a of allies){const el=document.createElement('div');el.className='ao-item';el.textContent=a;el.style.animationDelay=(i*0.12)+'s';list.appendChild(el);i++;}
-  document.getElementById('alliance-overlay').classList.add('show');updateAlliesBar();
-  let cd=4;const aoT=document.getElementById('ao-timer');aoT.textContent=`${cd}초 후 해협 개방`;
-  const iv=setInterval(()=>{cd--;if(cd<=0){clearInterval(iv);document.getElementById('alliance-overlay').classList.remove('show');alliancePhase=false;gateOpen=true;allianceTimer=60;lastAllianceTick=Date.now();document.getElementById('typing-input').focus();}else aoT.textContent=`${cd}초 후 해협 개방`;},1000);
+
+  // Show breaks
+  toBreak.forEach((n,i)=>{
+    const el=document.createElement('div');
+    el.className='ao-item';el.style.borderColor='#ff444455';el.style.color='#ff4444';
+    el.textContent=`✕ ${n} 절교`;
+    el.style.animationDelay=(i*0.12)+'s';
+    list.appendChild(el);
+  });
+  // Show new allies
+  toAdd.forEach((n,i)=>{
+    const el=document.createElement('div');
+    el.className='ao-item';
+    el.textContent=`✓ ${n} 수교`;
+    el.style.animationDelay=((toBreak.length+i)*0.12)+'s';
+    list.appendChild(el);
+  });
+
+  document.getElementById('alliance-overlay').classList.add('show');
+  updateAlliesBar();
+
+  let cd=3;const aoT=document.getElementById('ao-timer');aoT.textContent=`${cd}초 후 해협 개방`;
+  const iv=setInterval(()=>{cd--;if(cd<=0){clearInterval(iv);document.getElementById('alliance-overlay').classList.remove('show');alliancePhase=false;gateOpen=false;document.getElementById('typing-input').focus();}else aoT.textContent=`${cd}초 후 해협 개방`;},1000);
 }
 
 // ═══════════════════════════════════════
@@ -297,12 +405,84 @@ function showAllianceOverlay(){
 // ═══════════════════════════════════════
 const inputEl=document.getElementById('typing-input');
 let isComposing=false,pendingClear=false;
+let pendingAction=null; // 'pass' or 'seize'
+
 inputEl.addEventListener('compositionstart',()=>{isComposing=true;});
-inputEl.addEventListener('compositionend',()=>{isComposing=false;if(pendingClear){pendingClear=false;setTimeout(()=>{inputEl.value='';},0);}});
+inputEl.addEventListener('compositionend',()=>{
+  isComposing=false;
+  if(pendingClear){pendingClear=false;setTimeout(()=>{inputEl.value='';},0);}
+  // If Enter/Esc was pressed during composition, execute now
+  if(pendingAction){
+    const action=pendingAction;pendingAction=null;
+    setTimeout(()=>executeAction(action),10);
+  }
+});
 function clearInput(){if(isComposing){pendingClear=true;}else{inputEl.value='';}}
+
+function executeAction(action){
+  if(gameOver||alliancePhase)return;
+  const first=getFirst();if(!first)return;
+  const val=inputEl.value.trim();
+  if(val!==first.label)return;
+
+  // Open gate briefly
+  gateOpen=true;
+  gateOpenTimer=90; // ~1.5 seconds at 60fps
+
+  if(action==='pass'){
+    if(first.isAlly()){score+=10;showAnnounce('pass-ally',first);}
+    else{hp--;first.flash=1;showAnnounce('pass-enemy',first);}
+    first.state='transiting';
+  } else {
+    if(!first.isAlly()){score+=20;showAnnounce('seize-enemy',first);}
+    else{hp--;showAnnounce('seize-ally',first);}
+    first.state='seized';first.flash=1;
+    addToSeizedList(first);
+  }
+  clearInput();reindexQueue();updateHUD();updateLabel();
+  if(hp<=0)endGame();
+
+  // Track processed ships
+  processedCount++;
+  // Alliance shift every N ships
+  if(processedCount>=nextAllianceAt && !alliancePhase){
+    nextAllianceAt=processedCount+SHIPS_PER_ALLIANCE;
+    setTimeout(()=>{if(!gameOver)showAllianceOverlay();},800);
+  }
+  // Special event every ~5 ships
+  if(processedCount>=nextEventAt && !alliancePhase){
+    nextEventAt=processedCount+4+Math.floor(Math.random()*3);
+    setTimeout(()=>{if(!gameOver&&!alliancePhase)triggerSpecialEvent();},500);
+  }
+}
+
+inputEl.addEventListener('keydown',e=>{
+  if(gameOver)return;
+  // Dismiss announcement
+  if(announcePause){
+    if(e.key==='Enter'||e.key==='Escape'){
+      e.preventDefault();
+      document.getElementById('announce-overlay').classList.remove('show');
+      announcePause=false;
+      inputEl.focus();
+    }
+    return;
+  }
+  if(alliancePhase)return;
+  if(e.key==='Enter'){
+    e.preventDefault();
+    if(isComposing){pendingAction='pass';return;}
+    executeAction('pass');
+  }
+  if(e.key==='Escape'){
+    e.preventDefault();
+    if(isComposing){pendingAction='seize';return;}
+    executeAction('seize');
+  }
+});
 function updateLabel(){
   const el=document.getElementById('typing-label');const first=getFirst();
-  if(!first||gameOver||alliancePhase){el.innerHTML=`<span style="color:#33ff3322">${alliancePhase?'해협 폐쇄 중…':'선박 대기 중…'}</span>`;return;}
+  if(!first||gameOver||alliancePhase||announcePause){el.innerHTML=`<span style="color:#33ff3322">${alliancePhase?'해협 폐쇄 중…':announcePause?'':'선박 대기 중…'}</span>`;return;}
   el.textContent=`${first.flag} ${first.label}`;
 }
 let seizedList=[];
@@ -318,33 +498,104 @@ function addToSeizedList(ship){
   while(el.children.length>15) el.removeChild(el.lastChild);
 }
 
-inputEl.addEventListener('keydown',e=>{
-  if(gameOver||alliancePhase)return;
-  const first=getFirst();if(!first)return;
-
-  if(e.key==='Enter'){
-    e.preventDefault();if(isComposing)return;
-    if(inputEl.value.trim()===first.label){
-      // PASS
-      if(first.isAlly())score+=10;else{hp--;first.flash=1;}
-      first.state='transiting';
-      clearInput();reindexQueue();updateHUD();updateLabel();if(hp<=0)endGame();
-    }
-  }
-  if(e.key==='Escape'){
-    e.preventDefault();
-    if(inputEl.value.trim()===first.label){
-      // SEIZE
-      if(!first.isAlly())score+=20;else{hp--;};
-      first.state='seized';first.flash=1;
-      addToSeizedList(first);
-      clearInput();reindexQueue();updateHUD();updateLabel();if(hp<=0)endGame();
-    }
-  }
-});
 document.addEventListener('click',()=>{if(!gameOver&&!alliancePhase)inputEl.focus();});
 function updateHUD(){document.getElementById('score').textContent=score;document.getElementById('hp').textContent='♥'.repeat(Math.max(0,hp))+'♡'.repeat(Math.max(0,3-hp));}
 function endGame(){gameOver=true;document.getElementById('go-score').textContent=`최종 점수: ${score}`;setTimeout(()=>document.getElementById('gameover').classList.add('show'),400);}
+
+// ═══════════════════════════════════════
+// ANNOUNCEMENTS
+// ═══════════════════════════════════════
+const STATEMENTS = {
+  'seize-enemy': {
+    '중국':['🇨🇳 중국 외교부: "강력히 규탄하며 즉각 석방을 요구한다"','🇨🇳 환구시보: "미 제국주의의 해적 행위, 반드시 대가를 치를 것"'],
+    '러시아':['🇷🇺 크렘린: "국제법을 무시한 도발 행위에 유감을 표한다"','🇷🇺 라브로프: "서방의 이중잣대가 또 드러났다"'],
+    '이란':['🇮🇷 이란 혁명수비대: "성전의 불꽃이 해협을 태울 것이다"','🇮🇷 테헤란: "이 치욕을 반드시 되갚겠다"'],
+    '북한':['🇰🇵 조선중앙통신: "미제의 해적질에 천만배로 보복할 것"','🇰🇵 평양: "핵무력으로 응징할 준비가 되어있다"'],
+    '파키스탄':['🇵🇰 이슬라마바드: "형제국의 선박 나포에 깊은 유감"','🇵🇰 파키스탄 해군: "인도양 안보에 심각한 위협"'],
+    '_default':['해당국: "이는 명백한 국제법 위반이며 즉각 석방을 요구한다"','해당국: "필요한 모든 외교적 조치를 취할 것"','🇺🇳 유엔: "항행의 자유 원칙이 훼손되었다"'],
+  },
+  'seize-ally': {
+    '미국':['🇺🇸 백악관: "동맹국이 우리 선박을 나포? 전례 없는 배신"','🇺🇸 펜타곤: "제7함대 긴급 출동 명령"'],
+    '영국':['🇬🇧 다우닝가: "이 행위는 동맹의 근간을 흔드는 것"','🇬🇧 BBC: "충격적 외교 사고, 영국 정부 긴급 대응"'],
+    '일본':['🇯🇵 도쿄: "유감을 넘어 분노를 표한다"','🇯🇵 NHK: "동맹 신뢰 붕괴, 아베 독트린 재검토론"'],
+    '한국':['🇰🇷 외교부: "동맹국으로서 도저히 이해할 수 없는 처사"','🇰🇷 청와대: "즉각적인 해명을 요구한다"'],
+    '프랑스':['🇫🇷 엘리제궁: "프랑스 공화국의 자존심에 대한 모욕"','🇫🇷 르몽드: "동맹 관계의 위기"'],
+    '독일':['🇩🇪 베를린: "이는 규칙 기반 질서에 대한 도전"','🇩🇪 슈피겔: "외교적 재앙, 나토 균열 우려"'],
+    '호주':['🇦🇺 캔버라: "메이트, 이건 좀 아니지 않나"','🇦🇺 ABC: "인도태평양 동맹 구조에 균열"'],
+    '사우디':['🇸🇦 리야드: "석유 공급 안정을 위협하는 행위"','🇸🇦 아람코: "원유 선물 가격 급등 예상"'],
+    '_default':['해당국: "동맹국의 선박을 나포하다니, 심각한 외교적 결례"','해당국: "즉각적인 해명과 사과를 요구한다"','🇺🇳 유엔 사무총장: "동맹 간 신뢰 회복을 촉구한다"'],
+  },
+  'pass-enemy': {
+    '중국':['🇨🇳 중국: "현명한 판단에 감사한다"','🇺🇸 미 국무부: "중국 선박 통과 허용에 심각한 우려"'],
+    '러시아':['🇷🇺 모스크바: "합리적 결정을 환영한다"','🇬🇧 런던: "러시아 선박을 왜 보내주는 건가?"'],
+    '이란':['🇮🇷 테헤란: "당연한 권리를 행사한 것"','🇮🇱 이스라엘: "이란 선박 통과는 안보 위협"'],
+    '북한':['🇰🇵 평양: "제국주의자들도 우리 앞에 무릎 꿇었다"','🇯🇵 도쿄: "북한 선박 통과에 강력 항의"'],
+    '_default':['해당국: "자유로운 항행이 보장되어야 합니다"','🇺🇸 워싱턴: "적국 선박 통과 허용에 우려를 표한다"','동맹국들: "해협 통제력에 의문을 제기한다"'],
+  },
+};
+
+function getStatements(type, country){
+  const pool=STATEMENTS[type]||{};
+  const specific=pool[country.name]||pool['_default']||[];
+  // Pick 2-3 random from specific
+  const shuffled=[...specific].sort(()=>Math.random()-0.5);
+  return shuffled.slice(0,Math.min(3,shuffled.length));
+}
+
+function showAnnounce(type, ship){
+  // pass-ally is quiet, no big announcement
+  if(type==='pass-ally') return;
+
+  const overlay=document.getElementById('announce-overlay');
+  const badge=document.getElementById('ann-badge');
+  const title=document.getElementById('ann-title');
+  const sub=document.getElementById('ann-sub');
+  const stmts=document.getElementById('ann-statements');
+
+  const isGood = type==='seize-enemy';
+  const isBad = type==='seize-ally' || type==='pass-enemy';
+
+  badge.className='ann-badge '+(isGood?'success':'fail');
+  title.className='ann-title '+(isGood?'success':'fail');
+  sub.className='ann-sub '+(isGood?'success':'fail');
+
+  if(type==='seize-enemy'){
+    badge.textContent='나포 성공';
+    title.textContent=`${ship.flag} ${ship.country.name} 선박 나포!`;
+    sub.textContent=`+20점 — 비동맹국 선박을 성공적으로 나포했습니다`;
+  } else if(type==='seize-ally'){
+    badge.textContent='⚠ 외교 사고';
+    title.textContent=`${ship.flag} ${ship.country.name} 동맹국 나포!`;
+    sub.textContent=`HP -1 — 동맹국 선박을 나포하는 외교적 참사`;
+  } else if(type==='pass-enemy'){
+    badge.textContent='⚠ 적국 통과';
+    title.textContent=`${ship.flag} ${ship.country.name} 통과 허용`;
+    sub.textContent=`HP -1 — 비동맹국 선박을 통과시켰습니다`;
+  }
+
+  // Statements
+  stmts.innerHTML='';
+  const chosen=getStatements(type,ship.country);
+  chosen.forEach((text,i)=>{
+    const el=document.createElement('div');
+    el.className='ann-stmt '+(isGood?'ally':(type==='pass-enemy'?'neutral':'enemy'));
+    el.textContent=text;
+    stmts.appendChild(el);
+  });
+
+  overlay.classList.add('show');
+  announcePause=true;
+
+  // Confetti for seize-enemy
+  if(type==='seize-enemy' && typeof confetti==='function'){
+    confetti({particleCount:80,spread:70,origin:{y:0.5},colors:['#33ff33','#00aa44','#88ff88']});
+  }
+
+  // GSAP animate statements
+  if(typeof gsap!=='undefined'){
+    gsap.fromTo('.ann-stmt',{opacity:0,y:15},{opacity:1,y:0,stagger:0.2,delay:0.3,duration:0.4});
+  }
+}
 
 // ═══════════════════════════════════════
 // RENDER
@@ -514,20 +765,149 @@ function drawGate(){
   cx.fillText('CHECKPOINT',gx,ty-16);
 }
 
-function drawShipShape(x,y,angle,sc,fill,stroke,flash){
+// Ship speech bubbles
+const QUEUE_LINES=[
+  '빨리 좀!','새치기 하지마!','야 비켜!','느려터졌네','뭐하는 거야',
+  '기름값 오른다고!','통관 언제 되냐','해협 열어!','앞에 뭐야','짜증나네',
+  '나 급한데...','VIP인데요','유조선 먼저!','소형이 끼어들지마','뒤로 가!',
+  '전쟁나겠다','외교관 탔는데','핵 실었다','석유가 썩어','보험 올랐어',
+];
+let speechBubbles=[]; // {x,y,text,life,age,color}
+
+function spawnSpeech(ship){
+  if(speechBubbles.length>6) return;
+  const text=QUEUE_LINES[Math.floor(Math.random()*QUEUE_LINES.length)];
+  speechBubbles.push({
+    shipId:ship.id,
+    offsetY:-15*ship.sz.s,
+    text,life:80+Math.random()*40,age:0,
+    size:Math.max(8,9+ship.sz.s*2),
+  });
+}
+
+function renderSpeechBubbles(){
+  for(let i=speechBubbles.length-1;i>=0;i--){
+    const b=speechBubbles[i];
+    b.age++;
+    if(b.age>=b.life){speechBubbles.splice(i,1);continue;}
+
+    // Track the ship
+    const ship=ships.find(s=>s.id===b.shipId);
+    if(!ship||ship.state==='gone'||ship.opacity<=0){speechBubbles.splice(i,1);continue;}
+    const sp=ship.pos();
+    const bx=sp.x+Math.sin(b.age*0.12)*1.5;
+    const by=sp.y+b.offsetY - b.age*0.3; // float up slowly
+
+    const t=b.age/b.life;
+    const alpha=t<0.08?t/0.08:(t>0.65?(1-(t-0.65)/0.35):1);
+
+    cx.save();
+    cx.globalAlpha=alpha*0.92;
+    cx.font=`900 ${b.size}px "Noto Sans KR",sans-serif`;
+    cx.textAlign='center';cx.textBaseline='middle';
+    const tw=cx.measureText(b.text).width;
+    const padX=8,padY=5;
+    const bw=tw+padX*2, bh=b.size+padY*2;
+
+    const r=6;
+    cx.fillStyle='rgba(255,255,255,0.92)';
+    cx.strokeStyle='rgba(0,0,0,0.15)';cx.lineWidth=1;
+    cx.beginPath();
+    cx.moveTo(bx-bw/2+r,by-bh/2);
+    cx.lineTo(bx+bw/2-r,by-bh/2);
+    cx.quadraticCurveTo(bx+bw/2,by-bh/2,bx+bw/2,by-bh/2+r);
+    cx.lineTo(bx+bw/2,by+bh/2-r);
+    cx.quadraticCurveTo(bx+bw/2,by+bh/2,bx+bw/2-r,by+bh/2);
+    cx.lineTo(bx+4,by+bh/2);
+    cx.lineTo(bx,by+bh/2+7);
+    cx.lineTo(bx-4,by+bh/2);
+    cx.lineTo(bx-bw/2+r,by+bh/2);
+    cx.quadraticCurveTo(bx-bw/2,by+bh/2,bx-bw/2,by+bh/2-r);
+    cx.lineTo(bx-bw/2,by-bh/2+r);
+    cx.quadraticCurveTo(bx-bw/2,by-bh/2,bx-bw/2+r,by-bh/2);
+    cx.closePath();cx.fill();cx.stroke();
+
+    cx.fillStyle='#1a1a1a';
+    cx.fillText(b.text,bx,by);
+    cx.restore();
+  }
+}
+
+function drawShipShape(x,y,angle,sc,fill,stroke,flash,sizeIdx){
   cx.save();cx.translate(x,y);cx.rotate(angle);
-  const L=18*sc,BW=5.5*sc;
-  cx.fillStyle=flash>0?`rgba(255,68,68,${0.5+flash*0.5})`:fill;
-  cx.strokeStyle=flash>0?'#ff4444':stroke;cx.lineWidth=1;
-  cx.beginPath();
-  cx.moveTo(L,0);cx.lineTo(L*0.35,-BW);cx.lineTo(-L*0.5,-BW);
-  cx.lineTo(-L*0.65,0);cx.lineTo(-L*0.5,BW);cx.lineTo(L*0.35,BW);
-  cx.closePath();cx.fill();cx.stroke();
-  cx.fillStyle=flash>0?'#ff6666':'rgba(15,30,45,0.7)';
-  cx.fillRect(-L*0.15,-BW*0.7,L*0.25,BW*1.4);
-  cx.strokeRect(-L*0.15,-BW*0.7,L*0.25,BW*1.4);
-  cx.strokeStyle=flash>0?'#ff4444':'#33ff3333';
-  cx.beginPath();cx.moveTo(-L*0.03,-BW-2*sc);cx.lineTo(-L*0.03,-BW-7*sc);cx.stroke();
+  const fCol=flash>0?`rgba(255,68,68,${0.5+flash*0.5})`:fill;
+  const sCol=flash>0?'#ff4444':stroke;
+  cx.fillStyle=fCol;cx.strokeStyle=sCol;cx.lineWidth=1;
+
+  if(sizeIdx===0){
+    // Speedboat — small triangle
+    const L=10*sc,BW=3.5*sc;
+    cx.beginPath();
+    cx.moveTo(L,0);cx.lineTo(-L*0.6,-BW);cx.lineTo(-L*0.4,0);cx.lineTo(-L*0.6,BW);
+    cx.closePath();cx.fill();cx.stroke();
+  } else if(sizeIdx===1){
+    // Fishing/cargo — compact pentagon
+    const L=14*sc,BW=4.5*sc;
+    cx.beginPath();
+    cx.moveTo(L,0);cx.lineTo(L*0.3,-BW);cx.lineTo(-L*0.5,-BW);
+    cx.lineTo(-L*0.6,0);cx.lineTo(-L*0.5,BW);cx.lineTo(L*0.3,BW);
+    cx.closePath();cx.fill();cx.stroke();
+    // Small cabin
+    cx.fillStyle=flash>0?'#ff6666':'rgba(15,30,45,0.7)';
+    cx.fillRect(-L*0.1,-BW*0.5,L*0.2,BW);
+  } else if(sizeIdx===2){
+    // Container — long rectangle with pointed bow
+    const L=20*sc,BW=5*sc;
+    cx.beginPath();
+    cx.moveTo(L,0);cx.lineTo(L*0.5,-BW);cx.lineTo(-L*0.5,-BW);
+    cx.lineTo(-L*0.6,0);cx.lineTo(-L*0.5,BW);cx.lineTo(L*0.5,BW);
+    cx.closePath();cx.fill();cx.stroke();
+    // Container stacks
+    cx.fillStyle=flash>0?'#ff6666':'rgba(20,50,40,0.6)';
+    for(let i=0;i<3;i++) cx.fillRect(-L*0.35+i*L*0.22,-BW*0.6,L*0.18,BW*1.2);
+    // Bridge at back
+    cx.fillStyle='rgba(15,30,45,0.8)';
+    cx.fillRect(-L*0.5,-BW*0.7,L*0.15,BW*1.4);
+  } else if(sizeIdx===3){
+    // Bulk carrier — rounded wide
+    const L=24*sc,BW=7*sc;
+    cx.beginPath();
+    cx.moveTo(L,0);
+    cx.quadraticCurveTo(L*0.6,-BW,-L*0.3,-BW);
+    cx.lineTo(-L*0.6,-BW*0.5);cx.lineTo(-L*0.7,0);
+    cx.lineTo(-L*0.6,BW*0.5);cx.lineTo(-L*0.3,BW);
+    cx.quadraticCurveTo(L*0.6,BW,L,0);
+    cx.closePath();cx.fill();cx.stroke();
+    // Holds
+    cx.fillStyle=flash>0?'#ff6666':'rgba(20,40,35,0.5)';
+    cx.beginPath();cx.arc(-L*0.1,0,BW*0.5,0,Math.PI*2);cx.fill();
+    cx.beginPath();cx.arc(L*0.25,0,BW*0.4,0,Math.PI*2);cx.fill();
+    // Bridge
+    cx.fillStyle='rgba(15,30,45,0.8)';
+    cx.fillRect(-L*0.55,-BW*0.6,L*0.12,BW*1.2);
+  } else {
+    // Supertanker — massive elongated oval
+    const L=32*sc,BW=9*sc;
+    cx.beginPath();
+    cx.moveTo(L,0);
+    cx.quadraticCurveTo(L*0.7,-BW,-L*0.2,-BW);
+    cx.lineTo(-L*0.6,-BW*0.6);cx.quadraticCurveTo(-L*0.75,0,-L*0.6,BW*0.6);
+    cx.lineTo(-L*0.2,BW);
+    cx.quadraticCurveTo(L*0.7,BW,L,0);
+    cx.closePath();cx.fill();cx.stroke();
+    // Pipe runs
+    cx.strokeStyle=flash>0?'#ff4444':'rgba(60,90,70,0.3)';cx.lineWidth=0.8;
+    for(let i=-2;i<=2;i++){
+      cx.beginPath();cx.moveTo(-L*0.4,i*BW*0.25);cx.lineTo(L*0.5,i*BW*0.25);cx.stroke();
+    }
+    // Bridge at stern
+    cx.fillStyle='rgba(15,30,45,0.8)';
+    cx.fillRect(-L*0.58,-BW*0.5,L*0.1,BW);
+    // Mast
+    cx.strokeStyle=flash>0?'#ff4444':'#33ff3333';
+    cx.beginPath();cx.moveTo(-L*0.53,-BW-2*sc);cx.lineTo(-L*0.53,-BW-8*sc);cx.stroke();
+  }
+
   cx.restore();
 }
 
@@ -535,9 +915,36 @@ function renderShips(){
   const first=getFirst();
   for(const s of ships){
     if(s.state==='approaching'){s.t+=s.baseSpeed;if(s.t>=s.gateT-0.02){s.state='queuing';s.t=s.gateT-0.02;reindexQueue();}}
-    else if(s.state==='queuing'){s.t+=(s.targetT-s.t)*0.03;s.vox+=(Math.random()-0.5)*0.5;s.voy+=(Math.random()-0.5)*0.4;}
+    else if(s.state==='queuing'){s.t+=(s.targetT-s.t)*0.03;s.vox+=(Math.random()-0.5)*0.5;s.voy+=(Math.random()-0.5)*0.4;
+      // Random speech when jostling
+      if(Math.random()<0.003) spawnSpeech(s);
+    }
     else if(s.state==='transiting'){s.t+=s.baseSpeed*2.5;if(s.t>1.05)s.state='gone';}
-    else if(s.state==='seized'){s.flash=Math.max(0,s.flash-0.01);s.sinkY+=0.35;s.opacity-=0.005;}
+    else if(s.state==='seized'){
+      s.flash=Math.max(0,s.flash-0.008);
+      if(!s.seizeTargetX){
+        const idx=seizedCount++;
+        const row=idx%5;
+        const col=Math.floor(idx/5);
+        const startP=laneScr(s.lane,Math.max(0,s.t));
+        s.seizeStartX=startP.x+s.ox;
+        s.seizeStartY=startP.y+s.oy;
+        s.seizeFinalX=(0.03+col*0.03)*W;
+        s.seizeFinalY=(0.06+row*0.028)*H;
+        s.seizeTargetX=s.seizeStartX;
+        s.seizeTargetY=s.seizeStartY;
+        s.seizeProgress=0;
+      }
+      s.seizeProgress=Math.min(1,s.seizeProgress+0.02);
+      const ep=s.seizeProgress*s.seizeProgress*(3-2*s.seizeProgress); // smoothstep
+      s.seizeTargetX=s.seizeStartX+(s.seizeFinalX-s.seizeStartX)*ep;
+      s.seizeTargetY=s.seizeStartY+(s.seizeFinalY-s.seizeStartY)*ep;
+      s.opacity=Math.max(0.8,s.opacity-0.001);
+      s.vox=0;s.voy=0;
+      if(s.seizeProgress>=0.95 && Math.random()<0.12){
+        smokeParticles.push({x:s.seizeTargetX,y:s.seizeTargetY-6*s.sz.s,vx:(Math.random()-0.5)*0.4,vy:-0.3-Math.random()*0.4,life:50+Math.random()*30,age:0,size:2+Math.random()*3});
+      }
+    }
     else if(s.state==='gone'){s.opacity=0;}
     s.vox*=0.88;s.voy*=0.88;s.ox+=s.vox;s.oy+=s.voy;
     s.ox*=0.93;s.oy*=0.93;
@@ -554,33 +961,57 @@ function renderShips(){
     const fill=s.state==='seized'?'rgba(255,68,68,0.4)':(isF?'rgba(255,170,51,0.2)':'rgba(51,255,51,0.1)');
     const stroke=isF?'#ffaa33':'#33ff3355';
     cx.save();cx.globalAlpha=s.opacity;
-    drawShipShape(p.x,p.y,angle,s.sz.s,fill,stroke,s.flash);
-    const fs=isF?11:9;
-    cx.font=`700 ${fs}px "Noto Sans KR","Share Tech Mono",sans-serif`;
-    cx.textAlign='center';
-    cx.fillStyle=s.flash>0?'#ff4444':(isF?'#ffaa33':'#33ff33aa');
-    cx.fillText(`${s.flag} ${s.label}`,p.x,p.y-12*s.sz.s);
-    if(isF&&Math.sin(t*6)>0){
-      cx.fillStyle='#ffaa33';cx.beginPath();
-      cx.arc(p.x-cx.measureText(`${s.flag} ${s.label}`).width/2-6,p.y-12*s.sz.s,2.5,0,Math.PI*2);cx.fill();
+    drawShipShape(p.x,p.y,angle,s.sz.s,fill,stroke,s.flash,SIZES.indexOf(s.sz));
+    // No label for seized ships
+    if(s.state!=='seized'){
+      const fs=isF?11:9;
+      cx.font=`700 ${fs}px "Noto Sans KR","Share Tech Mono",sans-serif`;
+      cx.textAlign='center';
+      cx.fillStyle=s.flash>0?'#ff4444':(isF?'#ffaa33':'#33ff33aa');
+      cx.fillText(`${s.flag} ${s.label}`,p.x,p.y-12*s.sz.s);
+      if(isF&&Math.sin(t*6)>0){
+        cx.fillStyle='#ffaa33';cx.beginPath();
+        cx.arc(p.x-cx.measureText(`${s.flag} ${s.label}`).width/2-6,p.y-12*s.sz.s,2.5,0,Math.PI*2);cx.fill();
+      }
     }
     cx.restore();
   }
   ships=ships.filter(s=>s.opacity>0);
+
+  // Render smoke particles
+  for(let i=smokeParticles.length-1;i>=0;i--){
+    const p=smokeParticles[i];
+    p.x+=p.vx;p.y+=p.vy;p.age++;
+    if(p.age>=p.life){smokeParticles.splice(i,1);continue;}
+    const t=p.age/p.life;
+    cx.save();
+    cx.globalAlpha=(1-t)*0.25;
+    cx.fillStyle='#888';
+    cx.beginPath();
+    cx.arc(p.x,p.y,p.size*(1+t*2),0,Math.PI*2);
+    cx.fill();
+    cx.restore();
+  }
+  if(smokeParticles.length>200) smokeParticles.splice(0,smokeParticles.length-200);
+
+  // Speech bubbles
+  renderSpeechBubbles();
 }
 
 function loop(){
   if(!gameOver){
-    if(!alliancePhase){
-      const now=Date.now();
-      allianceTimer=Math.max(0,60-(now-lastAllianceTick)/1000);
-      document.getElementById('timer').textContent=Math.ceil(allianceTimer);
-      if(allianceTimer<=0)showAllianceOverlay();
+    if(!alliancePhase&&!announcePause){
+      document.getElementById('timer').textContent=Math.max(0,nextAllianceAt-processedCount);
       spawnAcc++;
-      const rate=Math.max(45,130-score*0.7);
+      const rate=Math.max(120,300-score*0.8);
       if(spawnAcc>=rate){spawnAcc=0;spawnShip();}
     }
     updateLabel();
+  }
+  // Gate auto-close
+  if(gateOpenTimer>0){
+    gateOpenTimer--;
+    if(gateOpenTimer<=0) gateOpen=false;
   }
   drawMap();drawGate();renderShips();
   requestAnimationFrame(loop);
