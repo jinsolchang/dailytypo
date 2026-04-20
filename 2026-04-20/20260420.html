@@ -49,7 +49,7 @@ canvas#scene{position:fixed;inset:0;z-index:1}
 .allies-bar .ab-title{font-size:0.5rem;color:#33ff3355;letter-spacing:0.18em;margin-bottom:4px}
 .allies-bar .ab-list{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
 .allies-bar .ab-item{padding:0 6px;font-size:clamp(0.65rem,1.3vw,0.8rem);color:#33ff33;font-weight:700;font-family:'Noto Sans KR','Share Tech Mono',sans-serif;text-shadow:0 0 5px rgba(51,255,51,0.25)}
-.ab-scramble{padding:3px 10px;font-size:clamp(0.65rem,1.3vw,0.8rem);color:#33ff33;font-weight:700;font-family:'Noto Sans KR','Share Tech Mono',sans-serif}
+.ab-scramble{padding:0 6px;font-size:clamp(0.65rem,1.3vw,0.8rem);color:#33ff33;font-weight:700;font-family:'Noto Sans KR','Share Tech Mono',sans-serif}
 .allies-bar .ab-item.removing{border-color:#ff444455;color:#ff4444;text-decoration:line-through;opacity:0;transform:translateY(-10px)}
 .allies-bar .ab-item.adding{animation:slideDown 0.4s ease}
 @keyframes slideDown{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:translateY(0)}}
@@ -67,11 +67,12 @@ canvas#scene{position:fixed;inset:0;z-index:1}
   border-radius:0 0 8px 8px;
   padding:4px 16px 6px;
 }
-.toast-area:empty{padding:0;border:none;background:none}
+.toast-area:empty{padding:0;border:none;background:none;opacity:0}
+.toast-area{transition:opacity 0.3s,padding 0.3s}
 .toast{
   font-family:'Noto Sans KR',sans-serif;font-size:0.65rem;font-weight:700;
   text-align:center;line-height:1.4;padding:3px 0;
-  animation:toastIn 0.3s ease,toastOut 0.5s ease 3s forwards;
+  animation:toastIn 0.3s ease;
 }
 .toast.success{color:#33ff33}
 .toast.fail{color:#ff4444}
@@ -81,7 +82,7 @@ canvas#scene{position:fixed;inset:0;z-index:1}
 .toast.trump .toast-title{font-size:0.9rem}
 .toast .toast-stmt{font-size:0.55rem;opacity:0.6;margin-top:1px}
 @keyframes toastIn{from{opacity:0;transform:translateY(-5px)}to{opacity:1;transform:translateY(0)}}
-@keyframes toastOut{to{opacity:0}}
+@keyframes toastOut{to{opacity:0;height:0;padding:0;margin:0;overflow:hidden}}
 .typing-label{text-align:center;margin-bottom:4px;font-size:clamp(0.8rem,2vw,1.2rem);font-weight:700;font-family:'Noto Sans KR',sans-serif;min-height:1.4em;color:#ffaa33;text-shadow:0 0 5px rgba(255,170,51,0.2)}
 .typing-input-wrap{display:flex;align-items:center;justify-content:center;max-width:480px;margin:0 auto}
 #typing-input{width:100%;padding:7px 12px;background:#0b1622;border:1px solid #33ff3344;border-radius:4px;color:#33ff33;font-family:'Noto Sans KR','Share Tech Mono',monospace;font-size:clamp(0.9rem,2.2vw,1.3rem);font-weight:700;outline:none;text-align:center;caret-color:#33ff33}
@@ -865,10 +866,33 @@ function updateFlyingObjects(){
         cx.restore();
         if(f.timer>60){
           flyingObjects.splice(i,1);
-          // Game over
           endGame();
         }
       }
+    } else if(f.type==='pirate'){
+      f.x-=f.speed;f.timer++;
+      const bobY=f.y+Math.sin(f.timer*0.08)*3;
+      cx.save();cx.translate(f.x,bobY);
+      cx.fillStyle='#333';cx.strokeStyle='#555';cx.lineWidth=1;
+      cx.beginPath();cx.moveTo(12,0);cx.lineTo(4,-4);cx.lineTo(-8,-4);cx.lineTo(-10,0);cx.lineTo(-8,4);cx.lineTo(4,4);cx.closePath();cx.fill();cx.stroke();
+      cx.font='10px sans-serif';cx.textAlign='center';cx.fillText('☠',0,-10);
+      cx.restore();
+      if(f.x<-50||f.timer>f.maxTimer){flyingObjects.splice(i,1);}
+    } else if(f.type==='shell'){
+      const dx=f.targetX-f.x,dy=f.targetY-f.y;
+      const dist=Math.sqrt(dx*dx+dy*dy);
+      if(dist<8){
+        if(f.victim){
+          for(let j=0;j<40;j++){
+            missileParticles.push({x:f.targetX,y:f.targetY,vx:(Math.random()-0.5)*6,vy:(Math.random()-0.5)*6,life:60+Math.random()*30,age:0,size:2+Math.random()*4,color:['#ff4444','#ffaa33','#ff6600'][Math.floor(Math.random()*3)]});
+          }
+          if(typeof confetti==='function') confetti({particleCount:40,spread:60,origin:{y:0.5},colors:['#ff4444','#ff6600']});
+        }
+        flyingObjects.splice(i,1);continue;
+      }
+      f.x+=dx/dist*f.speed;f.y+=dy/dist*f.speed;
+      missileParticles.push({x:f.x,y:f.y,vx:(Math.random()-0.5)*0.3,vy:(Math.random()-0.5)*0.3,life:12,age:0,size:1.5,color:'#ffaa33'});
+      cx.fillStyle='#ffcc00';cx.beginPath();cx.arc(f.x,f.y,3,0,Math.PI*2);cx.fill();
     }
   }
 }
@@ -888,6 +912,21 @@ function triggerSpecialEvent(){
   activeEffect=evt.effect;
   effectEndTime=Date.now()+evt.duration;
   showSpecialAnnounce('⚡ SPECIAL EVENT',`${evt.title}\n${evt.sub}`,'#ffaa33');
+
+  // Actual visual effects
+  if(evt.effect==='pirates'){
+    // Spawn pirate ships (small, fast, from random direction)
+    for(let i=0;i<3;i++){
+      const py=H*(0.35+Math.random()*0.25);
+      flyingObjects.push({type:'pirate',x:W+50+i*40,y:py,speed:2+Math.random(),timer:0,maxTimer:180});
+    }
+  } else if(evt.effect==='storm'){
+    // Screen shake effect via canvas
+    activeEffect='storm';
+  } else if(evt.effect==='bonus'){
+    // Visual: green glow pulse on gate
+    activeEffect='bonus';
+  }
 }
 
 function showSpecialAnnounce(badge,text,color){
@@ -1188,10 +1227,11 @@ function renderSpeechBubbles(){
 
     // Track the ship
     const ship=ships.find(s=>s.id===b.shipId);
-    if(!ship||ship.state==='gone'||ship.opacity<=0){speechBubbles.splice(i,1);continue;}
-    const sp=ship.pos();
+    if(!ship&&!b.fixedX){speechBubbles.splice(i,1);continue;}
+    if(ship&&(ship.state==='gone'||ship.opacity<=0)){speechBubbles.splice(i,1);continue;}
+    const sp=ship?ship.pos():{x:b.fixedX,y:b.fixedY};
     const bx=sp.x+Math.sin(b.age*0.12)*1.5;
-    const by=sp.y+b.offsetY - b.age*0.3; // float up slowly
+    const by=(ship?sp.y+b.offsetY:sp.y) - b.age*0.3;
 
     const t=b.age/b.life;
     const alpha=t<0.08?t/0.08:(t>0.65?(1-(t-0.65)/0.35):1);
@@ -1489,6 +1529,12 @@ function loop(){
     if(gateOpenTimer<=0) gateOpen=false;
   }
   drawMap();drawGate();renderShips();updateFlyingObjects();
+  // Storm shake
+  if(activeEffect==='storm'&&Date.now()<effectEndTime){
+    cv.style.transform=`translate(${(Math.random()-0.5)*4}px,${(Math.random()-0.5)*4}px)`;
+  } else {
+    cv.style.transform='';
+  }
   requestAnimationFrame(loop);
 }
 
