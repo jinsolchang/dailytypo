@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NEWSROOM</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap');
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a0a;font-family:'Noto Sans KR',sans-serif;color:#fff;min-height:100vh}
+
+/* ── 탑 바 ── */
+.topbar{
+  background:#cc0000;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 24px;height:48px;
+}
+.logo{
+  font-size:1.4rem;font-weight:900;letter-spacing:0.08em;
+  color:#fff;
+}
+.topbar-right{font-size:0.7rem;color:rgba(255,255,255,0.7);font-weight:400}
+
+/* ── 속보 티커 ── */
+.ticker{
+  background:#1a1a1a;border-bottom:1px solid #222;
+  overflow:hidden;height:36px;display:flex;align-items:center;
+}
+.ticker-label{
+  background:#cc0000;color:#fff;font-size:0.65rem;font-weight:700;
+  padding:4px 14px;letter-spacing:0.1em;white-space:nowrap;
+  flex-shrink:0;
+}
+.ticker-track{
+  overflow:hidden;flex:1;position:relative;height:100%;
+  display:flex;align-items:center;
+}
+.ticker-text{
+  white-space:nowrap;font-size:0.8rem;color:#ccc;font-weight:400;
+  animation:scroll-left 30s linear infinite;
+  padding-left:100%;
+}
+@keyframes scroll-left{0%{transform:translateX(0)}100%{transform:translateX(-100%)}}
+
+/* ── 메인 레이아웃 ── */
+.main{max-width:1100px;margin:0 auto;padding:24px 20px}
+
+/* ── 히어로 (최신 기사) ── */
+.hero{
+  position:relative;display:block;
+  background:#111;border-radius:4px;overflow:hidden;
+  text-decoration:none;color:#fff;
+  margin-bottom:24px;
+  transition:transform 0.2s;
+}
+.hero:hover{transform:scale(1.005)}
+.hero-visual{
+  height:360px;
+  background:linear-gradient(135deg,#0b1828,#0e1f33);
+  position:relative;overflow:hidden;
+}
+.hero-visual canvas{position:absolute;inset:0;width:100%;height:100%}
+.hero-visual::after{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(transparent 40%,rgba(0,0,0,0.85));
+}
+.hero-body{
+  position:absolute;bottom:0;left:0;right:0;z-index:2;
+  padding:28px 32px;
+}
+.hero-tag{
+  display:inline-block;
+  background:#cc0000;color:#fff;
+  font-size:0.6rem;font-weight:700;letter-spacing:0.1em;
+  padding:3px 10px;border-radius:2px;margin-bottom:10px;
+}
+.hero-title{
+  font-size:clamp(1.5rem,4vw,2.2rem);font-weight:900;
+  line-height:1.3;letter-spacing:-0.01em;
+}
+.hero-meta{
+  margin-top:8px;font-size:0.75rem;color:rgba(255,255,255,0.45);font-weight:400;
+}
+
+/* ── 기사 그리드 ── */
+.section-label{
+  font-size:0.7rem;font-weight:700;color:#cc0000;
+  letter-spacing:0.12em;
+  border-bottom:2px solid #cc0000;
+  padding-bottom:6px;margin-bottom:16px;
+  display:inline-block;
+}
+.grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(300px,1fr));
+  gap:16px;
+}
+.card{
+  display:flex;gap:16px;
+  padding:16px;
+  background:#111;border-radius:4px;
+  text-decoration:none;color:#fff;
+  border:1px solid #1a1a1a;
+  transition:all 0.15s;
+}
+.card:hover{background:#1a1a1a;border-color:#333}
+.card-body{flex:1;display:flex;flex-direction:column;justify-content:center}
+.card-tag{
+  font-size:0.6rem;font-weight:700;color:#cc0000;
+  letter-spacing:0.08em;margin-bottom:4px;
+}
+.card-title{font-size:0.95rem;font-weight:700;line-height:1.4}
+.card-date{font-size:0.7rem;color:rgba(255,255,255,0.3);margin-top:6px}
+.card-thumb{
+  width:100px;height:72px;border-radius:3px;flex-shrink:0;
+  overflow:hidden;background:#0a0a0a;
+}
+.card-thumb canvas{width:100%;height:100%}
+
+/* ── 푸터 ── */
+.footer{
+  text-align:center;padding:40px 20px;
+  font-size:0.7rem;color:rgba(255,255,255,0.15);
+}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">NEWSROOM</div>
+  <div class="topbar-right">만약 이런 뉴스가 나온다면</div>
+</div>
+
+<div class="ticker">
+  <div class="ticker-label">속보</div>
+  <div class="ticker-track">
+    <div class="ticker-text">
+      美, 휴전 시한 앞두고 이란 선박 전격 나포…이란 압박 극대화 &nbsp;│&nbsp;
+      "6월 역대급 장마 온다" 퍼지자…기상청이 내놓은 답 &nbsp;│&nbsp;
+      KOSPI 6,150 — 미국-이란 협상 기대감에 급등 &nbsp;│&nbsp;
+      美, 휴전 시한 앞두고 이란 선박 전격 나포…이란 압박 극대화
+    </div>
+  </div>
+</div>
+
+<div class="main">
+
+  <!-- 히어로: 최신 기사 -->
+  <a class="hero" href="2026-04-20/20260420.html">
+    <div class="hero-visual">
+      <canvas id="hero-canvas"></canvas>
+    </div>
+    <div class="hero-body">
+      <div class="hero-tag">국제</div>
+      <div class="hero-title">美, 휴전 시한 앞두고 이란 선박 전격 나포…이란 압박 극대화</div>
+      <div class="hero-meta">2026.04.20</div>
+    </div>
+  </a>
+
+  <!-- 이전 기사 -->
+  <div class="section-label">이전 기사</div>
+  <div class="grid">
+    <a class="card" href="2026-04-16/20260416.html">
+      <div class="card-body">
+        <div class="card-tag">기상</div>
+        <div class="card-title">"6월 역대급 장마 온다" 퍼지자…기상청이 내놓은 답</div>
+        <div class="card-date">2026.04.16</div>
+      </div>
+      <div class="card-thumb"><canvas id="thumb-rain" width="100" height="72"></canvas></div>
+    </a>
+    <a class="card" href="2026-04-15/20260415.html">
+      <div class="card-body">
+        <div class="card-tag">경제</div>
+        <div class="card-title">KOSPI 6,150 — 미국-이란 협상 기대감</div>
+        <div class="card-date">2026.04.15</div>
+      </div>
+      <div class="card-thumb"><canvas id="thumb-chart" width="100" height="72"></canvas></div>
+    </a>
+  </div>
+
+</div>
+
+<div class="footer">NEWSROOM — This is fiction. 실제 뉴스가 아닙니다.</div>
+
+<script>
+// ── 히어로: 호르무즈 해협 — 배와 레이더 ──
+(function(){
+  const cv = document.getElementById('hero-canvas');
+  const rect = cv.parentElement.getBoundingClientRect();
+  cv.width = rect.width * devicePixelRatio;
+  cv.height = rect.height * devicePixelRatio;
+  const cx = cv.getContext('2d');
+  cx.scale(devicePixelRatio, devicePixelRatio);
+  const W = rect.width, H = rect.height;
+
+  // Land polygons (simplified, screen-space)
+  const iranY = H*0.28;
+  const omanY = H*0.72;
+
+  // Ships
+  const FLAGS = ['🇺🇸','🇨🇳','🇷🇺','🇮🇷','🇬🇧','🇯🇵','🇰🇷','🇸🇦','🇦🇪','🇩🇪'];
+  const LABELS = ['OIL','CRUDE','제재','봉쇄','NUCLEAR','석유','SANCTION','나포','TREATY','원유'];
+  const ships = [];
+  for(let i=0;i<12;i++){
+    ships.push({
+      x: Math.random()*W,
+      y: iranY + 30 + Math.random()*(omanY - iranY - 60),
+      speed: 0.3 + Math.random()*0.8,
+      dir: Math.random()>0.5?1:-1,
+      size: 0.5 + Math.random()*1.2,
+      flag: FLAGS[Math.floor(Math.random()*FLAGS.length)],
+      label: LABELS[Math.floor(Math.random()*LABELS.length)],
+      bob: Math.random()*Math.PI*2,
+    });
+  }
+
+  let radarAngle = 0;
+
+  function loop(){
+    cx.clearRect(0,0,W,H);
+
+    // Ocean
+    cx.fillStyle='#0b1828';cx.fillRect(0,0,W,H);
+
+    // Water depth gradient
+    const wg = cx.createLinearGradient(0,iranY,0,omanY);
+    wg.addColorStop(0,'rgba(15,45,75,0.3)');
+    wg.addColorStop(0.5,'rgba(10,30,55,0.5)');
+    wg.addColorStop(1,'rgba(15,45,75,0.3)');
+    cx.fillStyle=wg;cx.fillRect(0,iranY,W,omanY-iranY);
+
+    // Iran (top)
+    cx.fillStyle='#1e2e1e';
+    cx.beginPath();cx.moveTo(0,0);cx.lineTo(W,0);cx.lineTo(W,iranY-10);
+    for(let x=W;x>=0;x-=15){
+      cx.lineTo(x, iranY + Math.sin(x*0.02)*8 - (x>W*0.3&&x<W*0.7?15:0));
+    }
+    cx.closePath();cx.fill();
+    cx.strokeStyle='rgba(70,140,80,0.4)';cx.lineWidth=1.5;cx.stroke();
+
+    // Oman (bottom)
+    cx.fillStyle='#1e2e1e';
+    cx.beginPath();cx.moveTo(0,H);cx.lineTo(W,H);cx.lineTo(W,omanY+10);
+    for(let x=W;x>=0;x-=15){
+      cx.lineTo(x, omanY + Math.sin(x*0.018+1)*6 + (x>W*0.35&&x<W*0.65?15:0));
+    }
+    cx.closePath();cx.fill();
+    cx.strokeStyle='rgba(70,140,80,0.4)';cx.lineWidth=1.5;cx.stroke();
+
+    // Grid
+    cx.strokeStyle='rgba(25,55,85,0.1)';cx.lineWidth=0.5;
+    for(let x=0;x<W;x+=40){cx.beginPath();cx.moveTo(x,0);cx.lineTo(x,H);cx.stroke();}
+    for(let y=0;y<H;y+=40){cx.beginPath();cx.moveTo(0,y);cx.lineTo(W,y);cx.stroke();}
+
+    // Gate (center)
+    const gx=W*0.52, gapH=18;
+    cx.fillStyle='#3a3a38';
+    cx.fillRect(gx-3, iranY-5, 6, (omanY-iranY)/2 - gapH);
+    cx.fillRect(gx-3, (iranY+omanY)/2 + gapH, 6, (omanY-iranY)/2 - gapH + 5);
+    cx.fillStyle='rgba(255,68,68,0.4)';
+    cx.fillRect(gx-4, (iranY+omanY)/2 - gapH - 3, 8, 3);
+    cx.fillRect(gx-4, (iranY+omanY)/2 + gapH, 8, 3);
+
+    // Radar sweep
+    radarAngle += 0.008;
+    cx.save();cx.globalAlpha=0.04;
+    cx.beginPath();cx.moveTo(W*0.52,H*0.5);
+    cx.arc(W*0.52,H*0.5,W*0.4,radarAngle,radarAngle+0.25);
+    cx.closePath();cx.fillStyle='#33ff33';cx.fill();cx.restore();
+
+    // Ships
+    const t = Date.now()*0.001;
+    for(const s of ships){
+      s.x += s.speed * s.dir;
+      if(s.x > W+30) s.x = -30;
+      if(s.x < -30) s.x = W+30;
+      const sy = s.y + Math.sin(t+s.bob)*2;
+
+      // Ship shape
+      cx.save();cx.translate(s.x, sy);
+      if(s.dir<0) cx.scale(-1,1);
+      const L=10*s.size, BW=3*s.size;
+      cx.fillStyle='rgba(51,255,51,0.12)';
+      cx.strokeStyle='#33ff3355';cx.lineWidth=0.8;
+      cx.beginPath();
+      cx.moveTo(L,0);cx.lineTo(L*0.3,-BW);cx.lineTo(-L*0.5,-BW);
+      cx.lineTo(-L*0.6,0);cx.lineTo(-L*0.5,BW);cx.lineTo(L*0.3,BW);
+      cx.closePath();cx.fill();cx.stroke();
+      cx.restore();
+
+      // Label
+      cx.font=`700 ${Math.max(6,7*s.size)}px "Share Tech Mono",sans-serif`;
+      cx.textAlign='center';cx.fillStyle='#33ff3388';
+      cx.fillText(`${s.flag}${s.label}`, s.x, sy - 8*s.size);
+    }
+
+    // Labels
+    cx.font='700 9px "Share Tech Mono",sans-serif';cx.textAlign='center';
+    cx.fillStyle='#3a6a4044';
+    cx.fillText('IRAN',W*0.5,iranY-18);
+    cx.fillText('OMAN',W*0.5,omanY+22);
+
+    requestAnimationFrame(loop);
+  }
+  loop();
+})();
+
+// ── 썸네일: 장마 빗물 ──
+(function(){
+  const cv = document.getElementById('thumb-rain');
+  if(!cv) return;
+  cv.width = 200; cv.height = 144;
+  const cx = cv.getContext('2d');
+  const W=200,H=144;
+  const WORDS=['비','장마','폭우','호우','소나기','침수'];
+  const drops=[];
+  for(let i=0;i<30;i++){
+    drops.push({
+      x:Math.random()*W, y:Math.random()*H,
+      speed:2+Math.random()*4,
+      ch:WORDS[Math.floor(Math.random()*WORDS.length)],
+      size:5+Math.random()*3,
+      opacity:0.15+Math.random()*0.25,
+      wind:-1-Math.random()*1.5,
+    });
+  }
+  function loop(){
+    cx.clearRect(0,0,W,H);
+    cx.fillStyle='#1a1e2e';cx.fillRect(0,0,W,H);
+    for(const d of drops){
+      d.y+=d.speed;d.x+=d.wind*0.3;
+      if(d.y>H+10){d.y=-10;d.x=Math.random()*W;d.ch=WORDS[Math.floor(Math.random()*WORDS.length)];}
+      cx.font=`700 ${d.size}px sans-serif`;
+      cx.fillStyle=`rgba(174,200,230,${d.opacity})`;
+      cx.fillText(d.ch,d.x,d.y);
+    }
+    // Water level
+    const wl=H*0.75;
+    const wg=cx.createLinearGradient(0,wl,0,H);
+    wg.addColorStop(0,'rgba(30,60,114,0.5)');wg.addColorStop(1,'rgba(20,40,80,0.7)');
+    cx.fillStyle=wg;cx.fillRect(0,wl,W,H-wl);
+    requestAnimationFrame(loop);
+  }
+  loop();
+})();
+
+// ── 썸네일: 미니 주가 차트 ──
+(function(){
+  const cv = document.getElementById('thumb-chart');
+  if(!cv) return;
+  cv.width = 200; cv.height = 144;
+  const cx = cv.getContext('2d');
+  const W=200,H=144;
+  const pts=[];let v=H*0.7;
+  for(let i=0;i<40;i++){v+=(-2+Math.random()*5);v=Math.max(H*0.15,Math.min(H*0.85,v));pts.push(v)}
+  for(let i=0;i<10;i++){v-=2+Math.random()*3;v=Math.max(H*0.1,v);pts.push(v)}
+  let offset=0;
+  function loop(){
+    cx.clearRect(0,0,W,H);
+    cx.strokeStyle='rgba(255,255,255,0.05)';cx.lineWidth=0.5;
+    for(let y=0;y<H;y+=H/4){cx.beginPath();cx.moveTo(0,y);cx.lineTo(W,y);cx.stroke()}
+    cx.beginPath();
+    const step=W/(pts.length-1);
+    for(let i=0;i<pts.length;i++){
+      const x=i*step,y=pts[i]+Math.sin(offset+i*0.3)*1.5;
+      i===0?cx.moveTo(x,y):cx.lineTo(x,y);
+    }
+    cx.strokeStyle='#00cc66';cx.lineWidth=1.5;cx.stroke();
+    cx.lineTo(W,H);cx.lineTo(0,H);cx.closePath();
+    cx.fillStyle='rgba(0,204,102,0.08)';cx.fill();
+    offset+=0.05;
+    requestAnimationFrame(loop);
+  }
+  loop();
+})();
+</script>
+
+</body>
+</html>

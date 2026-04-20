@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>美, 휴전 시한 앞두고 이란 선박 전격 나포</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&family=Share+Tech+Mono&display=swap');
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0b1622;font-family:'Share Tech Mono','Noto Sans KR',monospace;color:#33ff33;overflow:hidden;height:100vh;user-select:none}
+body::after{content:'';position:fixed;inset:0;z-index:9999;pointer-events:none;background:repeating-linear-gradient(0deg,rgba(0,0,0,0.07) 0px,rgba(0,0,0,0.07) 1px,transparent 1px,transparent 3px)}
+canvas#scene{position:fixed;inset:0;z-index:1}
+.hud-tl{position:fixed;top:10px;left:12px;z-index:10;pointer-events:none}
+.hud-headline{font-family:'Noto Sans KR',sans-serif;font-weight:900;font-size:clamp(0.55rem,1.3vw,0.85rem);color:#ff4444;text-shadow:0 0 8px rgba(255,68,68,0.3);line-height:1.35;max-width:220px}
+.hud-tr{position:fixed;top:10px;right:12px;z-index:10;pointer-events:none;text-align:right;font-size:0.65rem;line-height:1.9}
+.hud-tr .label{color:#33ff3344;font-size:0.48rem;letter-spacing:0.1em}
+.hud-tr .val{color:#33ff33}.hud-tr .hp{color:#ff4444;font-size:0.8rem}.hud-tr .timer{color:#ffaa33}
+.allies-bar{position:fixed;top:0;left:50%;transform:translateX(-50%);z-index:10;pointer-events:none;text-align:center;background:rgba(8,18,30,0.92);border:1px solid #33ff3344;border-top:none;border-radius:0 0 10px 10px;padding:7px 24px 9px;min-width:300px}
+.allies-bar .ab-title{font-size:0.5rem;color:#33ff3355;letter-spacing:0.18em;margin-bottom:4px}
+.allies-bar .ab-list{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+.allies-bar .ab-item{padding:3px 10px;border:1px solid #33ff3555;border-radius:3px;font-size:clamp(0.65rem,1.3vw,0.8rem);color:#33ff33;font-weight:700;font-family:'Noto Sans KR','Share Tech Mono',sans-serif;text-shadow:0 0 5px rgba(51,255,51,0.25)}
+.typing-zone{position:fixed;bottom:0;left:0;right:0;z-index:10;background:rgba(8,18,28,0.92);border-top:1px solid #33ff3322;padding:8px 14px 12px}
+.typing-label{text-align:center;margin-bottom:4px;font-size:clamp(0.8rem,2vw,1.2rem);font-weight:700;font-family:'Noto Sans KR',sans-serif;min-height:1.4em;color:#ffaa33;text-shadow:0 0 5px rgba(255,170,51,0.2)}
+.typing-input-wrap{display:flex;align-items:center;justify-content:center;max-width:480px;margin:0 auto}
+#typing-input{width:100%;padding:7px 12px;background:#0b1622;border:1px solid #33ff3344;border-radius:4px;color:#33ff33;font-family:'Noto Sans KR','Share Tech Mono',monospace;font-size:clamp(0.9rem,2.2vw,1.3rem);font-weight:700;outline:none;text-align:center;caret-color:#33ff33}
+#typing-input:focus{border-color:#33ff33}
+#typing-input::placeholder{color:#33ff3322}
+.typing-actions{display:flex;justify-content:center;gap:12px;margin-top:4px;font-size:0.5rem}
+.typing-actions span{padding:1px 5px;border-radius:2px}
+.typing-actions .pass{border:1px solid #33ff3322;color:#33ff3355}
+.typing-actions .seize{border:1px solid #ff444422;color:#ff444455}
+.alliance-overlay{position:fixed;inset:0;z-index:100;background:rgba(0,0,0,0.94);display:flex;flex-direction:column;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity 0.4s}
+.alliance-overlay.show{opacity:1;pointer-events:auto}
+.alliance-overlay .ao-title{font-family:'Noto Sans KR',sans-serif;font-weight:900;font-size:clamp(1rem,3vw,1.5rem);color:#ff4444;letter-spacing:0.1em;margin-bottom:8px;text-shadow:0 0 20px rgba(255,68,68,0.4)}
+.alliance-overlay .ao-subtitle{font-size:0.55rem;color:#ffaa33;margin-bottom:12px;letter-spacing:0.1em}
+.alliance-overlay .ao-list{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;max-width:360px}
+.alliance-overlay .ao-item{padding:5px 12px;border:1px solid #33ff3555;border-radius:3px;font-size:0.75rem;color:#33ff33;animation:popIn 0.3s ease both}
+@keyframes popIn{from{transform:scale(0.5);opacity:0}to{transform:scale(1);opacity:1}}
+.alliance-overlay .ao-timer{margin-top:12px;font-size:0.5rem;color:#33ff3333}
+.gameover{position:fixed;inset:0;z-index:200;background:rgba(8,0,0,0.95);display:flex;flex-direction:column;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity 0.5s}
+.gameover.show{opacity:1;pointer-events:auto}
+.gameover .go-title{font-family:'Noto Sans KR',sans-serif;font-weight:900;font-size:clamp(1.8rem,5vw,3.2rem);color:#ff4444;text-shadow:0 0 30px rgba(255,0,0,0.5)}
+.gameover .go-sub{font-size:0.75rem;color:#ff444455;margin-top:4px}
+.gameover .go-score{font-size:0.95rem;color:#ffaa33;margin-top:10px}
+.gameover .go-restart{margin-top:16px;padding:7px 20px;background:#ff4444;color:#000;border:none;border-radius:3px;font-size:0.75rem;font-weight:700;cursor:pointer;font-family:'Share Tech Mono',monospace}
+
+.seized-panel{
+  position:fixed;bottom:90px;left:12px;z-index:10;pointer-events:none;
+  max-width:200px;max-height:40vh;overflow-y:auto;
+}
+.seized-panel .sp-title{font-size:0.55rem;color:#ff444488;letter-spacing:0.1em;margin-bottom:4px}
+.seized-panel .sp-list{display:flex;flex-direction:column;gap:2px}
+.seized-panel .sp-item{
+  font-size:0.6rem;color:#ff444488;
+  font-family:'Noto Sans KR','Share Tech Mono',sans-serif;
+  padding:2px 6px;background:rgba(255,68,68,0.06);
+  border-left:2px solid #ff444444;border-radius:0 2px 2px 0;
+  animation:seizeIn 0.3s ease;
+}
+@keyframes seizeIn{from{transform:translateX(-20px);opacity:0}to{transform:translateX(0);opacity:1}}
+</style>
+</head>
+<body>
+<canvas id="scene"></canvas>
+<div class="hud-tl"><div class="hud-headline">美, 휴전 시한 앞두고<br>이란 선박 전격 나포…<br>이란 압박 극대화</div></div>
+<div class="hud-tr">
+  <div><span class="label">SCORE</span><br><span class="val" id="score">0</span></div>
+  <div><span class="label">HP</span><br><span class="hp" id="hp">♥♥♥</span></div>
+  <div><span class="label">ALLIANCE</span><br><span class="timer" id="timer">60</span><span style="color:#ffaa3344">s</span></div>
+</div>
+<div class="allies-bar"><div class="ab-title">▸ ALLIED NATIONS 동맹국 ◂</div><div class="ab-list" id="ab-list"></div></div>
+<div class="typing-zone">
+  <div class="typing-label" id="typing-label">선박 대기 중…</div>
+  <div class="typing-input-wrap"><input type="text" id="typing-input" placeholder="선박명 입력" autocomplete="off" autofocus></div>
+  <div class="typing-actions"><span class="pass">Enter → 통과</span><span class="seize">Esc → 나포</span></div>
+</div>
+
+<div class="seized-panel" id="seized-panel">
+  <div class="sp-title">🚨 나포 목록</div>
+  <div class="sp-list" id="sp-list"></div>
+</div>
+<div class="alliance-overlay" id="alliance-overlay">
+  <div class="ao-title">⚠ 동맹 재편</div><div class="ao-subtitle">ALLIANCE RESTRUCTURING</div>
+  <div class="ao-list" id="ao-list"></div><div class="ao-timer" id="ao-timer"></div>
+</div>
+<div class="gameover" id="gameover">
+  <div class="go-title">GAME OVER</div><div class="go-sub">해협 통제 실패</div>
+  <div class="go-score" id="go-score"></div>
+  <button class="go-restart" onclick="location.reload()">다시 시작</button>
+</div>
+<script>
+const cv=document.getElementById('scene'),cx=cv.getContext('2d');
+let W,H;
+function resize(){W=cv.width=innerWidth;H=cv.height=innerHeight;}
+resize();window.addEventListener('resize',resize);
+
+// ═══════════════════════════════════════
+// MAP — screen-space approach
+// We define everything in screen-normalized coords [0-1, 0-1]
+// This avoids geo projection issues entirely
+// Layout: water channel runs from left to right through center
+// Iran = top landmass, Oman/Musandam = bottom landmass
+// Strait narrows around x=0.52
+// ═══════════════════════════════════════
+
+// Iran coast (top) — y values define southern edge of Iran
+const IRAN = [
+  [0,0],[1,0],[1,0.15],
+  [0.98,0.17],[0.95,0.20],[0.90,0.24],[0.85,0.27],
+  [0.80,0.29],[0.75,0.30],[0.70,0.31],[0.65,0.33],
+  [0.60,0.35],[0.57,0.36],[0.54,0.35],[0.52,0.33],
+  [0.50,0.32],[0.48,0.33],[0.45,0.35],[0.42,0.34],
+  [0.38,0.32],[0.34,0.30],[0.30,0.28],[0.25,0.27],
+  [0.20,0.29],[0.15,0.31],[0.10,0.30],[0.05,0.28],[0,0.26],
+];
+// Oman/UAE coast (bottom) — y values define northern edge
+const OMAN = [
+  [0,1],[1,1],[1,0.72],
+  [0.95,0.70],[0.90,0.68],[0.85,0.66],[0.80,0.65],
+  [0.75,0.67],[0.70,0.70],[0.65,0.72],[0.60,0.70],
+  [0.57,0.68],[0.55,0.66],[0.53,0.65],[0.50,0.66],
+  [0.47,0.68],[0.44,0.70],[0.40,0.72],[0.35,0.73],
+  [0.30,0.72],[0.25,0.70],[0.20,0.68],[0.15,0.67],
+  [0.10,0.68],[0.05,0.70],[0,0.72],
+];
+// Musandam peninsula — juts up from Oman side into the strait
+const MUSANDAM = [
+  [0.48,0.68],[0.49,0.64],[0.50,0.60],[0.51,0.56],
+  [0.52,0.53],[0.53,0.51],[0.545,0.50],
+  [0.56,0.51],[0.57,0.53],[0.575,0.56],
+  [0.58,0.60],[0.575,0.64],[0.57,0.66],[0.55,0.66],
+  [0.53,0.65],[0.50,0.66],[0.48,0.68],
+];
+// Qeshm island (Iran side, in the strait)
+const QESHM = [
+  [0.42,0.36],[0.44,0.37],[0.47,0.38],[0.50,0.38],
+  [0.52,0.37],[0.54,0.38],[0.55,0.39],
+  [0.54,0.40],[0.52,0.41],[0.50,0.41],
+  [0.47,0.41],[0.44,0.40],[0.42,0.39],[0.42,0.36],
+];
+
+// Gate position — at the narrowest point between Qeshm and Musandam tip
+// Top of gate: just below Qeshm (y≈0.42)
+// Bottom of gate: just above Musandam tip (y≈0.50)
+const GATE = {
+  x: 0.535,       // x position of gate
+  topY: 0.415,    // just below Qeshm
+  botY: 0.495,    // just above Musandam tip
+};
+
+// Shipping lanes — must pass through the water channel
+// Eastbound (south lane): left → right, passing between Qeshm and Musandam
+const LANE_E = [
+  [0.02,0.55],[0.08,0.54],[0.15,0.53],[0.22,0.52],
+  [0.30,0.50],[0.38,0.48],[0.44,0.46],[0.50,0.45],
+  [0.535,0.455],  // gate point
+  [0.58,0.47],[0.64,0.50],[0.70,0.53],[0.78,0.55],
+  [0.86,0.56],[0.94,0.55],[1.02,0.54],
+];
+// Westbound (north lane): right → left, slightly north of eastbound
+const LANE_W = [
+  [1.02,0.48],[0.94,0.47],[0.86,0.46],[0.78,0.45],
+  [0.70,0.44],[0.64,0.43],[0.58,0.43],
+  [0.535,0.44],   // gate point
+  [0.50,0.44],[0.44,0.43],[0.38,0.42],[0.30,0.42],
+  [0.22,0.44],[0.15,0.46],[0.08,0.48],[0.02,0.50],
+];
+const GATE_T_E = 8/15;  // index 8 out of 15 points for eastbound
+const GATE_T_W = 7/15;  // index 7 out of 15 points for westbound
+
+function laneScr(lane,t){
+  t=Math.max(0,Math.min(1,t));
+  const idx=t*(lane.length-1),i=Math.floor(idx),f=idx-i;
+  const a=lane[Math.min(i,lane.length-1)],b=lane[Math.min(i+1,lane.length-1)];
+  return{x:(a[0]+(b[0]-a[0])*f)*W, y:(a[1]+(b[1]-a[1])*f)*H};
+}
+
+// ═══════════════════════════════════════
+// DATA
+// ═══════════════════════════════════════
+const COUNTRIES=[
+  {name:'미국',en:'USA',flag:'🇺🇸'},{name:'중국',en:'CHINA',flag:'🇨🇳'},
+  {name:'러시아',en:'RUSSIA',flag:'🇷🇺'},{name:'이란',en:'IRAN',flag:'🇮🇷'},
+  {name:'영국',en:'UK',flag:'🇬🇧'},{name:'프랑스',en:'FRANCE',flag:'🇫🇷'},
+  {name:'독일',en:'GERMANY',flag:'🇩🇪'},{name:'일본',en:'JAPAN',flag:'🇯🇵'},
+  {name:'한국',en:'KOREA',flag:'🇰🇷'},{name:'인도',en:'INDIA',flag:'🇮🇳'},
+  {name:'사우디',en:'SAUDI',flag:'🇸🇦'},{name:'터키',en:'TURKEY',flag:'🇹🇷'},
+  {name:'이스라엘',en:'ISRAEL',flag:'🇮🇱'},{name:'파키스탄',en:'PAKISTAN',flag:'🇵🇰'},
+  {name:'이집트',en:'EGYPT',flag:'🇪🇬'},{name:'브라질',en:'BRAZIL',flag:'🇧🇷'},
+  {name:'호주',en:'AUSTRALIA',flag:'🇦🇺'},{name:'북한',en:'DPRK',flag:'🇰🇵'},
+  {name:'UAE',en:'UAE',flag:'🇦🇪'},{name:'카타르',en:'QATAR',flag:'🇶🇦'},
+];
+const WORDS_KO=['석유','원유','제재','봉쇄','핵','미사일','외교','협상','휴전','나포','압박','동맹','패권','안보'];
+const SIZES=[
+  {s:0.5,r:12,spd:1.8},{s:0.7,r:16,spd:1.4},
+  {s:1.0,r:22,spd:1.0},{s:1.3,r:28,spd:0.7},{s:1.7,r:36,spd:0.45},
+];
+
+// ═══════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════
+let allies=new Set(),ships=[],score=0,hp=3;
+let gameOver=false,alliancePhase=false;
+let allianceTimer=60,lastAllianceTick=Date.now();
+let shipId=0,spawnAcc=0,gateOpen=true,gateAnim=1;
+
+// ═══════════════════════════════════════
+// SHIP
+// ═══════════════════════════════════════
+class Ship{
+  constructor(dir){
+    const c=COUNTRIES[Math.floor(Math.random()*COUNTRIES.length)];
+    const w=WORDS_KO[Math.floor(Math.random()*WORDS_KO.length)];
+    this.id=shipId++;this.country=c;
+    this.label=`${c.name} ${w}`;
+    this.flag=c.flag;this.dir=dir;
+    this.lane=dir==='east'?LANE_E:LANE_W;
+    this.gateT=dir==='east'?GATE_T_E:GATE_T_W;
+    this.t=-0.03;this.targetT=0;this.state='approaching';
+    this.sz=SIZES[Math.floor(Math.random()*5)];
+    this.opacity=1;this.sinkY=0;this.flash=0;
+    this.ox=0;this.oy=0;this.vox=0;this.voy=0;
+    this.bobPhase=Math.random()*Math.PI*2;
+    this.baseSpeed=0.0005*this.sz.spd;
+  }
+  isAlly(){return allies.has(this.country.name);}
+  pos(){
+    const p=laneScr(this.lane,Math.max(0,this.t));
+    return{
+      x:p.x+this.ox+Math.sin(Date.now()*0.0008+this.bobPhase)*1.5,
+      y:p.y+this.oy+this.sinkY+Math.cos(Date.now()*0.001+this.bobPhase)*1,
+    };
+  }
+}
+
+function resolveCollisions(){
+  for(let i=0;i<ships.length;i++){
+    const a=ships[i];if(a.state==='gone'||a.opacity<=0)continue;
+    const ap=a.pos();
+    for(let j=i+1;j<ships.length;j++){
+      const b=ships[j];if(b.state==='gone'||b.opacity<=0)continue;
+      const bp=b.pos();
+      const dx=bp.x-ap.x,dy=bp.y-ap.y;
+      const dist=Math.sqrt(dx*dx+dy*dy);
+      const minD=a.sz.r+b.sz.r;
+      if(dist<minD&&dist>0.1){
+        const ov=(minD-dist)/2,nx=dx/dist,ny=dy/dist;
+        a.vox-=nx*ov*0.12;a.voy-=ny*ov*0.12;
+        b.vox+=nx*ov*0.12;b.voy+=ny*ov*0.12;
+      }
+    }
+  }
+}
+
+function spawnShip(){
+  const dir=Math.random()>0.5?'east':'west';
+  const s=new Ship(dir);
+  const q=ships.filter(sh=>sh.dir===dir&&(sh.state==='queuing'||sh.state==='approaching'));
+  s.t=-0.03-q.length*0.04;
+  ships.push(s);reindexQueue();
+}
+function reindexQueue(){
+  for(const dir of['east','west']){
+    const q=ships.filter(s=>s.dir===dir&&s.state==='queuing');
+    q.sort((a,b)=>b.t-a.t);
+    const gT=dir==='east'?GATE_T_E:GATE_T_W;
+    q.forEach((s,i)=>{s.targetT=gT-0.015-i*0.035;});
+  }
+}
+function getFirst(){
+  let best=null;
+  for(const s of ships){if(s.state!=='queuing')continue;if(!best||s.t>best.t)best=s;}
+  return best;
+}
+
+// ═══════════════════════════════════════
+// ALLIANCE
+// ═══════════════════════════════════════
+function pickAllies(){
+  const pool=[...COUNTRIES];
+  for(let i=pool.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[pool[i],pool[j]]=[pool[j],pool[i]];}
+  allies=new Set(pool.slice(0,10).map(c=>c.name));
+}
+function updateAlliesBar(){document.getElementById('ab-list').innerHTML=[...allies].map(a=>`<div class="ab-item">${a}</div>`).join('');}
+function showAllianceOverlay(){
+  alliancePhase=true;gateOpen=false;
+  document.getElementById('typing-input').blur();pickAllies();
+  const list=document.getElementById('ao-list');list.innerHTML='';
+  let i=0;for(const a of allies){const el=document.createElement('div');el.className='ao-item';el.textContent=a;el.style.animationDelay=(i*0.12)+'s';list.appendChild(el);i++;}
+  document.getElementById('alliance-overlay').classList.add('show');updateAlliesBar();
+  let cd=4;const aoT=document.getElementById('ao-timer');aoT.textContent=`${cd}초 후 해협 개방`;
+  const iv=setInterval(()=>{cd--;if(cd<=0){clearInterval(iv);document.getElementById('alliance-overlay').classList.remove('show');alliancePhase=false;gateOpen=true;allianceTimer=60;lastAllianceTick=Date.now();document.getElementById('typing-input').focus();}else aoT.textContent=`${cd}초 후 해협 개방`;},1000);
+}
+
+// ═══════════════════════════════════════
+// TYPING
+// ═══════════════════════════════════════
+const inputEl=document.getElementById('typing-input');
+let isComposing=false,pendingClear=false;
+inputEl.addEventListener('compositionstart',()=>{isComposing=true;});
+inputEl.addEventListener('compositionend',()=>{isComposing=false;if(pendingClear){pendingClear=false;setTimeout(()=>{inputEl.value='';},0);}});
+function clearInput(){if(isComposing){pendingClear=true;}else{inputEl.value='';}}
+function updateLabel(){
+  const el=document.getElementById('typing-label');const first=getFirst();
+  if(!first||gameOver||alliancePhase){el.innerHTML=`<span style="color:#33ff3322">${alliancePhase?'해협 폐쇄 중…':'선박 대기 중…'}</span>`;return;}
+  el.textContent=`${first.flag} ${first.label}`;
+}
+let seizedList=[];
+function addToSeizedList(ship){
+  seizedList.push({flag:ship.flag,label:ship.label,country:ship.country.name,ally:ship.isAlly()});
+  const el=document.getElementById('sp-list');
+  const item=document.createElement('div');
+  item.className='sp-item';
+  item.textContent=`${ship.flag} ${ship.label}${ship.isAlly()?' ⚠외교사고':''}`;
+  if(ship.isAlly()) item.style.color='#ffaa3388';
+  el.insertBefore(item,el.firstChild);
+  // Keep max 15
+  while(el.children.length>15) el.removeChild(el.lastChild);
+}
+
+inputEl.addEventListener('keydown',e=>{
+  if(gameOver||alliancePhase)return;
+  const first=getFirst();if(!first)return;
+
+  if(e.key==='Enter'){
+    e.preventDefault();if(isComposing)return;
+    if(inputEl.value.trim()===first.label){
+      // PASS
+      if(first.isAlly())score+=10;else{hp--;first.flash=1;}
+      first.state='transiting';
+      clearInput();reindexQueue();updateHUD();updateLabel();if(hp<=0)endGame();
+    }
+  }
+  if(e.key==='Escape'){
+    e.preventDefault();
+    if(inputEl.value.trim()===first.label){
+      // SEIZE
+      if(!first.isAlly())score+=20;else{hp--;};
+      first.state='seized';first.flash=1;
+      addToSeizedList(first);
+      clearInput();reindexQueue();updateHUD();updateLabel();if(hp<=0)endGame();
+    }
+  }
+});
+document.addEventListener('click',()=>{if(!gameOver&&!alliancePhase)inputEl.focus();});
+function updateHUD(){document.getElementById('score').textContent=score;document.getElementById('hp').textContent='♥'.repeat(Math.max(0,hp))+'♡'.repeat(Math.max(0,3-hp));}
+function endGame(){gameOver=true;document.getElementById('go-score').textContent=`최종 점수: ${score}`;setTimeout(()=>document.getElementById('gameover').classList.add('show'),400);}
+
+// ═══════════════════════════════════════
+// RENDER
+// ═══════════════════════════════════════
+function drawPoly(pts,fill,stroke,lw){
+  cx.beginPath();
+  cx.moveTo(pts[0][0]*W,pts[0][1]*H);
+  for(let i=1;i<pts.length;i++) cx.lineTo(pts[i][0]*W,pts[i][1]*H);
+  cx.closePath();
+  if(fill){cx.fillStyle=fill;cx.fill();}
+  if(stroke){cx.strokeStyle=stroke;cx.lineWidth=lw||1;cx.stroke();}
+}
+
+function drawMap(){
+  // Deep ocean base
+  cx.fillStyle='#081828';cx.fillRect(0,0,W,H);
+
+  // Depth gradient — lighter near coasts (shallow), darker in center (deep channel)
+  const straitGrd=cx.createRadialGradient(W*0.535,H*0.46,0,W*0.535,H*0.46,W*0.5);
+  straitGrd.addColorStop(0,'rgba(15,50,80,0.4)');
+  straitGrd.addColorStop(0.3,'rgba(10,35,60,0.3)');
+  straitGrd.addColorStop(1,'rgba(8,24,40,0)');
+  cx.fillStyle=straitGrd;cx.fillRect(0,0,W,H);
+
+  // Shallow water near coasts — subtle lighter blue band
+  cx.save();
+  for(const coast of[IRAN,OMAN,MUSANDAM]){
+    cx.beginPath();
+    cx.moveTo(coast[0][0]*W,coast[0][1]*H);
+    for(let i=1;i<coast.length;i++) cx.lineTo(coast[i][0]*W,coast[i][1]*H);
+    cx.closePath();
+    cx.lineWidth=25;cx.strokeStyle='rgba(20,60,90,0.25)';cx.stroke();
+  }
+  cx.restore();
+
+  // Water grid (subtle)
+  cx.strokeStyle='rgba(25,55,85,0.15)';cx.lineWidth=0.5;
+  for(let x=0;x<W;x+=50){cx.beginPath();cx.moveTo(x,0);cx.lineTo(x,H);cx.stroke();}
+  for(let y=0;y<H;y+=50){cx.beginPath();cx.moveTo(0,y);cx.lineTo(W,y);cx.stroke();}
+
+  // Land — sandy/desert tone for Middle East
+  drawPoly(IRAN,'#2a3020','#4a6a3a',2);
+  drawPoly(OMAN,'#2a3020','#4a6a3a',2);
+  drawPoly(MUSANDAM,'#2e3424','#5a7a4a',2);
+  drawPoly(QESHM,'#2e3424','#5a7a4a',1.5);
+
+  // Inner land texture — lighter interior for depth
+  cx.save();cx.globalAlpha=0.3;
+  drawPoly(IRAN,'#3a4a30',null);
+  drawPoly(OMAN,'#3a4a30',null);
+  cx.restore();
+
+  // Coastline glow — bright edge
+  cx.save();
+  for(const coast of[IRAN,OMAN,MUSANDAM,QESHM]){
+    cx.beginPath();
+    cx.moveTo(coast[0][0]*W,coast[0][1]*H);
+    for(let i=1;i<coast.length;i++) cx.lineTo(coast[i][0]*W,coast[i][1]*H);
+    cx.closePath();
+    cx.shadowColor='rgba(60,180,100,0.3)';cx.shadowBlur=8;
+    cx.strokeStyle='rgba(70,140,80,0.5)';cx.lineWidth=1.5;cx.stroke();
+  }
+  cx.shadowBlur=0;cx.restore();
+
+  // Contour lines inside land (elevation feel)
+  cx.save();cx.globalAlpha=0.08;
+  const offsets=[0.01,0.02,0.03];
+  for(const off of offsets){
+    for(const [coast,dir] of[[IRAN,-1],[OMAN,1]]){
+      cx.beginPath();
+      for(let i=0;i<coast.length;i++){
+        const x=coast[i][0]*W, y=coast[i][1]*H + dir*off*H*3;
+        i===0?cx.moveTo(x,y):cx.lineTo(x,y);
+      }
+      cx.strokeStyle='#5a8a5a';cx.lineWidth=0.5;cx.stroke();
+    }
+  }
+  cx.restore();
+
+  // Labels
+  cx.font='700 12px "Share Tech Mono"';cx.textAlign='center';
+  cx.fillStyle='#5a8a50';
+  cx.fillText('I R A N',W*0.35,H*0.14);
+  cx.fillText('U A E',W*0.20,H*0.80);
+  cx.fillText('O M A N',W*0.70,H*0.80);
+  cx.font='9px "Share Tech Mono"';cx.fillStyle='#5a8a5066';
+  cx.fillText('Musandam',W*0.535,H*0.62);
+  cx.fillText('Qeshm Is.',W*0.48,H*0.355);
+  // Water labels
+  cx.fillStyle='#2a6090';cx.font='700 10px "Share Tech Mono"';
+  cx.fillText('◀ PERSIAN GULF',W*0.10,H*0.50);
+  cx.fillText('GULF OF OMAN ▶',W*0.90,H*0.50);
+  cx.font='8px "Share Tech Mono"';cx.fillStyle='#2a609066';
+  cx.fillText('Strait of Hormuz',W*0.535,H*0.475);
+
+  // Shipping lanes
+  cx.setLineDash([4,6]);cx.strokeStyle='rgba(40,90,140,0.2)';cx.lineWidth=1;
+  for(const lane of[LANE_E,LANE_W]){
+    cx.beginPath();
+    for(let i=0;i<lane.length;i++){const x=lane[i][0]*W,y=lane[i][1]*H;i===0?cx.moveTo(x,y):cx.lineTo(x,y);}
+    cx.stroke();
+  }
+  cx.setLineDash([]);
+
+  // Radar sweep
+  const t=Date.now()*0.001,sa=(t*0.3)%(Math.PI*2);
+  cx.save();cx.globalAlpha=0.02;
+  cx.beginPath();cx.moveTo(W*0.535,H*0.46);cx.arc(W*0.535,H*0.46,W*0.3,sa,sa+0.2);cx.closePath();
+  cx.fillStyle='#33ff33';cx.fill();cx.restore();
+}
+
+function drawGate(){
+  const gx=GATE.x*W, ty=GATE.topY*H, by=GATE.botY*H;
+  const targetGA=gateOpen?1:0;
+  gateAnim+=(targetGA-gateAnim)*0.07;
+  const midY=(ty+by)/2;
+  const halfLen=(by-ty)/2;
+  const openGap=gateAnim*halfLen*0.45;
+
+  // Concrete walls — thick, gray
+  const wallW=8;
+  const topArmEnd=midY-openGap;
+  const botArmStart=midY+openGap;
+
+  // Top wall (from top edge down)
+  cx.fillStyle='#3a3a38';cx.strokeStyle='#555550';cx.lineWidth=1;
+  cx.fillRect(gx-wallW/2, ty-10, wallW, topArmEnd-ty+10);
+  cx.strokeRect(gx-wallW/2, ty-10, wallW, topArmEnd-ty+10);
+  // Bottom wall (from bottom edge up)
+  cx.fillRect(gx-wallW/2, botArmStart, wallW, by+10-botArmStart);
+  cx.strokeRect(gx-wallW/2, botArmStart, wallW, by+10-botArmStart);
+
+  // Concrete texture lines
+  cx.strokeStyle='#4a4a4633';cx.lineWidth=0.5;
+  for(let y=ty-10;y<topArmEnd;y+=6){cx.beginPath();cx.moveTo(gx-wallW/2,y);cx.lineTo(gx+wallW/2,y);cx.stroke();}
+  for(let y=botArmStart;y<by+10;y+=6){cx.beginPath();cx.moveTo(gx-wallW/2,y);cx.lineTo(gx+wallW/2,y);cx.stroke();}
+
+  // Gate tips — red when closed
+  if(gateAnim<0.9){
+    const tipCol=`rgba(255,68,68,${(1-gateAnim)*0.8})`;
+    cx.fillStyle=tipCol;
+    cx.fillRect(gx-wallW/2-2, topArmEnd-4, wallW+4, 4);
+    cx.fillRect(gx-wallW/2-2, botArmStart, wallW+4, 4);
+  }
+
+  // Danger zone glow when closed
+  if(gateAnim<0.5){
+    const pulse=Math.sin(Date.now()*0.004)*0.3+0.5;
+    cx.save();cx.globalAlpha=(1-gateAnim)*pulse*0.08;
+    cx.fillStyle='#ff4444';
+    cx.fillRect(gx-40, ty-10, 80, by-ty+20);
+    cx.restore();
+  }
+
+  // Warning stripes in gap when closing
+  if(gateAnim<0.7 && openGap>2){
+    cx.save();cx.globalAlpha=(1-gateAnim)*0.4;
+    cx.strokeStyle='#ff4444';cx.lineWidth=2;cx.setLineDash([4,4]);
+    cx.beginPath();cx.moveTo(gx,topArmEnd);cx.lineTo(gx,botArmStart);cx.stroke();
+    cx.setLineDash([]);cx.restore();
+  }
+
+  // Label
+  cx.font='700 8px "Share Tech Mono"';
+  cx.fillStyle=gateOpen?'#33ff3333':'#ff444466';
+  cx.textAlign='center';
+  cx.fillText('CHECKPOINT',gx,ty-16);
+}
+
+function drawShipShape(x,y,angle,sc,fill,stroke,flash){
+  cx.save();cx.translate(x,y);cx.rotate(angle);
+  const L=18*sc,BW=5.5*sc;
+  cx.fillStyle=flash>0?`rgba(255,68,68,${0.5+flash*0.5})`:fill;
+  cx.strokeStyle=flash>0?'#ff4444':stroke;cx.lineWidth=1;
+  cx.beginPath();
+  cx.moveTo(L,0);cx.lineTo(L*0.35,-BW);cx.lineTo(-L*0.5,-BW);
+  cx.lineTo(-L*0.65,0);cx.lineTo(-L*0.5,BW);cx.lineTo(L*0.35,BW);
+  cx.closePath();cx.fill();cx.stroke();
+  cx.fillStyle=flash>0?'#ff6666':'rgba(15,30,45,0.7)';
+  cx.fillRect(-L*0.15,-BW*0.7,L*0.25,BW*1.4);
+  cx.strokeRect(-L*0.15,-BW*0.7,L*0.25,BW*1.4);
+  cx.strokeStyle=flash>0?'#ff4444':'#33ff3333';
+  cx.beginPath();cx.moveTo(-L*0.03,-BW-2*sc);cx.lineTo(-L*0.03,-BW-7*sc);cx.stroke();
+  cx.restore();
+}
+
+function renderShips(){
+  const first=getFirst();
+  for(const s of ships){
+    if(s.state==='approaching'){s.t+=s.baseSpeed;if(s.t>=s.gateT-0.02){s.state='queuing';s.t=s.gateT-0.02;reindexQueue();}}
+    else if(s.state==='queuing'){s.t+=(s.targetT-s.t)*0.03;s.vox+=(Math.random()-0.5)*0.5;s.voy+=(Math.random()-0.5)*0.4;}
+    else if(s.state==='transiting'){s.t+=s.baseSpeed*2.5;if(s.t>1.05)s.state='gone';}
+    else if(s.state==='seized'){s.flash=Math.max(0,s.flash-0.01);s.sinkY+=0.35;s.opacity-=0.005;}
+    else if(s.state==='gone'){s.opacity=0;}
+    s.vox*=0.88;s.voy*=0.88;s.ox+=s.vox;s.oy+=s.voy;
+    s.ox*=0.93;s.oy*=0.93;
+    s.ox=Math.max(-20,Math.min(20,s.ox));s.oy=Math.max(-18,Math.min(18,s.oy));
+  }
+  resolveCollisions();
+  const vis=ships.filter(s=>s.opacity>0&&s.t>-0.12);
+  vis.sort((a,b)=>a.pos().y-b.pos().y);
+  const t=Date.now()*0.001;
+  for(const s of vis){
+    const p=s.pos(),p2=laneScr(s.lane,Math.max(0,s.t+0.02));
+    const angle=Math.atan2(p2.y-p.y,p2.x-p.x);
+    const isF=(s===first);
+    const fill=s.state==='seized'?'rgba(255,68,68,0.4)':(isF?'rgba(255,170,51,0.2)':'rgba(51,255,51,0.1)');
+    const stroke=isF?'#ffaa33':'#33ff3355';
+    cx.save();cx.globalAlpha=s.opacity;
+    drawShipShape(p.x,p.y,angle,s.sz.s,fill,stroke,s.flash);
+    const fs=isF?11:9;
+    cx.font=`700 ${fs}px "Noto Sans KR","Share Tech Mono",sans-serif`;
+    cx.textAlign='center';
+    cx.fillStyle=s.flash>0?'#ff4444':(isF?'#ffaa33':'#33ff33aa');
+    cx.fillText(`${s.flag} ${s.label}`,p.x,p.y-12*s.sz.s);
+    if(isF&&Math.sin(t*6)>0){
+      cx.fillStyle='#ffaa33';cx.beginPath();
+      cx.arc(p.x-cx.measureText(`${s.flag} ${s.label}`).width/2-6,p.y-12*s.sz.s,2.5,0,Math.PI*2);cx.fill();
+    }
+    cx.restore();
+  }
+  ships=ships.filter(s=>s.opacity>0);
+}
+
+function loop(){
+  if(!gameOver){
+    if(!alliancePhase){
+      const now=Date.now();
+      allianceTimer=Math.max(0,60-(now-lastAllianceTick)/1000);
+      document.getElementById('timer').textContent=Math.ceil(allianceTimer);
+      if(allianceTimer<=0)showAllianceOverlay();
+      spawnAcc++;
+      const rate=Math.max(45,130-score*0.7);
+      if(spawnAcc>=rate){spawnAcc=0;spawnShip();}
+    }
+    updateLabel();
+  }
+  drawMap();drawGate();renderShips();
+  requestAnimationFrame(loop);
+}
+
+pickAllies();updateAlliesBar();updateHUD();
+for(let i=0;i<4;i++)spawnShip();
+inputEl.focus();loop();
+</script>
+</body>
+</html>

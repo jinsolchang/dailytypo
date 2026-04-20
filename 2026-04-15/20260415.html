@@ -1,0 +1,1158 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KOSPI 6,150</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;700;900&display=swap');
+  *{margin:0;padding:0;box-sizing:border-box}
+
+  body{
+    background:#050510;
+    font-family:'Noto Sans KR',sans-serif;
+    height:100vh;overflow:hidden;
+    cursor:crosshair;
+  }
+
+  canvas#c{position:fixed;inset:0;z-index:3}
+  canvas{position:fixed;inset:0}
+
+  /* ── 오로라 배경 ── */
+  .aurora{
+    position:fixed;inset:0;z-index:1;
+    background:
+      radial-gradient(ellipse 80% 50% at 30% 80%, rgba(0,255,136,0.08) 0%, transparent 50%),
+      radial-gradient(ellipse 60% 40% at 70% 70%, rgba(255,60,60,0.06) 0%, transparent 50%),
+      radial-gradient(ellipse 90% 60% at 50% 100%, rgba(0,200,255,0.05) 0%, transparent 50%);
+    animation: aurora-shift 8s ease-in-out infinite alternate;
+    pointer-events:none;
+  }
+  @keyframes aurora-shift{
+    0%{filter:hue-rotate(0deg) brightness(1)}
+    100%{filter:hue-rotate(30deg) brightness(1.3)}
+  }
+
+  /* ── 메인 ── */
+  .main{
+    position:relative;z-index:10;
+    display:flex;flex-direction:column;
+    align-items:center;justify-content:center;
+    height:100vh;text-align:center;
+    gap:0;
+  }
+
+  /* ── 숫자 ── */
+  .num{
+    font-size:clamp(7rem,22vw,18rem);
+    font-weight:900;
+    line-height:1.2;
+    padding-bottom:0.1em;
+    overflow:visible;
+    letter-spacing:-0.05em;
+    color:transparent;
+    background:linear-gradient(135deg,#00ff88 0%,#00d4ff 30%,#fff 50%,#ff6b6b 70%,#ff3366 100%);
+    background-size:300% 300%;
+    -webkit-background-clip:text;background-clip:text;
+    animation:gradient-flow 3s ease infinite;
+    position:relative;
+    user-select:none;
+    filter:drop-shadow(0 0 60px rgba(0,255,136,0.3)) drop-shadow(0 0 120px rgba(0,212,255,0.15));
+  }
+  @keyframes gradient-flow{
+    0%{background-position:0% 50%}
+    50%{background-position:100% 50%}
+    100%{background-position:0% 50%}
+  }
+
+  /* 글리치 레이어 */
+  .num.glitch::before,.num.glitch::after{
+    content:attr(data-text);
+    position:absolute;inset:0;
+    background:inherit;-webkit-background-clip:text;background-clip:text;
+    color:transparent;
+  }
+  .num.glitch::before{
+    animation:glitch-1 2.5s infinite;
+    clip-path:polygon(0 0,100% 0,100% 35%,0 35%);
+  }
+  .num.glitch::after{
+    animation:glitch-2 2.5s infinite;
+    clip-path:polygon(0 65%,100% 65%,100% 100%,0 100%);
+  }
+  @keyframes glitch-1{
+    0%,92%,100%{transform:translate(0)}
+    93%{transform:translate(8px,-2px)}
+    95%{transform:translate(-5px,1px)}
+    97%{transform:translate(3px,0)}
+  }
+  @keyframes glitch-2{
+    0%,90%,100%{transform:translate(0)}
+    91%{transform:translate(-6px,2px)}
+    94%{transform:translate(4px,-1px)}
+    96%{transform:translate(-2px,0)}
+  }
+
+  /* ── 상승률 ── */
+  .pct{
+    font-size:clamp(2rem,6vw,4.5rem);
+    font-weight:900;
+    color:#00ff88;
+    letter-spacing:0.05em;
+    text-shadow:0 0 40px rgba(0,255,136,0.5),0 0 80px rgba(0,255,136,0.2);
+    animation:pulse-green 1.5s ease-in-out infinite;
+    margin-top:0.2em;
+  }
+  @keyframes pulse-green{
+    0%,100%{opacity:1;transform:scale(1)}
+    50%{opacity:0.85;transform:scale(1.03)}
+  }
+
+  /* ── 헤드라인 ── */
+  .headline{
+    margin-top:2.5rem;
+    font-size:clamp(0.9rem,2.2vw,1.4rem);
+    font-weight:300;
+    color:rgba(255,255,255,0.5);
+    max-width:600px;
+    word-break:keep-all;
+    line-height:1.8;
+    overflow:hidden;
+  }
+  .headline span{
+    display:inline-block;
+    transform:translateY(100%);
+    animation:slide-up 0.6s cubic-bezier(0.16,1,0.3,1) forwards;
+  }
+  .headline strong{
+    font-weight:700;
+    color:rgba(255,255,255,0.85);
+  }
+
+  @keyframes slide-up{
+    to{transform:translateY(0)}
+  }
+
+  /* ── 틱커 바 ── */
+  .ticker{
+    position:fixed;bottom:0;left:0;right:0;
+    z-index:20;
+    background:rgba(0,255,136,0.06);
+    border-top:1px solid rgba(0,255,136,0.15);
+    backdrop-filter:blur(10px);
+    overflow:hidden;
+    height:40px;display:flex;align-items:center;
+  }
+  .ticker-track{
+    display:flex;gap:3rem;
+    white-space:nowrap;
+    animation:scroll-left 20s linear infinite;
+    font-size:0.8rem;
+    color:rgba(255,255,255,0.4);
+    font-weight:300;
+  }
+  .ticker-track .up{color:#00ff88}
+  .ticker-track .down{color:#ff4466}
+  @keyframes scroll-left{
+    0%{transform:translateX(0)}
+    100%{transform:translateX(-50%)}
+  }
+
+  /* ── 비네팅 ── */
+  .vig{
+    position:fixed;inset:0;z-index:5;pointer-events:none;
+    background:radial-gradient(ellipse 70% 60% at 50% 50%,transparent 0%,rgba(5,5,16,0.7) 100%);
+  }
+
+  /* ── 아나운서 ── */
+  .anchor-wrap{
+    position:fixed;
+    bottom:40px;right:20px;
+    z-index:30;
+    display:flex;flex-direction:column;align-items:flex-end;gap:0;
+  }
+  .speech{
+    background:rgba(255,255,255,0.1);
+    backdrop-filter:blur(12px);
+    border:1px solid rgba(255,255,255,0.15);
+    border-radius:16px 16px 4px 16px;
+    padding:12px 18px;
+    max-width:260px;
+    font-size:0.85rem;
+    color:rgba(255,255,255,0.85);
+    line-height:1.6;
+    margin-bottom:8px;
+    opacity:0;
+    transform:translateY(10px);
+    animation:speech-in 0.5s 2s cubic-bezier(0.16,1,0.3,1) forwards;
+  }
+  .speech strong{color:#00ff88;font-weight:700}
+  @keyframes speech-in{
+    to{opacity:1;transform:translateY(0)}
+  }
+  .anchor-img{
+    width:180px;
+    filter:drop-shadow(0 0 30px rgba(0,0,0,0.5));
+    transform:translateX(40px);
+    opacity:0;
+    animation:anchor-slide 0.7s 1.5s cubic-bezier(0.16,1,0.3,1) forwards;
+  }
+  @keyframes anchor-slide{
+    to{opacity:1;transform:translateX(0)}
+  }
+  .live-badge{
+    display:inline-block;
+    background:#ff3366;
+    color:#fff;
+    font-size:0.65rem;
+    font-weight:700;
+    padding:3px 8px;
+    border-radius:4px;
+    letter-spacing:0.1em;
+    margin-bottom:6px;
+    animation:live-blink 1s infinite;
+    opacity:0;
+    animation:live-blink 1s 2s infinite, speech-in 0.5s 1.8s cubic-bezier(0.16,1,0.3,1) forwards;
+  }
+  @keyframes live-blink{
+    0%,100%{opacity:1}50%{opacity:0.4}
+  }
+
+  /* ── 하락 모드 ── */
+  body.down .num{
+    background:linear-gradient(135deg,#ff3366 0%,#ff6b6b 30%,#fff 50%,#ff3366 70%,#cc0033 100%);
+    background-size:300% 300%;
+    -webkit-background-clip:text;background-clip:text;
+    animation:gradient-flow 3s ease infinite;
+    filter:drop-shadow(0 0 60px rgba(255,51,102,0.3)) drop-shadow(0 0 120px rgba(255,51,102,0.15));
+  }
+  body.down .pct{
+    color:#ff3366;
+    text-shadow:0 0 40px rgba(255,51,102,0.5),0 0 80px rgba(255,51,102,0.2);
+  }
+  body.down .aurora{
+    background:
+      radial-gradient(ellipse 80% 50% at 30% 80%, rgba(255,51,102,0.08) 0%, transparent 50%),
+      radial-gradient(ellipse 60% 40% at 70% 70%, rgba(255,0,0,0.06) 0%, transparent 50%),
+      radial-gradient(ellipse 90% 60% at 50% 100%, rgba(200,0,50,0.05) 0%, transparent 50%);
+  }
+  body.down .ticker{
+    background:rgba(255,51,102,0.06);
+    border-top:1px solid rgba(255,51,102,0.15);
+  }
+  body.down .speech strong{color:#ff3366}
+
+  /* ── 배경 미니 차트 ── */
+  .bg-charts{
+    position:fixed;inset:0;z-index:1;pointer-events:none;
+    overflow:hidden;opacity:0.35;
+  }
+  .bg-charts canvas{width:100%;height:100%}
+
+  /* ── 호가창 ── */
+  .orderbook{
+    position:fixed;left:20px;top:50%;transform:translateY(-50%);
+    z-index:25;
+    width:180px;
+    font-size:0.7rem;
+    font-family:'Noto Sans KR',monospace;
+    background:rgba(10,10,30,0.7);
+    backdrop-filter:blur(12px);
+    border:1px solid rgba(255,255,255,0.08);
+    border-radius:8px;
+    overflow:hidden;
+    opacity:1;
+  }
+  .ob-header{
+    text-align:center;padding:6px;
+    font-weight:700;font-size:0.65rem;
+    color:rgba(255,255,255,0.4);
+    border-bottom:1px solid rgba(255,255,255,0.06);
+    letter-spacing:0.1em;
+  }
+  .ob-row{
+    display:flex;justify-content:space-between;
+    padding:3px 10px;position:relative;
+  }
+  .ob-row .bar{
+    position:absolute;top:0;bottom:0;
+    opacity:0.15;border-radius:2px;
+    transition:width 0.3s;
+  }
+  .ob-row.sell .bar{right:0;background:#ff3366}
+  .ob-row.buy .bar{left:0;background:#00ff88}
+  .ob-row .price{position:relative;z-index:1;font-weight:700}
+  .ob-row .qty{position:relative;z-index:1;color:rgba(255,255,255,0.35)}
+  .ob-row.sell .price{color:#ff6b8a}
+  .ob-row.buy .price{color:#66ffaa}
+  .ob-mid{
+    text-align:center;padding:5px;
+    font-weight:900;font-size:0.8rem;
+    color:#fff;
+    border-top:1px solid rgba(255,255,255,0.06);
+    border-bottom:1px solid rgba(255,255,255,0.06);
+  }
+  .ob-balance{
+    padding:8px 10px;
+    border-top:1px solid rgba(255,255,255,0.06);
+    font-size:0.65rem;
+    color:rgba(255,255,255,0.35);
+  }
+  .ob-balance .label{display:flex;justify-content:space-between;margin-bottom:3px}
+  .ob-balance .val{font-weight:700;color:rgba(255,255,255,0.7);font-size:0.75rem}
+  .ob-balance .pnl{font-weight:700}
+
+  /* ── 체결 로그 (호가창 내부) ── */
+  .tl-header{
+    padding:5px 8px;font-weight:700;font-size:0.6rem;
+    color:rgba(255,255,255,0.3);letter-spacing:0.1em;
+    border-top:1px solid rgba(255,255,255,0.06);
+    border-bottom:1px solid rgba(255,255,255,0.06);
+    display:flex;justify-content:space-between;
+  }
+  .tl-body{max-height:120px;overflow:hidden;padding:2px 0}
+  .tl-row{
+    display:flex;justify-content:space-between;
+    padding:2px 8px;font-size:0.6rem;
+    animation:tl-fade 0.3s ease;
+  }
+  .tl-row .time{color:rgba(255,255,255,0.25)}
+  .tl-row .tprice{font-weight:700}
+  .tl-row .tvol{color:rgba(255,255,255,0.3)}
+  .tl-row.up .tprice{color:#66ffaa}
+  .tl-row.down .tprice{color:#ff6b8a}
+  @keyframes tl-fade{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
+
+  /* ── 공포/탐욕 (호가창 내부) ── */
+  .fg-section{
+    border-top:1px solid rgba(255,255,255,0.06);
+    padding:8px 10px 6px;text-align:center;
+  }
+  .fg-label{font-size:0.55rem;color:rgba(255,255,255,0.3);letter-spacing:0.1em;font-weight:700;margin-bottom:4px}
+  .fg-bar-wrap{
+    height:6px;border-radius:3px;
+    background:linear-gradient(to right,#ff3366,#ffaa00,#00ff88);
+    position:relative;margin:6px 0 4px;
+  }
+  .fg-bar-dot{
+    position:absolute;top:-3px;
+    width:12px;height:12px;border-radius:50%;
+    background:#fff;border:2px solid #000;
+    transition:left 0.3s;
+    box-shadow:0 0 8px rgba(255,255,255,0.5);
+  }
+  .fg-bottom{display:flex;justify-content:space-between;align-items:center}
+  .fg-value{font-size:0.9rem;font-weight:900}
+  .fg-text{font-size:0.6rem;font-weight:700}
+
+  /* ── 속보 배너 ── */
+  .breaking{
+    position:fixed;top:0;left:0;right:0;
+    z-index:30;height:80px;
+    background:rgba(255,51,102,0.9);
+    display:flex;align-items:center;
+    overflow:hidden;
+    transform:translateY(-100%);
+    transition:transform 0.4s cubic-bezier(0.16,1,0.3,1);
+  }
+  .breaking.show{transform:translateY(0)}
+  .breaking .tag{
+    background:rgba(0,0,0,0.3);
+    color:#fff;font-size:0.9rem;font-weight:900;
+    padding:4px 14px;margin:0 16px;
+    border-radius:3px;letter-spacing:0.1em;
+    white-space:nowrap;flex-shrink:0;
+  }
+  .breaking .text{
+    color:#fff;font-size:1.5rem;font-weight:900;
+    white-space:nowrap;
+    animation:breaking-scroll 12s linear infinite;
+  }
+  @keyframes breaking-scroll{0%{transform:translateX(100vw)}100%{transform:translateX(-100%)}}
+
+  /* ── 탄막 댓글 ── */
+  .danmaku{
+    position:fixed;inset:0;z-index:6;
+    pointer-events:none;overflow:hidden;
+  }
+  .danmaku span{
+    position:absolute;
+    white-space:nowrap;
+    font-size:0.85rem;
+    font-weight:700;
+    color:rgba(255,255,255,0.6);
+    text-shadow:1px 1px 2px rgba(0,0,0,0.5);
+    animation:danmaku-flow linear forwards;
+  }
+  @keyframes danmaku-flow{
+    from{transform:translateX(100vw)}
+    to{transform:translateX(-100%)}
+  }
+
+  /* ── 배경색 전환 ── */
+  .bg-mood{
+    position:fixed;inset:0;z-index:0;
+    pointer-events:none;
+    transition:background 1s ease;
+  }
+
+  /* ── 마우스 리플 ── */
+  .ripple{
+    position:fixed;
+    border:1px solid rgba(0,255,136,0.4);
+    border-radius:50%;
+    pointer-events:none;
+    z-index:15;
+    animation:ripple-out 0.8s ease-out forwards;
+  }
+  @keyframes ripple-out{
+    0%{width:0;height:0;opacity:0.8}
+    100%{width:200px;height:200px;opacity:0;transform:translate(-50%,-50%)}
+  }
+</style>
+</head>
+<body>
+
+<!-- 속보 배너 -->
+<div class="breaking" id="breaking">
+  <span class="tag">속보</span>
+  <span class="text" id="breaking-text"></span>
+</div>
+
+<div class="bg-mood" id="bg-mood"></div>
+<div class="danmaku" id="danmaku"></div>
+<canvas id="c"></canvas>
+<div class="aurora"></div>
+
+<!-- 배경 미니 차트 -->
+<div class="bg-charts"><canvas id="bgChart"></canvas></div>
+
+<!-- 호가창 -->
+<div class="orderbook" id="orderbook">
+  <div class="ob-header">호가창</div>
+  <div id="ob-sells"></div>
+  <div class="ob-mid" id="ob-mid">6,150</div>
+  <div id="ob-buys"></div>
+  <div class="ob-balance" id="ob-bal">
+    <div class="label">총 평가<span class="val" id="bal-total">1,000,000,000</span></div>
+    <div class="label">평가손익<span class="pnl" id="bal-pnl">+0</span></div>
+  </div>
+  <div class="tl-header"><span>체결</span><span>TIME / PRICE / VOL</span></div>
+  <div class="tl-body" id="tl-body"></div>
+  <div class="fg-section">
+    <div class="fg-label">FEAR &amp; GREED</div>
+    <div class="fg-bar-wrap"><div class="fg-bar-dot" id="fg-dot"></div></div>
+    <div class="fg-bottom">
+      <span class="fg-text" id="fg-text">NEUTRAL</span>
+      <span class="fg-value" id="fg-value">50</span>
+    </div>
+  </div>
+</div>
+
+<div class="main">
+  <div class="num" id="num">6,150</div>
+  <div class="pct" id="pct"></div>
+  <div class="headline" id="hl"></div>
+</div>
+
+<div class="anchor-wrap">
+  <div class="live-badge">LIVE</div>
+  <div class="speech">미국-이란 2차 협상 기대감에 코스피가 <strong>3%대 급등</strong>하며 <strong>6,150선</strong>을 돌파했습니다.</div>
+  <img class="anchor-img" src="anchor_nobg.png" alt="anchor">
+</div>
+
+<div class="ticker">
+  <div class="ticker-track" id="ticker"></div>
+</div>
+
+<div class="vig"></div>
+
+<script>
+// ── 파티클 캔버스 ──
+const c = document.getElementById('c');
+const ctx = c.getContext('2d');
+let W, H;
+const resize = () => { W = c.width = innerWidth; H = c.height = innerHeight; };
+resize();
+addEventListener('resize', resize);
+
+const particles = [];
+const COLORS_UP = ['#00ff88','#00d4ff','#ff6b6b','#ffffff','#ff3366','#88ffcc'];
+const COLORS_DOWN = ['#ff3366','#ff6b6b','#cc0033','#ff8888','#ffffff','#ff4477'];
+
+class P {
+  constructor(x, y, burst) {
+    this.x = x ?? Math.random() * W;
+    this.y = y ?? Math.random() * H;
+    this.vx = (Math.random() - 0.5) * (burst ? 8 : 0.3);
+    this.vy = (Math.random() - 0.5) * (burst ? 8 : 0.3) - (burst ? 2 : 0);
+    this.r = Math.random() * (burst ? 3 : 1.5) + 0.5;
+    this.life = burst ? 60 + Math.random() * 40 : 200 + Math.random() * 300;
+    this.maxLife = this.life;
+    const colors = document.body.classList.contains('down') ? COLORS_DOWN : COLORS_UP;
+    this.color = colors[Math.floor(Math.random() * colors.length)];
+  }
+  update() {
+    this.x += this.vx;
+    this.y += this.vy;
+    this.vy += 0.02;
+    this.vx *= 0.99;
+    this.life--;
+  }
+  draw() {
+    const a = this.life / this.maxLife;
+    ctx.globalAlpha = a * 0.7;
+    ctx.fillStyle = this.color;
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.r * a, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+// 초기 파티클
+for (let i = 0; i < 80; i++) particles.push(new P());
+
+function loop() {
+  ctx.clearRect(0, 0, W, H);
+
+  // 연결선
+  for (let i = 0; i < particles.length; i++) {
+    for (let j = i + 1; j < particles.length; j++) {
+      const dx = particles[i].x - particles[j].x;
+      const dy = particles[i].y - particles[j].y;
+      const d = dx * dx + dy * dy;
+      if (d < 12000) {
+        const a = (1 - d / 12000) * 0.08;
+        const lineColor = document.body.classList.contains('down') ? '255,51,102' : '0,255,136';
+        ctx.strokeStyle = `rgba(${lineColor},${a})`;
+        ctx.lineWidth = 0.5;
+        ctx.beginPath();
+        ctx.moveTo(particles[i].x, particles[i].y);
+        ctx.lineTo(particles[j].x, particles[j].y);
+        ctx.stroke();
+      }
+    }
+  }
+
+  for (let i = particles.length - 1; i >= 0; i--) {
+    particles[i].update();
+    particles[i].draw();
+    if (particles[i].life <= 0) {
+      particles.splice(i, 1);
+    }
+  }
+
+  // 배경 파티클 보충
+  while (particles.length < 60) particles.push(new P());
+
+  ctx.globalAlpha = 1;
+  requestAnimationFrame(loop);
+}
+loop();
+
+// ── 클릭 시 파티클 폭발 ──
+document.addEventListener('click', e => {
+  for (let i = 0; i < 30; i++) particles.push(new P(e.clientX, e.clientY, true));
+
+  // 리플
+  const r = document.createElement('div');
+  r.className = 'ripple';
+  r.style.left = e.clientX + 'px';
+  r.style.top = e.clientY + 'px';
+  document.body.appendChild(r);
+  setTimeout(() => r.remove(), 800);
+});
+
+// ── 마우스 근처 파티클 밀어내기 ──
+let mouseX = W / 2, mouseY = H / 2;
+document.addEventListener('mousemove', e => {
+  mouseX = e.clientX;
+  mouseY = e.clientY;
+
+  // 마우스 근처 파티클에 힘 가하기
+  for (const p of particles) {
+    const dx = p.x - e.clientX;
+    const dy = p.y - e.clientY;
+    const d = Math.sqrt(dx * dx + dy * dy);
+    if (d < 120) {
+      const force = (120 - d) / 120 * 0.8;
+      p.vx += (dx / d) * force;
+      p.vy += (dy / d) * force;
+    }
+  }
+
+  // 이동 시 파티클 소량 생성
+  if (Math.random() > 0.7) particles.push(new P(e.clientX, e.clientY, false));
+});
+
+// ── 숫자 카운트업 ──
+const numEl = document.getElementById('num');
+const pctEl = document.getElementById('pct');
+const TARGET = 6150;
+let current = 5200;
+let arrived = false;
+
+function countUp() {
+  if (current >= TARGET) {
+    current = TARGET;
+    numEl.textContent = '6,150';
+    numEl.dataset.text = '6,150';
+    numEl.classList.add('glitch');
+    arrived = true;
+    for (let i = 0; i < 60; i++) particles.push(new P(W/2, H*0.4, true));
+    startLiveTicker();
+    return;
+  }
+  current += Math.ceil((TARGET - current) * 0.06);
+  if (current > TARGET) current = TARGET;
+  numEl.textContent = current.toLocaleString();
+  const curPct = ((current - 5960) / 5960 * 100);
+  pctEl.textContent = `▲ ${curPct.toFixed(1)}%`;
+  requestAnimationFrame(countUp);
+}
+setTimeout(countUp, 300);
+
+// ── 도착 후: 마우스 Y축으로 수치 제어 ──
+function startLiveTicker() {
+  let liveVal = 6150;
+  let livePct = 3.2;
+  let targetVal = 6150;
+  let mouseActive = false;
+  let tickerReady = false;
+
+  setTimeout(() => { tickerReady = true; }, 500);
+
+  document.addEventListener('mousemove', e => {
+    if(!tickerReady) return;
+    mouseActive = true;
+    // Y축 중심(0.5)에서의 거리 → 제곱으로 가속
+    const center = 0.5;
+    const norm = 1 - (e.clientY / innerHeight); // 0(하단)~1(상단)
+    const diff = norm - center; // -0.5 ~ +0.5
+    const accel = Math.sign(diff) * Math.pow(Math.abs(diff) * 2, 2); // -1~+1 제곱 가속
+    targetVal = Math.round(6150 + accel * 4000); // ~-50% ~ +50%
+  });
+
+  const anchorImg = document.querySelector('.anchor-img');
+  const speechEl = document.querySelector('.speech');
+  let mood = 'up'; // 'up' | 'excited' | 'down'
+
+  // 부드럽게 따라가기
+  setInterval(() => {
+    if(!mouseActive) return;
+    if(document.body.classList.contains('delisted')) return;
+    const prev = liveVal;
+    liveVal += Math.round((targetVal - liveVal) * 0.15);
+    if(liveVal < 0) liveVal = 0;
+    livePct = ((liveVal - 5960) / 5960 * 100);
+
+    numEl.textContent = liveVal.toLocaleString();
+    numEl.dataset.text = liveVal.toLocaleString();
+
+    // 상장폐지 (-60% 이하)
+    if(livePct <= -60){
+      document.body.classList.add('delisted');
+      numEl.textContent = '0';
+      numEl.dataset.text = '0';
+      numEl.classList.remove('glitch');
+      numEl.style.filter = 'grayscale(1) brightness(0.5)';
+      pctEl.textContent = '▼ 100.0%';
+      pctEl.style.color = '#666';
+      speechEl.innerHTML = '<strong>코스피 상장폐지.</strong> 대한민국 증시가 역사 속으로 사라졌습니다. 시청해주셔서 감사했습니다. 안녕히…';
+      anchorImg.src = 'anchor_panic_nobg.png';
+      document.querySelector('.aurora').style.opacity = '0';
+      document.getElementById('bg-mood').style.background = 'radial-gradient(ellipse at 50% 50%, rgba(0,0,0,0.8) 0%, rgba(5,5,16,1) 70%)';
+      document.body.style.filter = 'grayscale(0.8)';
+      // 속보
+      const bEl = document.getElementById('breaking');
+      const bText = document.getElementById('breaking-text');
+      bText.textContent = '코스피 전종목 거래정지… 상장폐지 결정. 대한민국 증시 역사의 마지막 날입니다.';
+      bEl.style.background = 'rgba(0,0,0,0.9)';
+      bEl.classList.add('show');
+      return;
+    }
+
+    const absPct = Math.abs(livePct).toFixed(1);
+    const isNeg = livePct < 0;
+    pctEl.textContent = isNeg ? `▼ ${absPct}%` : `▲ ${absPct}%`;
+
+    // 5단계 mood 판정
+    let newMood;
+    if (livePct <= -30) newMood = 'panic';
+    else if (isNeg) newMood = 'down';
+    else if (livePct >= 40) newMood = 'euphoria';
+    else if (livePct >= 5) newMood = 'excited';
+    else newMood = 'up';
+
+    if (newMood !== mood) {
+      mood = newMood;
+      document.body.classList.toggle('down', mood === 'down' || mood === 'panic');
+
+      const imgMap = {
+        panic: 'anchor_panic_nobg.png',
+        down: 'anchor_sad_nobg.png',
+        up: 'anchor_nobg.png',
+        excited: 'anchor_excited_nobg.png',
+        euphoria: 'anchor_euphoria_nobg.png',
+      };
+      anchorImg.src = imgMap[mood];
+    }
+
+    // 대사 실시간 연동
+    if (mood === 'panic') {
+      speechEl.innerHTML = `아… 아 망했다… <strong>내 주식…!!</strong> 핸드폰 화면이 온통 빨간색… <strong>▼${absPct}%</strong> 이게 실화…?! 😱`;
+    } else if (mood === 'down') {
+      speechEl.innerHTML = `코스피가 <strong>▼${absPct}%</strong> 하락 전환했습니다. 투자자 여러분 <strong>주의</strong>가 필요합니다.`;
+    } else if (mood === 'euphoria') {
+      speechEl.innerHTML = `저 <strong>퇴사합니다~</strong> 바잉~ 👋 코스피 <strong>▲${absPct}%</strong>면 더 이상 회사 다닐 이유가 없죠? ✌️`;
+    } else if (mood === 'excited') {
+      speechEl.innerHTML = `코스피 <strong>▲${absPct}% 폭등!</strong> 역대급 상승세입니다! 🎉`;
+    } else {
+      speechEl.innerHTML = `미국-이란 2차 협상 기대감에 코스피가 <strong>▲${absPct}%</strong> 올라 <strong>${liveVal.toLocaleString()}선</strong>을 기록 중입니다.`;
+    }
+
+    // 큰 변동 시 플래시
+    if (Math.abs(liveVal - prev) > 8) {
+      const flashColor = mood === 'down' ? 'rgba(255,51,102,0.8)' : 'rgba(0,255,136,0.8)';
+      numEl.style.filter = `drop-shadow(0 0 80px ${flashColor}) brightness(1.5)`;
+      setTimeout(() => numEl.style.filter = '', 150);
+      const rect = numEl.getBoundingClientRect();
+      for (let i = 0; i < 8; i++) {
+        particles.push(new P(
+          rect.left + Math.random() * rect.width,
+          rect.top + Math.random() * rect.height,
+          true
+        ));
+      }
+    }
+  }, 60);
+
+  // 주기적 웨이브 펄스 (5초마다)
+  setInterval(() => {
+    numEl.style.transition = 'transform 0.3s cubic-bezier(0.34,1.56,0.64,1)';
+    numEl.style.transform = 'scale(1.08)';
+    setTimeout(() => {
+      numEl.style.transform = 'scale(1)';
+      setTimeout(() => numEl.style.transition = '', 300);
+    }, 300);
+    for (let a = 0; a < Math.PI * 2; a += 0.3) {
+      const p = new P(W/2 + Math.cos(a)*50, H*0.4 + Math.sin(a)*30, true);
+      p.vx = Math.cos(a) * 4;
+      p.vy = Math.sin(a) * 4;
+      particles.push(p);
+    }
+  }, 5000);
+}
+
+// ── 숫자 호버 인터랙션 ──
+numEl.addEventListener('mouseenter', () => {
+  numEl.style.transition = 'transform 0.2s';
+  numEl.style.transform = 'scale(1.12) rotate(-1deg)';
+  for (let i = 0; i < 20; i++) {
+    const rect = numEl.getBoundingClientRect();
+    particles.push(new P(
+      rect.left + Math.random() * rect.width,
+      rect.top + Math.random() * rect.height,
+      true
+    ));
+  }
+});
+numEl.addEventListener('mouseleave', () => {
+  numEl.style.transform = 'scale(1) rotate(0deg)';
+  setTimeout(() => numEl.style.transition = '', 200);
+});
+
+// ── 헤드라인 단어별 등장 ──
+const hlText = '코스피, 미국-이란 2차 협상 기대감에 <strong>3%대</strong> 올라… <strong>6,150선</strong>';
+const hlEl = document.getElementById('hl');
+const words = hlText.split(/(?=<)|(?<=>)|\s+/).filter(Boolean);
+let htmlOut = '';
+let delay = 0;
+for (const w of words) {
+  if (w.startsWith('<')) { htmlOut += w; continue; }
+  if (w.startsWith('/')) { htmlOut += w; continue; }
+  htmlOut += `<span style="animation-delay:${0.8 + delay * 0.08}s">${w} </span>`;
+  delay++;
+}
+hlEl.innerHTML = htmlOut;
+
+// ── 틱커 ──
+const tickers = [
+  {name:'삼성전자',val:'+4.2%',up:true},{name:'SK하이닉스',val:'+5.8%',up:true},
+  {name:'LG에너지솔루션',val:'+3.1%',up:true},{name:'현대차',val:'+2.7%',up:true},
+  {name:'NAVER',val:'+1.9%',up:true},{name:'카카오',val:'-0.3%',up:false},
+  {name:'셀트리온',val:'+6.2%',up:true},{name:'포스코홀딩스',val:'+3.5%',up:true},
+  {name:'KB금융',val:'+2.1%',up:true},{name:'삼성바이오로직스',val:'+4.0%',up:true},
+  {name:'기아',val:'+2.9%',up:true},{name:'삼성SDI',val:'+3.8%',up:true},
+];
+const tickerEl = document.getElementById('ticker');
+const tickerHTML = tickers.map(t =>
+  `<span>${t.name} <span class="${t.up?'up':'down'}">${t.val}</span></span>`
+).join('');
+tickerEl.innerHTML = tickerHTML + tickerHTML;
+
+// ── 탄막 댓글 ──
+(function(){
+  const container = document.getElementById('danmaku');
+  const comments = {
+    up: [
+      '존버 승리 ㅋㅋㅋ','풀매수 간다!!','🚀🚀🚀','ㅋㅋㅋ 개이득',
+      '오늘 치킨이다','매도 누른 놈 손절각','와 미쳤다 진짜','더 간다 더 가!!',
+      '영끌 성공 ㅠㅠ','내일 출근 안 해도 되나','삼전 고마워','ㄹㅇ 불장',
+      '아직도 안 산 사람?','10억 찍었다!!','개미 파이팅 🐜',
+    ],
+    down: [
+      '아 ㅋㅋ 망했다','손절각인가...','반토막 ㄷㄷ','물타기 할까...',
+      '엄마 미안해','내 퇴직금...','ㅠㅠㅠㅠ','이게 나라냐',
+      '다시는 주식 안 한다','마이너스 통장 열어야 하나','빚투 후회 중',
+      '바닥이 어딘데...','패닉셀 ㄱ?','눈물이 난다 진짜','하... 진짜 하...',
+    ],
+    extreme_up: [
+      '🎉🎉🎉 퇴사합니다!!','나 오늘 벤츠 계약함','100억 돌파 ㅋㅋ',
+      '사장님 안녕히 계세요~','이게 진짜 불장이다','인생 역전 ㄹㅇ',
+    ],
+    extreme_down: [
+      '서킷브레이커 발동해라 제발','전재산이 녹고 있어','다리 위에서 씁니다',
+      '대한민국 망했다','IMF 2 시작?','난 왜 빚투를 했을까',
+    ],
+  };
+
+  const delistedComments = [
+    '...','ㅋㅋㅋ 진짜 끝났다','다시는 주식 안 한다','엄마 미안해',
+    '대한민국 끝','내 돈...','하하하하하','어떡해...','RIP 코스피',
+  ];
+  let _delisted = false;
+
+  function spawnComment(){
+    if(_delisted) return;
+    if(document.body.classList.contains('delisted')){
+      _delisted = true;
+      // 마지막 댓글 한 번에 쏟아내기
+      delistedComments.forEach((txt,i) => {
+        setTimeout(() => {
+          const span = document.createElement('span');
+          span.textContent = txt;
+          span.style.top = (Math.random()*70+5)+'%';
+          span.style.animationDuration = (6+Math.random()*3)+'s';
+          span.style.color = 'rgba(255,255,255,0.3)';
+          container.appendChild(span);
+          span.addEventListener('animationend', () => span.remove());
+        }, i*400);
+      });
+      return;
+    }
+    const cur = parseInt(numEl.textContent.replace(/,/g,'')) || 6150;
+    const pct = (cur - 5960) / 5960 * 100;
+    let pool;
+    if(pct >= 100) pool = comments.extreme_up;
+    else if(pct <= -30) pool = comments.extreme_down;
+    else if(pct >= 0) pool = comments.up;
+    else pool = comments.down;
+
+    const span = document.createElement('span');
+    span.textContent = pool[Math.floor(Math.random()*pool.length)];
+    span.style.top = (Math.random()*70 + 5) + '%';
+    span.style.animationDuration = (4 + Math.random()*4) + 's';
+    span.style.fontSize = (0.7 + Math.random()*0.6) + 'rem';
+
+    if(pct >= 0) span.style.color = `rgba(${Math.random()>0.5?'0,255,136':'255,255,255'},${0.4+Math.random()*0.3})`;
+    else span.style.color = `rgba(${Math.random()>0.5?'255,51,102':'255,255,255'},${0.4+Math.random()*0.3})`;
+
+    container.appendChild(span);
+    span.addEventListener('animationend', () => span.remove());
+  }
+
+  setInterval(spawnComment, 400);
+  // 극단일 때 더 빠르게
+  setInterval(() => {
+    const cur = parseInt(numEl.textContent.replace(/,/g,'')) || 6150;
+    const pct = Math.abs((cur - 5960) / 5960 * 100);
+    if(pct > 20) spawnComment();
+    if(pct > 50) spawnComment();
+  }, 300);
+})();
+
+// ── 배경색 전환 ──
+(function(){
+  const bgMood = document.getElementById('bg-mood');
+  setInterval(() => {
+    const cur = parseInt(numEl.textContent.replace(/,/g,'')) || 6150;
+    const pct = (cur - 5960) / 5960 * 100;
+    if(pct >= 100) bgMood.style.background = 'radial-gradient(ellipse at 50% 50%, rgba(255,215,0,0.15) 0%, transparent 70%)';
+    else if(pct >= 30) bgMood.style.background = 'radial-gradient(ellipse at 50% 50%, rgba(0,255,136,0.08) 0%, transparent 70%)';
+    else if(pct <= -30) bgMood.style.background = 'radial-gradient(ellipse at 50% 50%, rgba(255,0,0,0.15) 0%, transparent 70%)';
+    else if(pct < 0) bgMood.style.background = 'radial-gradient(ellipse at 50% 50%, rgba(255,51,102,0.06) 0%, transparent 70%)';
+    else bgMood.style.background = 'none';
+  }, 300);
+})();
+
+// ── 체결 로그 ──
+(function(){
+  const body = document.getElementById('tl-body');
+  let seq = 0;
+  const h = 9, m = 30, s = 0;
+  let ts = h*3600+m*60+s;
+
+  setInterval(() => {
+    if(document.body.classList.contains('delisted')) return;
+    const cur = parseInt(numEl.textContent.replace(/,/g,''))||6150;
+    const delta = Math.round((Math.random()-0.45)*30);
+    const price = cur + delta;
+    const vol = Math.floor(Math.random()*500+10);
+    ts += Math.floor(Math.random()*3+1);
+    const hh = String(Math.floor(ts/3600)%24).padStart(2,'0');
+    const mm = String(Math.floor((ts%3600)/60)).padStart(2,'0');
+    const ss = String(ts%60).padStart(2,'0');
+    const cls = delta>=0?'up':'down';
+    const row = document.createElement('div');
+    row.className = `tl-row ${cls}`;
+    row.innerHTML = `<span class="time">${hh}:${mm}:${ss}</span><span class="tprice">${price.toLocaleString()}</span><span class="tvol">${vol}</span>`;
+    body.prepend(row);
+    if(body.children.length > 40) body.lastChild.remove();
+  }, 120);
+})();
+
+// ── 공포/탐욕 게이지 (매수/매도 잔량 비율 연동) ──
+(function(){
+  const dot = document.getElementById('fg-dot');
+  const valEl = document.getElementById('fg-value');
+  const textEl = document.getElementById('fg-text');
+  const levels = [
+    [0,'EXTREME FEAR','#ff3366'],[25,'FEAR','#ff6644'],
+    [45,'NEUTRAL','#ffaa00'],[65,'GREED','#88cc00'],
+    [80,'EXTREME GREED','#00ff88']
+  ];
+
+  // 호가창의 sellQtys/buyQtys를 읽기 위해 window에 노출
+  setInterval(() => {
+    const buySum = (window._buyQtys||[]).reduce((a,b)=>a+b,0) || 1;
+    const sellSum = (window._sellQtys||[]).reduce((a,b)=>a+b,0) || 1;
+    const ratio = buySum / (buySum + sellSum); // 0~1, 1=매수 압도
+    const score = Math.max(0,Math.min(100,Math.round(ratio * 100)));
+
+    dot.style.left = `calc(${score}% - 6px)`;
+    valEl.textContent = score;
+    let label = levels[0];
+    for(const l of levels) if(score >= l[0]) label = l;
+    textEl.textContent = label[1];
+    textEl.style.color = label[2];
+    valEl.style.color = label[2];
+  }, 200);
+})();
+
+// ── 속보 배너 ──
+(function(){
+  const el = document.getElementById('breaking');
+  const textEl = document.getElementById('breaking-text');
+  const overlay = null;
+  const headlines = [
+    {text:'외국인 "한국 주식 너무 싸다" 3조 쓸어담는 중 ㅋㅋㅋ'},
+    {text:'미국-이란 협상 타결… 트럼프 "내가 했다" 자축 트윗'},
+    {text:'삼성전자 AI칩 수주 폭발… 직원들 보너스 200% 확정?!'},
+    {text:'Fed 의장 갑자기 "금리 내릴 수도?" 월가 패닉바잉 시작'},
+    {text:'중국 "돈 풀겠다" 선언에 아시아 증시 파티 모드 돌입'},
+    {text:'SK하이닉스 HBM4 찍었다!! 엔비디아 젠슨황 직접 전화'},
+    {text:'원/달러 1,200원대 진입… 환전하러 은행 앞 줄 선 사람들'},
+    {text:'국민연금 "주식 더 산다" 발표에 개미들 환호성'},
+    {text:'개미: "6천 뚫으면 치킨 쏜다" → 진짜 뚫음 → 치킨집 서버 다운'},
+    {text:'증권사 앱 동시접속 폭주… MTS 먹통에 고객센터 불바다'},
+    {text:'코스피 보고 사표 던진 직장인 속출… "주식이 월급보다 낫다"'},
+    {text:'부동산 카페 조용… 주식 카페 실시간 댓글 초당 300개'},
+  ];
+  let idx = 0;
+  function showBreaking(){
+    if(document.body.classList.contains('delisted')) return;
+    const h = headlines[idx % headlines.length];
+    textEl.textContent = h.text;
+    el.classList.add('show');
+    setTimeout(() => el.classList.remove('show'), 8000);
+    idx++;
+  }
+  setTimeout(showBreaking, 4000);
+  setInterval(showBreaking, 15000);
+})();
+
+// ── 배경 미니 차트 ──
+(function(){
+  const cv = document.getElementById('bgChart');
+  const cx = cv.getContext('2d');
+  let cW, cH;
+  const resizeBg = () => { cW = cv.width = innerWidth; cH = cv.height = innerHeight; };
+  resizeBg(); addEventListener('resize', resizeBg);
+
+  // 여러 줄의 차트 데이터 생성
+  const lines = Array.from({length:6}, () => {
+    const pts = [];
+    let v = Math.random() * cH * 0.6 + cH * 0.2;
+    for(let i = 0; i < 200; i++){
+      v += (Math.random()-0.48) * 8;
+      v = Math.max(cH*0.1, Math.min(cH*0.9, v));
+      pts.push(v);
+    }
+    return {pts, speed: 0.3 + Math.random()*0.5, offset:0, color: Math.random()>0.5 ? '#00ff88':'#ff3366'};
+  });
+
+  // 캔들스틱 데이터 — 전체 화면
+  const candles = [];
+  (function initCandles(){
+    const N = 80;
+    let v = cH * 0.5;
+    for(let i=0;i<N;i++){
+      v += (Math.random()-0.48)*15;
+      v = Math.max(cH*0.05, Math.min(cH*0.95, v));
+      const o = v;
+      const c = o + (Math.random()-0.45)*40;
+      const h = Math.min(o,c) - Math.random()*15;
+      const l = Math.max(o,c) + Math.random()*15;
+      candles.push({o,c,h,l,x:0});
+    }
+  })();
+
+  function drawBg(){
+    cx.clearRect(0,0,cW,cH);
+
+    // 그리드
+    cx.strokeStyle = 'rgba(255,255,255,0.03)';
+    cx.lineWidth = 1;
+    for(let y=0;y<cH;y+=cH/10){cx.beginPath();cx.moveTo(0,y);cx.lineTo(cW,y);cx.stroke();}
+    for(let x=0;x<cW;x+=cW/12){cx.beginPath();cx.moveTo(x,0);cx.lineTo(x,cH);cx.stroke();}
+
+    // 캔들스틱
+    const candleW = cW/candles.length;
+    candles.forEach((cd,i) => {
+      cd.x = i * candleW;
+      const bull = cd.c < cd.o;
+      cx.strokeStyle = bull ? 'rgba(0,255,136,0.5)' : 'rgba(255,51,102,0.5)';
+      cx.fillStyle = bull ? 'rgba(0,255,136,0.25)' : 'rgba(255,51,102,0.25)';
+      const w = candleW*0.6;
+      const x = cd.x + candleW*0.2;
+      cx.beginPath();cx.moveTo(x+w/2,cd.h);cx.lineTo(x+w/2,cd.l);cx.stroke();
+      cx.fillRect(x, Math.min(cd.o,cd.c), w, Math.abs(cd.c-cd.o)||2);
+      cx.strokeRect(x, Math.min(cd.o,cd.c), w, Math.abs(cd.c-cd.o)||2);
+    });
+
+    // 라인 차트 (스크롤)
+    lines.forEach(ln => {
+      ln.offset += ln.speed;
+      cx.beginPath();
+      cx.strokeStyle = ln.color;
+      cx.globalAlpha = 0.15;
+      cx.lineWidth = 1.5;
+      for(let i=0;i<cW;i++){
+        const idx = Math.floor((i+ln.offset)%ln.pts.length);
+        const y = ln.pts[idx];
+        i===0 ? cx.moveTo(i,y) : cx.lineTo(i,y);
+      }
+      cx.stroke();
+      cx.globalAlpha = 1;
+    });
+
+    requestAnimationFrame(drawBg);
+  }
+  drawBg();
+})();
+
+// ── 호가창 실시간 업데이트 ──
+(function(){
+  const sellsEl = document.getElementById('ob-sells');
+  const buysEl = document.getElementById('ob-buys');
+  const midEl = document.getElementById('ob-mid');
+  let prevPrice = 6150;
+
+  // 호가별 잔량 상태 유지
+  let sellQtys = Array.from({length:5}, () => Math.floor(Math.random()*8000+2000));
+  let buyQtys = Array.from({length:5}, () => Math.floor(Math.random()*8000+2000));
+
+  function renderOB(base, delta){
+    const isUp = delta > 0;
+    const intensity = Math.min(Math.abs(delta), 30); // 변동 강도
+
+    // 상승 시: 매도 잔량 급감(체결), 매수 잔량 급증(매수세)
+    // 하락 시: 매수 잔량 급감(체결), 매도 잔량 급증(매도세)
+    for(let i=0;i<5;i++){
+      const chaos = Math.floor(Math.random()*3000*Math.max(1,intensity/5));
+      if(isUp){
+        sellQtys[i] = Math.max(100, sellQtys[i] - Math.floor(Math.random()*chaos) + Math.floor(Math.random()*800));
+        buyQtys[i] = Math.min(30000, buyQtys[i] + Math.floor(Math.random()*chaos*1.5) - Math.floor(Math.random()*500));
+      } else if(delta < 0){
+        buyQtys[i] = Math.max(100, buyQtys[i] - Math.floor(Math.random()*chaos) + Math.floor(Math.random()*800));
+        sellQtys[i] = Math.min(30000, sellQtys[i] + Math.floor(Math.random()*chaos*1.5) - Math.floor(Math.random()*500));
+      } else {
+        // 횡보: 랜덤 노이즈
+        sellQtys[i] = Math.max(200, sellQtys[i] + Math.floor((Math.random()-0.5)*2000));
+        buyQtys[i] = Math.max(200, buyQtys[i] + Math.floor((Math.random()-0.5)*2000));
+      }
+    }
+
+    // 가끔 특정 호가 물량 폭발/소멸 (대량 주문/체결)
+    if(Math.random() < 0.15){
+      const idx = Math.floor(Math.random()*5);
+      if(Math.random()>0.5) sellQtys[idx] = Math.floor(Math.random()*25000+5000);
+      else sellQtys[idx] = Math.floor(Math.random()*300+50);
+    }
+    if(Math.random() < 0.15){
+      const idx = Math.floor(Math.random()*5);
+      if(Math.random()>0.5) buyQtys[idx] = Math.floor(Math.random()*25000+5000);
+      else buyQtys[idx] = Math.floor(Math.random()*300+50);
+    }
+
+    const maxQ = Math.max(...sellQtys, ...buyQtys, 1);
+    window._sellQtys = [...sellQtys];
+    window._buyQtys = [...buyQtys];
+
+    let sellHTML = '';
+    for(let i=0;i<5;i++){
+      const p = base + (5-i)*10;
+      const w = (sellQtys[i]/maxQ*100).toFixed(1);
+      sellHTML += `<div class="ob-row sell"><span class="bar" style="width:${w}%"></span><span class="price">${p.toLocaleString()}</span><span class="qty">${sellQtys[i].toLocaleString()}</span></div>`;
+    }
+    let buyHTML = '';
+    for(let i=0;i<5;i++){
+      const p = base - (i+1)*10;
+      const w = (buyQtys[i]/maxQ*100).toFixed(1);
+      buyHTML += `<div class="ob-row buy"><span class="bar" style="width:${w}%"></span><span class="price">${p.toLocaleString()}</span><span class="qty">${buyQtys[i].toLocaleString()}</span></div>`;
+    }
+
+    sellsEl.innerHTML = sellHTML;
+    buysEl.innerHTML = buyHTML;
+    midEl.textContent = base.toLocaleString();
+    midEl.style.color = delta > 0 ? '#00ff88' : delta < 0 ? '#ff3366' : '#fff';
+
+    // 큰 변동 시 호가창 플래시
+    if(intensity > 5){
+      const ob = document.getElementById('orderbook');
+      ob.style.borderColor = isUp ? 'rgba(0,255,136,0.4)' : 'rgba(255,51,102,0.4)';
+      setTimeout(() => ob.style.borderColor = 'rgba(255,255,255,0.08)', 150);
+    }
+  }
+
+  // 초기 렌더
+  renderOB(6150, 0);
+
+  // 잔고
+  const balTotal = document.getElementById('bal-total');
+  const balPnl = document.getElementById('bal-pnl');
+  let balance = 1_000_000_000;
+  let balTarget = balance;
+
+  // 80ms마다 업데이트 — 미친 속도
+  setInterval(() => {
+    if(document.body.classList.contains('delisted')) return;
+    const cur = parseInt(document.getElementById('num').textContent.replace(/,/g,'')) || 6150;
+    const delta = cur - prevPrice;
+    prevPrice = cur;
+    renderOB(cur, delta);
+
+    // 잔고: 주가 비례로 10억 근처에서 와리가리
+    const pctFromBase = (cur - 5960) / 5960;
+    balTarget = 1_000_000_000 + Math.round(pctFromBase * 300_000_000) + Math.round((Math.random()-0.5)*5_000_000);
+    balance += Math.round((balTarget - balance) * 0.2);
+    const pnl = balance - 1_000_000_000;
+    balTotal.textContent = balance.toLocaleString();
+    balPnl.textContent = (pnl>=0?'+':'')+pnl.toLocaleString();
+    balPnl.style.color = pnl>=0 ? '#00ff88' : '#ff3366';
+  }, 80);
+})();
+</script>
+</body>
+</html>
