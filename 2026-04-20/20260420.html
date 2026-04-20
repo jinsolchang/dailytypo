@@ -335,7 +335,15 @@ const COUNTRIES=[
   {name:'호주',en:'AUSTRALIA',flag:'🇦🇺'},{name:'북한',en:'DPRK',flag:'🇰🇵'},
   {name:'아랍에미리트',en:'UAE',flag:'🇦🇪'},{name:'카타르',en:'QATAR',flag:'🇶🇦'},
 ];
-const WORDS_KO=['석유','원유','제재','봉쇄','핵','미사일','외교','협상','휴전','나포','압박','동맹','패권','안보'];
+const WORDS_KO_EASY=['유조선','화물선','어선','쾌속정','벌크선'];
+const WORDS_KO_MID=['원유수송','LNG운반','컨테이너','군함','정찰선','보급함','구축함','순양함'];
+const WORDS_KO_HARD=['초대형유조선','핵잠수함위장','무기밀수선','특수작전함','정보수집함','위장화물선','원자력추진'];
+
+function getShipWord(){
+  if(score>=150) return [...WORDS_KO_EASY,...WORDS_KO_MID,...WORDS_KO_HARD][Math.floor(Math.random()*(5+8+7))];
+  if(score>=60) return [...WORDS_KO_EASY,...WORDS_KO_MID][Math.floor(Math.random()*13)];
+  return WORDS_KO_EASY[Math.floor(Math.random()*5)];
+}
 const SIZES=[
   {s:0.35,r:8,spd:2.5},   // 소형 쾌속정
   {s:0.55,r:13,spd:1.8},  // 어선
@@ -380,7 +388,7 @@ class Ship{
     let c;
     if(Math.random()<0.1){c=COUNTRIES.find(x=>x.name==='이스라엘');}
     else{c=COUNTRIES[Math.floor(Math.random()*COUNTRIES.length)];}
-    const w=WORDS_KO[Math.floor(Math.random()*WORDS_KO.length)];
+    const w=getShipWord();
     this.id=shipId++;this.country=c;
     this.label=`${c.name} ${w}`;
     this.flag=c.flag;this.dir=dir;
@@ -629,6 +637,20 @@ inputEl.addEventListener('keydown',e=>{
   if(e.key==='Escape'){
     e.preventDefault();
     if(isComposing){pendingAction='seize';return;}
+    // Israel — no typing needed, instant artillery
+    const first=getFirst();
+    if(first && first.country.name==='이스라엘'){
+      score+=50;
+      first.flash=1;
+      const fp=first.pos();
+      const batteries=[[0.48,0.33],[0.54,0.34],[0.60,0.34],[0.44,0.34],[0.38,0.31]];
+      const nearest=batteries.reduce((best,b)=>{const d=Math.hypot(b[0]*W-fp.x,b[1]*H-fp.y);return d<best.d?{d,b}:best;},{d:Infinity,b:batteries[0]});
+      flyingObjects.push({type:'shell',x:nearest.b[0]*W,y:nearest.b[1]*H,targetX:fp.x,targetY:fp.y,speed:8,victim:first,phase:'flying',timer:0});
+      first.state='sinking';first.sinkTimer=0;
+      showAnnounce('seize-enemy',first);
+      clearInput();reindexQueue();updateHUD();updateLabel();
+      return;
+    }
     executeAction('seize');
   }
   if(e.key==='Tab'){
@@ -901,18 +923,31 @@ function updateFlyingObjects(){
     } else if(f.type==='shell'){
       const dx=f.targetX-f.x,dy=f.targetY-f.y;
       const dist=Math.sqrt(dx*dx+dy*dy);
-      if(dist<8){
+      // Muzzle flash at start
+      if(!f.flashed){
+        f.flashed=true;
+        for(let j=0;j<12;j++){
+          missileParticles.push({x:f.x,y:f.y,vx:(Math.random()-0.5)*3,vy:(Math.random()-0.5)*3,life:15+Math.random()*10,age:0,size:3+Math.random()*3,color:Math.random()>0.5?'#ffcc00':'#ffffff'});
+        }
+      }
+      if(dist<12){
+        // Big impact explosion
         if(f.victim){
-          for(let j=0;j<40;j++){
-            missileParticles.push({x:f.targetX,y:f.targetY,vx:(Math.random()-0.5)*6,vy:(Math.random()-0.5)*6,life:60+Math.random()*30,age:0,size:2+Math.random()*4,color:['#ff4444','#ffaa33','#ff6600'][Math.floor(Math.random()*3)]});
+          for(let j=0;j<50;j++){
+            missileParticles.push({x:f.targetX+(Math.random()-0.5)*15,y:f.targetY+(Math.random()-0.5)*15,vx:(Math.random()-0.5)*8,vy:(Math.random()-0.5)*8,life:70+Math.random()*40,age:0,size:3+Math.random()*5,color:['#ff4444','#ffaa33','#ff6600','#ffcc00','#ff0000'][Math.floor(Math.random()*5)]});
           }
-          if(typeof confetti==='function') confetti({particleCount:40,spread:60,origin:{y:0.5},colors:['#ff4444','#ff6600']});
+          if(typeof confetti==='function') confetti({particleCount:60,spread:80,origin:{y:0.5},colors:['#ff4444','#ff6600','#ffcc00']});
         }
         flyingObjects.splice(i,1);continue;
       }
       f.x+=dx/dist*f.speed;f.y+=dy/dist*f.speed;
-      missileParticles.push({x:f.x,y:f.y,vx:(Math.random()-0.5)*0.3,vy:(Math.random()-0.5)*0.3,life:12,age:0,size:1.5,color:'#ffaa33'});
-      cx.fillStyle='#ffcc00';cx.beginPath();cx.arc(f.x,f.y,3,0,Math.PI*2);cx.fill();
+      // Thick trail
+      missileParticles.push({x:f.x,y:f.y,vx:(Math.random()-0.5)*0.4,vy:(Math.random()-0.5)*0.4,life:18,age:0,size:2,color:'#ffaa33'});
+      // Draw shell — glowing ball
+      cx.save();
+      cx.shadowColor='#ffcc00';cx.shadowBlur=10;
+      cx.fillStyle='#ffcc00';cx.beginPath();cx.arc(f.x,f.y,4,0,Math.PI*2);cx.fill();
+      cx.restore();
     }
   }
 }
