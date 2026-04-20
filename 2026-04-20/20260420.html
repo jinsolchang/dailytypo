@@ -770,8 +770,12 @@ function checkTrumpEvent(){
   if(queueCount>=20 && !bomberLaunched){
     bomberLaunched=true;
     warnEl.classList.remove('show');
-    flyingObjects.push({type:'bomber',x:-100,y:H*0.2,targetX:GATE.x*W,targetY:GATE.topY*H,speed:4,phase:'approach',timer:0});
-    showSpecialAnnounce('🇺🇸 미 공군','B-52 전략폭격기 출격 — 호르무즈 해협 폭격 명령','#ff0000');
+    // 3-ship formation
+    const offsets=[{dx:0,dy:0},{dx:-60,dy:30},{dx:-60,dy:-30}];
+    offsets.forEach((o,i)=>{
+      flyingObjects.push({type:'bomber',x:-100+o.dx-i*40,y:H*0.2+o.dy,targetX:GATE.x*W+o.dx*0.3,targetY:(GATE.topY+GATE.botY)/2*H+o.dy*0.5,speed:3,phase:'approach',timer:0,scale:2});
+    });
+    showSpecialAnnounce('🇺🇸 미 공군','B-52 편대 3기 출격 — 호르무즈 해협 폭격 명령','#ff0000');
     return;
   }
 
@@ -850,38 +854,39 @@ function updateFlyingObjects(){
       cx.beginPath();cx.moveTo(-12,0);cx.lineTo(-20,-3);cx.lineTo(-18,0);cx.lineTo(-20,3);cx.closePath();cx.fill();
       cx.restore();
     } else if(f.type==='bomber'){
+      const sc=f.scale||1;
       if(f.phase==='approach'){
         const dx=f.targetX-f.x,dy=f.targetY-f.y;
         const dist=Math.sqrt(dx*dx+dy*dy);
         f.x+=dx/dist*f.speed;f.y+=dy/dist*f.speed;
-        // Draw bomber
+        // Draw bomber — scaled
         cx.save();cx.translate(f.x,f.y);
         cx.fillStyle='#888';
-        cx.beginPath();cx.moveTo(20,0);cx.lineTo(-10,-12);cx.lineTo(-15,0);cx.lineTo(-10,12);cx.closePath();cx.fill();
-        cx.fillStyle='#666';cx.fillRect(-15,-2,8,4);
+        cx.beginPath();cx.moveTo(40*sc,0);cx.lineTo(-20*sc,-24*sc);cx.lineTo(-30*sc,0);cx.lineTo(-20*sc,24*sc);cx.closePath();cx.fill();
+        cx.fillStyle='#666';cx.fillRect(-30*sc,-4*sc,16*sc,8*sc);
+        cx.fillStyle='#777';cx.fillRect(-5*sc,-28*sc,10*sc,56*sc);
         cx.restore();
-        // Engine trail
-        missileParticles.push({x:f.x-15,y:f.y,vx:-1-Math.random(),vy:(Math.random()-0.5)*0.5,life:20,age:0,size:2,color:'#ffaa33'});
-        if(dist<30){
+        missileParticles.push({x:f.x-30*sc,y:f.y,vx:-1.5-Math.random(),vy:(Math.random()-0.5)*0.5,life:25,age:0,size:2+sc,color:'#ffaa33'});
+        if(dist<40){
           f.phase='bombing';f.timer=0;
-          // Massive explosion at gate
-          for(let j=0;j<60;j++){
-            missileParticles.push({x:f.targetX+(Math.random()-0.5)*40,y:f.targetY+(Math.random()-0.5)*40,vx:(Math.random()-0.5)*8,vy:(Math.random()-0.5)*8,life:80+Math.random()*40,age:0,size:3+Math.random()*6,color:['#ff4444','#ffaa33','#ff6600','#ffcc00','#ff0000'][Math.floor(Math.random()*5)]});
+          for(let j=0;j<80;j++){
+            missileParticles.push({x:f.targetX+(Math.random()-0.5)*60,y:f.targetY+(Math.random()-0.5)*60,vx:(Math.random()-0.5)*10,vy:(Math.random()-0.5)*10,life:90+Math.random()*50,age:0,size:3+Math.random()*7,color:['#ff4444','#ffaa33','#ff6600','#ffcc00','#ff0000'][Math.floor(Math.random()*5)]});
           }
           if(typeof confetti==='function'){
-            confetti({particleCount:150,spread:120,origin:{y:0.4},colors:['#ff0000','#ff4444','#ff6600','#ffaa33']});
+            confetti({particleCount:200,spread:140,origin:{y:0.4},colors:['#ff0000','#ff4444','#ff6600','#ffaa33']});
           }
         }
       } else if(f.phase==='bombing'){
         f.timer++;
-        // Bomber flies away
-        f.x+=3;f.y-=1;
+        f.x+=4;f.y-=1.5;
         cx.save();cx.translate(f.x,f.y);
-        cx.fillStyle='#888';cx.beginPath();cx.moveTo(20,0);cx.lineTo(-10,-12);cx.lineTo(-15,0);cx.lineTo(-10,12);cx.closePath();cx.fill();
+        cx.fillStyle='#888';
+        cx.beginPath();cx.moveTo(40*sc,0);cx.lineTo(-20*sc,-24*sc);cx.lineTo(-30*sc,0);cx.lineTo(-20*sc,24*sc);cx.closePath();cx.fill();
+        cx.fillStyle='#777';cx.fillRect(-5*sc,-28*sc,10*sc,56*sc);
         cx.restore();
-        if(f.timer>60){
+        if(f.timer>80){
           flyingObjects.splice(i,1);
-          endGame();
+          if(!gameOver) endGame();
         }
       }
     } else if(f.type==='pirate'){
