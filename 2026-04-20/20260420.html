@@ -454,6 +454,8 @@ function executeAction(action){
     nextEventAt=processedCount+4+Math.floor(Math.random()*3);
     setTimeout(()=>{if(!gameOver&&!alliancePhase)triggerSpecialEvent();},500);
   }
+  // Trump rage when queue is long
+  setTimeout(()=>{if(!gameOver&&!announcePause)checkTrumpEvent();},300);
 }
 
 inputEl.addEventListener('keydown',e=>{
@@ -500,51 +502,124 @@ function addToSeizedList(ship){
 
 document.addEventListener('click',()=>{if(!gameOver&&!alliancePhase)inputEl.focus();});
 function updateHUD(){document.getElementById('score').textContent=score;document.getElementById('hp').textContent='♥'.repeat(Math.max(0,hp))+'♡'.repeat(Math.max(0,3-hp));}
-function endGame(){gameOver=true;document.getElementById('go-score').textContent=`최종 점수: ${score}`;setTimeout(()=>document.getElementById('gameover').classList.add('show'),400);}
+function endGame(){
+  gameOver=true;
+  stats.passed++; // count the last one
+  const el=document.getElementById('go-score');
+  el.innerHTML=`최종 점수: ${score}<br><span style="font-size:0.7rem;color:#ffffff44">통과 ${stats.passed} | 나포 ${stats.seized} | 외교사고 ${stats.allySeized} | 적국통과 ${stats.enemyPassed}</span>`;
+  setTimeout(()=>document.getElementById('gameover').classList.add('show'),400);
+}
 
 // ═══════════════════════════════════════
 // ANNOUNCEMENTS
 // ═══════════════════════════════════════
+// Stats tracking
+let stats={passed:0,seized:0,allySeized:0,enemyPassed:0};
+
 const STATEMENTS = {
   'seize-enemy': {
-    '중국':['🇨🇳 중국 외교부: "강력히 규탄하며 즉각 석방을 요구한다"','🇨🇳 환구시보: "미 제국주의의 해적 행위, 반드시 대가를 치를 것"'],
-    '러시아':['🇷🇺 크렘린: "국제법을 무시한 도발 행위에 유감을 표한다"','🇷🇺 라브로프: "서방의 이중잣대가 또 드러났다"'],
-    '이란':['🇮🇷 이란 혁명수비대: "성전의 불꽃이 해협을 태울 것이다"','🇮🇷 테헤란: "이 치욕을 반드시 되갚겠다"'],
-    '북한':['🇰🇵 조선중앙통신: "미제의 해적질에 천만배로 보복할 것"','🇰🇵 평양: "핵무력으로 응징할 준비가 되어있다"'],
-    '파키스탄':['🇵🇰 이슬라마바드: "형제국의 선박 나포에 깊은 유감"','🇵🇰 파키스탄 해군: "인도양 안보에 심각한 위협"'],
-    '_default':['해당국: "이는 명백한 국제법 위반이며 즉각 석방을 요구한다"','해당국: "필요한 모든 외교적 조치를 취할 것"','🇺🇳 유엔: "항행의 자유 원칙이 훼손되었다"'],
+    '중국':['🇨🇳 중국 외교부: "강력히 규탄하며 즉각 석방을 요구한다"','🇨🇳 환구시보: "미 제국주의의 해적 행위다"','🇨🇳 시진핑: "중화민족의 위대한 부흥을 막을 수 없다"','🇨🇳 왕이: "일방주의적 행태를 즉각 중단하라"','🇨🇳 CCTV: "서방 패권의 몰락이 시작됐다"'],
+    '러시아':['🇷🇺 크렘린: "국제법을 무시한 도발 행위"','🇷🇺 라브로프: "서방의 이중잣대가 또 드러났다"','🇷🇺 푸틴: "러시아는 자국 이익을 반드시 수호한다"','🇷🇺 타스통신: "나토의 해적 행위에 세계가 분노"','🇷🇺 메드베데프: "핵 독트린 재검토를 시사"'],
+    '이란':['🇮🇷 혁명수비대: "성전의 불꽃이 해협을 태울 것"','🇮🇷 테헤란: "이 치욕을 반드시 되갚겠다"','🇮🇷 하메네이: "미국에 죽음을! 이슬람은 승리한다"','🇮🇷 IRGC 해군: "호르무즈를 봉쇄할 준비가 됐다"','🇮🇷 라이시: "제재와 나포로 이란을 꺾을 수 없다"'],
+    '북한':['🇰🇵 조선중앙통신: "미제의 해적질에 천만배로 보복"','🇰🇵 김정은: "핵무력으로 응징할 준비 완료"','🇰🇵 리선권: "전쟁광들의 도발에 초강경 대응"','🇰🇵 노동신문: "제국주의 해적떼를 쓸어버리자"'],
+    '파키스탄':['🇵🇰 이슬라마바드: "형제국 선박 나포에 깊은 유감"','🇵🇰 해군: "인도양 안보에 심각한 위협"','🇵🇰 외교부: "즉각적인 석방을 촉구한다"'],
+    '인도':['🇮🇳 뉴델리: "항행의 자유는 모든 국가의 권리"','🇮🇳 모디: "인도는 이 사태를 심각하게 주시한다"','🇮🇳 해군: "인도양 안보 태세를 강화한다"'],
+    '터키':['🇹🇷 앙카라: "이슬람 세계에 대한 도발"','🇹🇷 에르도안: "서방은 오만함을 버려야 한다"','🇹🇷 아나돌루: "나토 동맹국 간 균열 심화"'],
+    '브라질':['🇧🇷 브라질리아: "남반구 국가에 대한 차별적 행위"','🇧🇷 룰라: "다극 세계 질서가 필요하다"'],
+    '이집트':['🇪🇬 카이로: "수에즈에 이어 호르무즈까지 위협받고 있다"','🇪🇬 시시: "아랍 세계의 연대를 촉구한다"'],
+    'UAE':['🇦🇪 아부다비: "역내 안정을 해치는 행위에 우려"','🇦🇪 MBZ: "대화를 통한 해결을 촉구한다"'],
+    '카타르':['🇶🇦 도하: "걸프 지역의 평화를 위협하는 행위"','🇶🇦 알자지라: "해협 위기, 유가 폭등 우려"'],
+    '_default':['해당국 외교부: "국제법 위반이며 즉각 석방을 요구"','해당국: "필요한 모든 외교적 조치를 취할 것"','🇺🇳 유엔: "항행의 자유 원칙이 훼손되었다"','🇺🇳 안보리: "긴급 회의 소집을 검토 중"'],
   },
   'seize-ally': {
-    '미국':['🇺🇸 백악관: "동맹국이 우리 선박을 나포? 전례 없는 배신"','🇺🇸 펜타곤: "제7함대 긴급 출동 명령"'],
-    '영국':['🇬🇧 다우닝가: "이 행위는 동맹의 근간을 흔드는 것"','🇬🇧 BBC: "충격적 외교 사고, 영국 정부 긴급 대응"'],
-    '일본':['🇯🇵 도쿄: "유감을 넘어 분노를 표한다"','🇯🇵 NHK: "동맹 신뢰 붕괴, 아베 독트린 재검토론"'],
-    '한국':['🇰🇷 외교부: "동맹국으로서 도저히 이해할 수 없는 처사"','🇰🇷 청와대: "즉각적인 해명을 요구한다"'],
-    '프랑스':['🇫🇷 엘리제궁: "프랑스 공화국의 자존심에 대한 모욕"','🇫🇷 르몽드: "동맹 관계의 위기"'],
-    '독일':['🇩🇪 베를린: "이는 규칙 기반 질서에 대한 도전"','🇩🇪 슈피겔: "외교적 재앙, 나토 균열 우려"'],
-    '호주':['🇦🇺 캔버라: "메이트, 이건 좀 아니지 않나"','🇦🇺 ABC: "인도태평양 동맹 구조에 균열"'],
-    '사우디':['🇸🇦 리야드: "석유 공급 안정을 위협하는 행위"','🇸🇦 아람코: "원유 선물 가격 급등 예상"'],
-    '_default':['해당국: "동맹국의 선박을 나포하다니, 심각한 외교적 결례"','해당국: "즉각적인 해명과 사과를 요구한다"','🇺🇳 유엔 사무총장: "동맹 간 신뢰 회복을 촉구한다"'],
+    '미국':['🇺🇸 백악관: "동맹국이 우리 선박을 나포? 전례 없는 배신"','🇺🇸 펜타곤: "제7함대 긴급 출동 명령"','🇺🇸 CNN: "동맹 관계 최악의 위기"','🇺🇸 트럼프: "UNBELIEVABLE! 이게 동맹이냐!"','🇺🇸 국무부: "모든 군사 협력을 즉시 재검토"'],
+    '영국':['🇬🇧 다우닝가: "동맹의 근간을 흔드는 행위"','🇬🇧 BBC: "충격적 외교 사고"','🇬🇧 왕실: "깊은 유감을 표한다"','🇬🇧 MI6: "정보 공유 협정 중단 검토"'],
+    '일본':['🇯🇵 도쿄: "유감을 넘어 분노를 표한다"','🇯🇵 NHK: "동맹 신뢰 붕괴"','🇯🇵 기시다: "일미 안보 조약 재검토 불가피"','🇯🇵 아사히: "전후 최악의 외교 참사"'],
+    '한국':['🇰🇷 외교부: "도저히 이해할 수 없는 처사"','🇰🇷 청와대: "즉각적인 해명을 요구"','🇰🇷 연합뉴스: "한미동맹 균열 우려"','🇰🇷 국방부: "합동 군사훈련 중단 검토"'],
+    '프랑스':['🇫🇷 엘리제궁: "공화국의 자존심에 대한 모욕"','🇫🇷 르몽드: "동맹 관계의 위기"','🇫🇷 마크롱: "유럽 독자 안보의 필요성이 증명됐다"'],
+    '독일':['🇩🇪 베를린: "규칙 기반 질서에 대한 도전"','🇩🇪 슈피겔: "외교적 재앙"','🇩🇪 숄츠: "나토 내 신뢰가 심각하게 훼손됐다"'],
+    '호주':['🇦🇺 캔버라: "메이트, 이건 좀 아니지 않나"','🇦🇺 ABC: "인도태평양 동맹 구조에 균열"','🇦🇺 총리: "AUKUS 재검토를 배제하지 않는다"'],
+    '사우디':['🇸🇦 리야드: "석유 공급 안정을 위협하는 행위"','🇸🇦 아람코: "원유 선물 가격 급등 예상"','🇸🇦 MBS: "이 배신을 잊지 않겠다"'],
+    '이스라엘':['🇮🇱 예루살렘: "동맹에 대한 배신, 용납할 수 없다"','🇮🇱 모사드: "정보 협력 전면 중단"','🇮🇱 네타냐후: "이스라엘은 스스로를 지킨다"'],
+    '_default':['해당국: "동맹국 선박 나포, 심각한 외교적 결례"','해당국: "즉각적인 해명과 사과를 요구"','🇺🇳 사무총장: "동맹 간 신뢰 회복을 촉구"'],
   },
   'pass-enemy': {
-    '중국':['🇨🇳 중국: "현명한 판단에 감사한다"','🇺🇸 미 국무부: "중국 선박 통과 허용에 심각한 우려"'],
-    '러시아':['🇷🇺 모스크바: "합리적 결정을 환영한다"','🇬🇧 런던: "러시아 선박을 왜 보내주는 건가?"'],
-    '이란':['🇮🇷 테헤란: "당연한 권리를 행사한 것"','🇮🇱 이스라엘: "이란 선박 통과는 안보 위협"'],
-    '북한':['🇰🇵 평양: "제국주의자들도 우리 앞에 무릎 꿇었다"','🇯🇵 도쿄: "북한 선박 통과에 강력 항의"'],
-    '_default':['해당국: "자유로운 항행이 보장되어야 합니다"','🇺🇸 워싱턴: "적국 선박 통과 허용에 우려를 표한다"','동맹국들: "해협 통제력에 의문을 제기한다"'],
+    '중국':['🇨🇳 중국: "현명한 판단에 감사"','🇺🇸 국무부: "중국 선박 통과에 심각한 우려"','🇯🇵 도쿄: "중국의 해양 팽창을 방치하는 것"'],
+    '러시아':['🇷🇺 모스크바: "합리적 결정을 환영"','🇬🇧 런던: "러시아 선박을 왜 보내주나?"','🇺🇦 키이우: "러시아에 힘을 실어주는 행위"'],
+    '이란':['🇮🇷 테헤란: "당연한 권리를 행사한 것"','🇮🇱 이스라엘: "이란 선박 통과는 안보 위협"','🇸🇦 리야드: "이란의 영향력 확대를 우려"'],
+    '북한':['🇰🇵 평양: "제국주의자들도 무릎 꿇었다"','🇯🇵 도쿄: "북한 선박 통과에 강력 항의"','🇰🇷 서울: "대북 제재 이행에 구멍이 뚫렸다"'],
+    '_default':['해당국: "자유로운 항행이 보장되어야 합니다"','🇺🇸 워싱턴: "적국 선박 통과에 우려"','동맹국들: "해협 통제력에 의문을 제기"','🇺🇳 안보리: "제재 이행 점검이 필요하다"'],
   },
 };
 
+// Trump special tweets when queue gets long
+const TRUMP_TWEETS=[
+  '🇺🇸 트럼프 @realDonaldTrump:\n"해협이 막히고 있다! WEAK! 내가 했으면 5분 만에 해결했을 것. SAD!"',
+  '🇺🇸 트럼프 @realDonaldTrump:\n"배가 너무 많다! FIRE THE MISSILES! 농담 아님!"',
+  '🇺🇸 트럼프 @realDonaldTrump:\n"이란이 웃고 있다. 해협을 완전히 봉쇄해야 한다. TOTAL BLOCKADE!"',
+  '🇺🇸 트럼프 @realDonaldTrump:\n"내 임기였으면 배 한 척도 못 지나갔을 것. NOBODY does it better than me!"',
+  '🇺🇸 트럼프 @realDonaldTrump:\n"유가가 폭등하고 있다! 해협 관리자를 해고하라! YOU\'RE FIRED!"',
+  '🇺🇸 트럼프 @realDonaldTrump:\n"중국 배가 지나갔다고? CHINA IS LAUGHING AT US! 관세 500%!"',
+  '🇺🇸 트럼프 @realDonaldTrump:\n"B-2 폭격기를 보내겠다. 아니 B-52. 아니 둘 다! MAXIMUM PRESSURE!"',
+];
+let lastTrumpAt=0;
+
+function checkTrumpEvent(){
+  const queueCount=ships.filter(s=>s.state==='queuing').length;
+  if(queueCount>=5 && processedCount-lastTrumpAt>=3){
+    lastTrumpAt=processedCount;
+    const tweet=TRUMP_TWEETS[Math.floor(Math.random()*TRUMP_TWEETS.length)];
+    showSpecialAnnounce('🇺🇸 TRUTH SOCIAL',tweet,'#ff6600');
+  }
+}
+
 function getStatements(type, country){
   const pool=STATEMENTS[type]||{};
-  const specific=pool[country.name]||pool['_default']||[];
-  // Pick 2-3 random from specific
-  const shuffled=[...specific].sort(()=>Math.random()-0.5);
+  const specific=pool[country.name]||[];
+  const defaults=pool['_default']||[];
+  const combined=[...specific,...defaults];
+  const shuffled=combined.sort(()=>Math.random()-0.5);
   return shuffled.slice(0,Math.min(3,shuffled.length));
 }
 
+// Special event system
+function triggerSpecialEvent(){
+  const evt=SPECIAL_EVENTS[Math.floor(Math.random()*SPECIAL_EVENTS.length)];
+  activeEffect=evt.effect;
+  effectEndTime=Date.now()+evt.duration;
+  showSpecialAnnounce('⚡ SPECIAL EVENT',`${evt.title}\n${evt.sub}`,'#ffaa33');
+}
+
+function showSpecialAnnounce(badge,text,color){
+  const overlay=document.getElementById('announce-overlay');
+  const badgeEl=document.getElementById('ann-badge');
+  const title=document.getElementById('ann-title');
+  const sub=document.getElementById('ann-sub');
+  const stmts=document.getElementById('ann-statements');
+
+  badgeEl.className='ann-badge';badgeEl.style.cssText=`border-color:${color}55;color:${color};background:${color}22`;
+  badgeEl.textContent=badge;
+  title.className='ann-title';title.style.color=color;title.style.textShadow=`0 0 20px ${color}66`;
+  const lines=text.split('\n');
+  title.textContent=lines[0];
+  sub.className='ann-sub';sub.style.color=color+'88';
+  sub.textContent=lines[1]||'';
+  stmts.innerHTML='';
+
+  overlay.classList.add('show');
+  announcePause=true;
+
+  if(typeof confetti==='function' && color==='#ffaa33'){
+    confetti({particleCount:40,spread:50,origin:{y:0.5},colors:['#ffaa33','#ff6600','#ffcc00']});
+  }
+}
+
 function showAnnounce(type, ship){
-  // pass-ally is quiet, no big announcement
-  if(type==='pass-ally') return;
+  if(type==='pass-ally'){stats.passed++;return;}
+
+  if(type==='seize-enemy') stats.seized++;
+  else if(type==='seize-ally') stats.allySeized++;
+  else if(type==='pass-enemy') stats.enemyPassed++;
 
   const overlay=document.getElementById('announce-overlay');
   const badge=document.getElementById('ann-badge');
@@ -553,30 +628,30 @@ function showAnnounce(type, ship){
   const stmts=document.getElementById('ann-statements');
 
   const isGood = type==='seize-enemy';
-  const isBad = type==='seize-ally' || type==='pass-enemy';
 
+  badge.style.cssText='';title.style.cssText='';sub.style.cssText='';
   badge.className='ann-badge '+(isGood?'success':'fail');
   title.className='ann-title '+(isGood?'success':'fail');
   sub.className='ann-sub '+(isGood?'success':'fail');
 
+  const cn=ship.country.name;
   if(type==='seize-enemy'){
     badge.textContent='나포 성공';
-    title.textContent=`${ship.flag} ${ship.country.name} 선박 나포!`;
-    sub.textContent=`+20점 — 비동맹국 선박을 성공적으로 나포했습니다`;
+    title.textContent=`${ship.flag} ${cn} 선박 나포!`;
+    sub.textContent=`+20점 — ${cn} 비동맹국 선박을 성공적으로 나포`;
   } else if(type==='seize-ally'){
     badge.textContent='⚠ 외교 사고';
-    title.textContent=`${ship.flag} ${ship.country.name} 동맹국 나포!`;
-    sub.textContent=`HP -1 — 동맹국 선박을 나포하는 외교적 참사`;
+    title.textContent=`${ship.flag} ${cn} 동맹국 나포!`;
+    sub.textContent=`HP -1 — ${cn} 동맹국 선박을 나포하는 외교적 참사`;
   } else if(type==='pass-enemy'){
     badge.textContent='⚠ 적국 통과';
-    title.textContent=`${ship.flag} ${ship.country.name} 통과 허용`;
-    sub.textContent=`HP -1 — 비동맹국 선박을 통과시켰습니다`;
+    title.textContent=`${ship.flag} ${cn} 통과 허용`;
+    sub.textContent=`HP -1 — ${cn} 비동맹국 선박을 통과시켰습니다`;
   }
 
-  // Statements
   stmts.innerHTML='';
   const chosen=getStatements(type,ship.country);
-  chosen.forEach((text,i)=>{
+  chosen.forEach((text)=>{
     const el=document.createElement('div');
     el.className='ann-stmt '+(isGood?'ally':(type==='pass-enemy'?'neutral':'enemy'));
     el.textContent=text;
@@ -586,12 +661,9 @@ function showAnnounce(type, ship){
   overlay.classList.add('show');
   announcePause=true;
 
-  // Confetti for seize-enemy
-  if(type==='seize-enemy' && typeof confetti==='function'){
+  if(isGood && typeof confetti==='function'){
     confetti({particleCount:80,spread:70,origin:{y:0.5},colors:['#33ff33','#00aa44','#88ff88']});
   }
-
-  // GSAP animate statements
   if(typeof gsap!=='undefined'){
     gsap.fromTo('.ann-stmt',{opacity:0,y:15},{opacity:1,y:0,stagger:0.2,delay:0.3,duration:0.4});
   }
@@ -914,7 +986,7 @@ function drawShipShape(x,y,angle,sc,fill,stroke,flash,sizeIdx){
 function renderShips(){
   const first=getFirst();
   for(const s of ships){
-    if(s.state==='approaching'){s.t+=s.baseSpeed;if(s.t>=s.gateT-0.02){s.state='queuing';s.t=s.gateT-0.02;reindexQueue();}}
+    if(s.state==='approaching'){const spd=s.baseSpeed*(activeEffect==='storm'?2.5:1);s.t+=spd;if(s.t>=s.gateT-0.02){s.state='queuing';s.t=s.gateT-0.02;reindexQueue();}}
     else if(s.state==='queuing'){s.t+=(s.targetT-s.t)*0.03;s.vox+=(Math.random()-0.5)*0.5;s.voy+=(Math.random()-0.5)*0.4;
       // Random speech when jostling
       if(Math.random()<0.003) spawnSpeech(s);
@@ -1002,6 +1074,8 @@ function loop(){
   if(!gameOver){
     if(!alliancePhase&&!announcePause){
       document.getElementById('timer').textContent=Math.max(0,nextAllianceAt-processedCount);
+      // Clear expired effects
+      if(activeEffect && Date.now()>effectEndTime) activeEffect=null;
       spawnAcc++;
       const rate=Math.max(120,300-score*0.8);
       if(spawnAcc>=rate){spawnAcc=0;spawnShip();}
