@@ -60,17 +60,24 @@ canvas#scene{position:fixed;inset:0;z-index:1}
 .toast-area{
   position:fixed;top:52px;left:50%;transform:translateX(-50%);z-index:11;
   pointer-events:none;text-align:center;
-  max-width:400px;width:90vw;
+  max-width:500px;width:90vw;
+  background:rgba(8,18,30,0.88);
+  border:1px solid #33ff3333;border-top:none;
+  border-radius:0 0 8px 8px;
+  padding:4px 16px 6px;
 }
+.toast-area:empty{padding:0;border:none;background:none}
 .toast{
   font-family:'Noto Sans KR',sans-serif;font-size:0.65rem;font-weight:700;
-  text-align:center;line-height:1.4;padding:2px 0;
+  text-align:center;line-height:1.4;padding:3px 0;
   animation:toastIn 0.3s ease,toastOut 0.5s ease 3s forwards;
 }
 .toast.success{color:#33ff33}
 .toast.fail{color:#ff4444}
 .toast.neutral{color:#ffaa33}
+.toast.trump{color:#ff6600;font-size:0.85rem;padding:6px 0;text-shadow:0 0 8px rgba(255,102,0,0.3)}
 .toast .toast-title{font-size:0.7rem}
+.toast.trump .toast-title{font-size:0.9rem}
 .toast .toast-stmt{font-size:0.55rem;opacity:0.6;margin-top:1px}
 @keyframes toastIn{from{opacity:0;transform:translateY(-5px)}to{opacity:1;transform:translateY(0)}}
 @keyframes toastOut{to{opacity:0}}
@@ -820,14 +827,15 @@ function triggerSpecialEvent(){
 
 function showSpecialAnnounce(badge,text,color){
   const area=document.getElementById('toast-area');
+  const isTrump=badge.includes('TRUTH');
   const toast=document.createElement('div');
-  toast.className='toast neutral';
-  toast.style.borderColor=color+'44';toast.style.background=color+'18';toast.style.color=color;
+  toast.className='toast '+(isTrump?'trump':'neutral');
   const lines=text.split('\n');
   toast.innerHTML=`<div class="toast-title">${lines[0]}</div>${lines[1]?'<div class="toast-stmt">'+lines[1]+'</div>':''}`;
   area.appendChild(toast);
-  if(typeof confetti==='function'){confetti({particleCount:30,spread:40,origin:{y:0.7},colors:[color,'#fff']});}
-  setTimeout(()=>{if(toast.parentNode)toast.remove();},3500);
+  if(typeof baffle!=='undefined'){const b=baffle(toast.querySelector('.toast-title'),{characters:'█▓▒░',speed:isTrump?30:50});b.start();setTimeout(()=>b.reveal(isTrump?800:500),50);}
+  if(typeof confetti==='function'&&isTrump){confetti({particleCount:30,spread:40,origin:{y:0.15},colors:['#ff6600','#ff4444','#ffaa33']});}
+  setTimeout(()=>{if(toast.parentNode)toast.remove();},isTrump?5000:3500);
 }
 
 function showAnnounce(type, ship){
