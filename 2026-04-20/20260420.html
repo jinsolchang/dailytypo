@@ -100,6 +100,23 @@ canvas#scene{position:fixed;inset:0;z-index:1}
 .alliance-overlay .ao-item{padding:5px 12px;border:1px solid #33ff3555;border-radius:3px;font-size:0.75rem;color:#33ff33;animation:popIn 0.3s ease both}
 @keyframes popIn{from{transform:scale(0.5);opacity:0}to{transform:scale(1);opacity:1}}
 .alliance-overlay .ao-timer{margin-top:12px;font-size:0.5rem;color:#33ff3333}
+.gameover{position:fixed;inset:0;z-index:200;
+
+.trump-warn{
+  position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:30;
+  pointer-events:none;text-align:center;
+  background:rgba(40,0,0,0.85);border:2px solid #ff4444;
+  border-radius:10px;padding:16px 32px;
+  display:none;
+  animation:warnPulse 1s infinite;
+}
+.trump-warn.show{display:block}
+.tw-flag{font-size:2rem}
+.tw-text{font-family:'Noto Sans KR',sans-serif;font-weight:900;font-size:0.85rem;color:#ff4444;margin-top:4px;letter-spacing:0.05em}
+.tw-count{font-size:2.5rem;font-weight:900;color:#ff4444;font-family:'Share Tech Mono',monospace;text-shadow:0 0 20px rgba(255,0,0,0.5)}
+.tw-sub{font-size:0.6rem;color:#ff444488;margin-top:2px}
+@keyframes warnPulse{0%,100%{border-color:#ff4444;box-shadow:0 0 20px rgba(255,0,0,0.2)}50%{border-color:#ff6600;box-shadow:0 0 40px rgba(255,0,0,0.4)}}
+
 .gameover{position:fixed;inset:0;z-index:200;background:rgba(8,0,0,0.95);display:flex;flex-direction:column;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity 0.5s}
 .gameover.show{opacity:1;pointer-events:auto}
 .gameover .go-title{font-family:'Noto Sans KR',sans-serif;font-weight:900;font-size:clamp(2.5rem,8vw,5rem);color:#ff4444;text-shadow:0 0 40px rgba(255,0,0,0.5)}
@@ -201,6 +218,12 @@ canvas#scene{position:fixed;inset:0;z-index:1}
   <div class="ann-sub" id="ann-sub"></div>
   <div class="ann-statements" id="ann-statements"></div>
   <div class="ann-dismiss">Enter를 눌러 계속</div>
+</div>
+<div class="trump-warn" id="trump-warn">
+  <div class="tw-flag">🇺🇸</div>
+  <div class="tw-text">해협 선박 적체 경고</div>
+  <div class="tw-count"><span id="tw-count">15</span>/20</div>
+  <div class="tw-sub">20척 도달 시 미군 공습</div>
 </div>
 <div class="gameover" id="gameover">
   <div class="go-title">GAME OVER</div><div class="go-sub">해협 통제 실패</div>
@@ -713,13 +736,12 @@ const STATEMENTS = {
 
 // Trump special tweets when queue gets long
 const TRUMP_TWEETS=[
-  {text:'🇺🇸 트럼프 @realDonaldTrump:\n"해협이 막히고 있다! WEAK! 미사일 발사!"',effect:'missile'},
-  {text:'🇺🇸 트럼프 @realDonaldTrump:\n"FIRE THE MISSILES! 농담 아님!"',effect:'missile'},
-  {text:'🇺🇸 트럼프 @realDonaldTrump:\n"해협을 완전히 봉쇄해야 한다. TOTAL BLOCKADE!"',effect:'blockade'},
-  {text:'🇺🇸 트럼프 @realDonaldTrump:\n"내 임기였으면 배 한 척도 못 지나갔을 것!"',effect:'blockade'},
-  {text:'🇺🇸 트럼프 @realDonaldTrump:\n"유가가 폭등! 해협 관리자를 해고하라! YOU\'RE FIRED!"',effect:'sanction'},
-  {text:'🇺🇸 트럼프 @realDonaldTrump:\n"MAXIMUM PRESSURE! 제재를 500% 강화한다!"',effect:'sanction'},
-  {text:'🇺🇸 트럼프 @realDonaldTrump:\n"B-52 폭격기를 보내겠다. SHOW OF FORCE!"',effect:'missile'},
+  {text:'🇺🇸 트럼프 대통령 긴급 성명:\n"호르무즈 해협의 선박 적체가 미국의 국가 안보를 위협하고 있다. 즉각적인 조치를 명령한다."',effect:'missile'},
+  {text:'🇺🇸 백악관 국가안보회의:\n"대통령이 해협 내 적성국 선박에 대한 정밀 타격을 승인했다."',effect:'missile'},
+  {text:'🇺🇸 트럼프 대통령 @POTUS:\n"해협 봉쇄는 전쟁 행위다. 미 해군에 완전한 해상 봉쇄를 지시했다."',effect:'blockade'},
+  {text:'🇺🇸 국무부 긴급 브리핑:\n"호르무즈 통항 지연에 대해 최대 압박 제재를 발동한다."',effect:'sanction'},
+  {text:'🇺🇸 펜타곤 대변인:\n"제5함대가 호르무즈 해역에 토마호크 미사일 발사 태세를 갖추었다."',effect:'missile'},
+  {text:'🇺🇸 트럼프 대통령:\n"이란의 해협 관리 능력에 심각한 의문을 제기한다. 모든 옵션이 테이블 위에 있다."',effect:'blockade'},
 ];
 let lastTrumpAt=0;
 let trumpBonusMultiplier=1;
@@ -731,25 +753,23 @@ function checkTrumpEvent(){
   if(alliancePhase) return;
   const queueCount=ships.filter(s=>s.state==='queuing').length;
 
+  // 15+ ships: persistent warning with live count
+  const warnEl=document.getElementById('trump-warn');
+  if(queueCount>=15){
+    warnEl.classList.add('show');
+    document.getElementById('tw-count').textContent=queueCount;
+  } else {
+    warnEl.classList.remove('show');
+  }
+  trumpWarned=queueCount>=15;
+
   // 20+ ships: bomber destroys gate, game over
   if(queueCount>=20){
-    // Spawn bomber
+    warnEl.classList.remove('show');
     flyingObjects.push({type:'bomber',x:-100,y:H*0.2,targetX:GATE.x*W,targetY:GATE.topY*H,speed:4,phase:'approach',timer:0});
-    showSpecialAnnounce('🇺🇸 TRUTH SOCIAL','🇺🇸 트럼프: "ENOUGH! B-52 출격! 해협을 날려버려라!"','#ff0000');
+    showSpecialAnnounce('🇺🇸 미 공군','B-52 전략폭격기 출격 — 호르무즈 해협 폭격 명령','#ff0000');
     return;
   }
-
-  // 15+ ships: warning
-  if(queueCount>=15 && !trumpWarned){
-    trumpWarned=true;
-    const warns=[
-      '🇺🇸 트럼프: "배가 너무 많다! 10초 안에 정리 안 하면 폭격한다!"',
-      '🇺🇸 트럼프: "WARNING! 해협이 막히고 있다! LAST CHANCE!"',
-      '🇺🇸 트럼프: "이건 참을 수 없다! 폭격기 대기 중! HURRY UP!"',
-    ];
-    showSpecialAnnounce('🇺🇸 TRUTH SOCIAL',warns[Math.floor(Math.random()*warns.length)],'#ff6600');
-  }
-  if(queueCount<12) trumpWarned=false;
 
   // Regular trump events (missile, sanction, blockade)
   if(queueCount>=3 && processedCount-lastTrumpAt>=5){
