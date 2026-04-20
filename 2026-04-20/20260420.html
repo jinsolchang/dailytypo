@@ -376,7 +376,10 @@ let gateOpenTimer=0; // frames gate stays open
 // ═══════════════════════════════════════
 class Ship{
   constructor(dir){
-    const c=COUNTRIES[Math.floor(Math.random()*COUNTRIES.length)];
+    // Israel 1.5x frequency
+    let c;
+    if(Math.random()<0.1){c=COUNTRIES.find(x=>x.name==='이스라엘');}
+    else{c=COUNTRIES[Math.floor(Math.random()*COUNTRIES.length)];}
     const w=WORDS_KO[Math.floor(Math.random()*WORDS_KO.length)];
     this.id=shipId++;this.country=c;
     this.label=`${c.name} ${w}`;
