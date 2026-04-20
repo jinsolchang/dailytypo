@@ -18,7 +18,13 @@ canvas#scene{position:fixed;inset:0;z-index:1}
 .allies-bar{position:fixed;top:0;left:50%;transform:translateX(-50%);z-index:10;pointer-events:none;text-align:center;background:rgba(8,18,30,0.92);border:1px solid #33ff3344;border-top:none;border-radius:0 0 10px 10px;padding:7px 24px 9px;min-width:300px}
 .allies-bar .ab-title{font-size:0.5rem;color:#33ff3355;letter-spacing:0.18em;margin-bottom:4px}
 .allies-bar .ab-list{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
-.allies-bar .ab-item{padding:3px 10px;border:1px solid #33ff3555;border-radius:3px;font-size:clamp(0.65rem,1.3vw,0.8rem);color:#33ff33;font-weight:700;font-family:'Noto Sans KR','Share Tech Mono',sans-serif;text-shadow:0 0 5px rgba(51,255,51,0.25)}
+.allies-bar .ab-item{padding:3px 10px;border:1px solid #33ff3555;border-radius:3px;font-size:clamp(0.65rem,1.3vw,0.8rem);color:#33ff33;font-weight:700;font-family:'Noto Sans KR','Share Tech Mono',sans-serif;text-shadow:0 0 5px rgba(51,255,51,0.25);transition:all 0.4s}
+.allies-bar .ab-item.removing{border-color:#ff444455;color:#ff4444;text-decoration:line-through;opacity:0;transform:translateY(-10px)}
+.allies-bar .ab-item.adding{animation:slideDown 0.4s ease}
+@keyframes slideDown{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:translateY(0)}}
+.ab-changes{margin-top:5px;font-size:0.55rem;min-height:1em;text-align:center;transition:opacity 0.3s}
+.ab-changes .ch-break{color:#ff4444aa}
+.ab-changes .ch-new{color:#33ff33aa}
 .typing-zone{position:fixed;bottom:0;left:0;right:0;z-index:10;background:rgba(8,18,28,0.92);border-top:1px solid #33ff3322;padding:8px 14px 12px}
 .typing-label{text-align:center;margin-bottom:4px;font-size:clamp(0.8rem,2vw,1.2rem);font-weight:700;font-family:'Noto Sans KR',sans-serif;min-height:1.4em;color:#ffaa33;text-shadow:0 0 5px rgba(255,170,51,0.2)}
 .typing-input-wrap{display:flex;align-items:center;justify-content:center;max-width:480px;margin:0 auto}
@@ -110,7 +116,7 @@ canvas#scene{position:fixed;inset:0;z-index:1}
   <div><span class="label">HP</span><br><span class="hp" id="hp">♥♥♥</span></div>
   <div><span class="label">NEXT SHIFT</span><br><span class="timer" id="timer">2</span><span style="color:#ffaa3344">척</span></div>
 </div>
-<div class="allies-bar"><div class="ab-title">▸ ALLIED NATIONS 동맹국 ◂</div><div class="ab-list" id="ab-list"></div></div>
+<div class="allies-bar"><div class="ab-title">▸ ALLIED NATIONS 동맹국 ◂</div><div class="ab-list" id="ab-list"></div><div class="ab-changes" id="ab-changes"></div></div>
 <div class="typing-zone">
   <div class="typing-label" id="typing-label">선박 대기 중…</div>
   <div class="typing-input-wrap"><input type="text" id="typing-input" placeholder="선박명 입력" autocomplete="off" autofocus></div>
@@ -359,46 +365,40 @@ function pickAllies(){
 }
 function updateAlliesBar(){document.getElementById('ab-list').innerHTML=[...allies].map(a=>`<div class="ab-item">${a}</div>`).join('');}
 function showAllianceOverlay(){
-  alliancePhase=true;gateOpen=false;
-  document.getElementById('typing-input').blur();
-
-  // Partial alliance change: 1-3 break, 1-3 new
+  // Inline alliance change — no fullscreen overlay
   const currentAllies=[...allies];
   const nonAllies=COUNTRIES.filter(c=>!allies.has(c.name)).map(c=>c.name);
   const breakCount=1+Math.floor(Math.random()*3);
   const newCount=1+Math.floor(Math.random()*3);
-
-  // Shuffle and pick
   const toBreak=currentAllies.sort(()=>Math.random()-0.5).slice(0,Math.min(breakCount,currentAllies.length));
   const toAdd=nonAllies.sort(()=>Math.random()-0.5).slice(0,Math.min(newCount,nonAllies.length));
 
-  toBreak.forEach(n=>allies.delete(n));
-  toAdd.forEach(n=>allies.add(n));
+  // Show changes text below allies bar
+  const changesEl=document.getElementById('ab-changes');
+  const breakText=toBreak.map(n=>`✕ ${n}`).join('  ');
+  const addText=toAdd.map(n=>`✓ ${n}`).join('  ');
+  changesEl.innerHTML=`<span class="ch-break">${breakText}</span>  <span class="ch-new">${addText}</span>`;
 
-  const list=document.getElementById('ao-list');list.innerHTML='';
-
-  // Show breaks
-  toBreak.forEach((n,i)=>{
-    const el=document.createElement('div');
-    el.className='ao-item';el.style.borderColor='#ff444455';el.style.color='#ff4444';
-    el.textContent=`✕ ${n} 절교`;
-    el.style.animationDelay=(i*0.12)+'s';
-    list.appendChild(el);
-  });
-  // Show new allies
-  toAdd.forEach((n,i)=>{
-    const el=document.createElement('div');
-    el.className='ao-item';
-    el.textContent=`✓ ${n} 수교`;
-    el.style.animationDelay=((toBreak.length+i)*0.12)+'s';
-    list.appendChild(el);
+  // Animate removal
+  toBreak.forEach(n=>{
+    const items=document.querySelectorAll('.ab-item');
+    items.forEach(el=>{if(el.textContent===n) el.classList.add('removing');});
   });
 
-  document.getElementById('alliance-overlay').classList.add('show');
-  updateAlliesBar();
+  // After animation, apply changes and rebuild
+  setTimeout(()=>{
+    toBreak.forEach(n=>allies.delete(n));
+    toAdd.forEach(n=>allies.add(n));
+    updateAlliesBar();
+    // Mark new ones
+    toAdd.forEach(n=>{
+      const items=document.querySelectorAll('.ab-item');
+      items.forEach(el=>{if(el.textContent===n) el.classList.add('adding');});
+    });
+  },500);
 
-  let cd=3;const aoT=document.getElementById('ao-timer');aoT.textContent=`${cd}초 후 해협 개방`;
-  const iv=setInterval(()=>{cd--;if(cd<=0){clearInterval(iv);document.getElementById('alliance-overlay').classList.remove('show');alliancePhase=false;gateOpen=false;document.getElementById('typing-input').focus();}else aoT.textContent=`${cd}초 후 해협 개방`;},1000);
+  // Clear changes text after a few seconds
+  setTimeout(()=>{changesEl.innerHTML='';},4000);
 }
 
 // ═══════════════════════════════════════
@@ -461,7 +461,7 @@ function executeAction(action){
   // Track processed ships
   processedCount++;
   // Alliance shift every N ships
-  if(processedCount>=nextAllianceAt && !alliancePhase){
+  if(processedCount>=nextAllianceAt){
     nextAllianceAt=processedCount+SHIPS_PER_ALLIANCE;
     setTimeout(()=>{if(!gameOver)showAllianceOverlay();},800);
   }
@@ -470,8 +470,7 @@ function executeAction(action){
     nextEventAt=processedCount+4+Math.floor(Math.random()*3);
     setTimeout(()=>{if(!gameOver&&!alliancePhase)triggerSpecialEvent();},500);
   }
-  // Trump rage when queue is long
-  setTimeout(()=>{if(!gameOver&&!announcePause)checkTrumpEvent();},300);
+  // Trump rage when queue is long — check in game loop instead
 }
 
 inputEl.addEventListener('keydown',e=>{
@@ -602,6 +601,7 @@ let trumpBonusMultiplier=1;
 let missileParticles=[];
 
 function checkTrumpEvent(){
+  if(announcePause||alliancePhase) return;
   const queueCount=ships.filter(s=>s.state==='queuing').length;
   if(queueCount>=5 && processedCount-lastTrumpAt>=3){
     lastTrumpAt=processedCount;
@@ -848,6 +848,30 @@ function drawMap(){
   cx.save();cx.globalAlpha=0.02;
   cx.beginPath();cx.moveTo(W*0.535,H*0.46);cx.arc(W*0.535,H*0.46,W*0.3,sa,sa+0.2);cx.closePath();
   cx.fillStyle='#33ff33';cx.fill();cx.restore();
+
+  // Iran artillery batteries along coast
+  const batteries=[[0.48,0.33],[0.54,0.34],[0.60,0.34],[0.44,0.34],[0.38,0.31]];
+  const bt=Date.now()*0.001;
+  for(const [bx,by] of batteries){
+    const px=bx*W,py=by*H;
+    cx.save();
+    // Base
+    cx.fillStyle='#3a4a30';
+    cx.fillRect(px-6,py-3,12,6);
+    cx.strokeStyle='#5a7a4a';cx.lineWidth=1;
+    cx.strokeRect(px-6,py-3,12,6);
+    // Barrel — rotates slowly, pointing toward strait
+    const barrelAngle=Math.sin(bt*0.5+bx*10)*0.3+Math.PI*0.4;
+    cx.translate(px,py);cx.rotate(barrelAngle);
+    cx.fillStyle='#555';
+    cx.fillRect(0,-1.5,14,3);
+    cx.fillStyle='#666';
+    cx.beginPath();cx.arc(0,0,4,0,Math.PI*2);cx.fill();
+    cx.restore();
+    // Label
+    cx.font='6px "Share Tech Mono"';cx.fillStyle='#5a8a5044';cx.textAlign='center';
+    cx.fillText('▲',px,py-8);
+  }
 }
 
 function drawGate(){
@@ -1162,6 +1186,8 @@ function loop(){
       spawnAcc++;
       const rate=Math.max(120,300-score*0.8);
       if(spawnAcc>=rate){spawnAcc=0;spawnShip();}
+      // Trump check — independent of announce state
+      checkTrumpEvent();
     }
     updateLabel();
   }
