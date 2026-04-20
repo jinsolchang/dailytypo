@@ -1115,7 +1115,20 @@ function drawShipShape(x,y,angle,sc,fill,stroke,flash,sizeIdx){
 function renderShips(){
   const first=getFirst();
   for(const s of ships){
-    if(s.state==='approaching'){const spd=s.baseSpeed*(activeEffect==='storm'?2.5:1);s.t+=spd;if(s.t>=s.gateT-0.02){s.state='queuing';s.t=s.gateT-0.02;reindexQueue();}}
+    if(s.state==='approaching'){const spd=s.baseSpeed*(activeEffect==='storm'?2.5:1);s.t+=spd;if(s.t>=s.gateT-0.02){
+      // Iran ships auto-pass
+      if(s.country.name==='이란'){
+        s.state='transiting';
+        gateOpen=true;gateOpenTimer=60;
+        const area=document.getElementById('toast-area');
+        const toast=document.createElement('div');toast.className='toast neutral';
+        toast.innerHTML=`<div class="toast-title">${s.flag} 이란 선박 자동 통과</div>`;
+        area.appendChild(toast);
+        setTimeout(()=>{if(toast.parentNode)toast.remove();},2500);
+      } else {
+        s.state='queuing';s.t=s.gateT-0.02;reindexQueue();
+      }
+    }}
     else if(s.state==='queuing'){s.t+=(s.targetT-s.t)*0.03;s.vox+=(Math.random()-0.5)*0.5;s.voy+=(Math.random()-0.5)*0.4;
       // Random speech when jostling
       if(Math.random()<0.003) spawnSpeech(s);
