@@ -10,6 +10,36 @@
 body{background:#0b1622;font-family:'Share Tech Mono','Noto Sans KR',monospace;color:#33ff33;overflow:hidden;height:100vh;user-select:none}
 body::after{content:'';position:fixed;inset:0;z-index:9999;pointer-events:none;background:repeating-linear-gradient(0deg,rgba(0,0,0,0.07) 0px,rgba(0,0,0,0.07) 1px,transparent 1px,transparent 3px)}
 canvas#scene{position:fixed;inset:0;z-index:1}
+
+.intro-overlay{
+  position:fixed;inset:0;z-index:500;
+  background:#0b1622;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  transition:opacity 0.8s;
+}
+.intro-overlay.hide{opacity:0;pointer-events:none}
+.intro-tag{
+  font-size:0.6rem;letter-spacing:0.3em;color:#ff4444;
+  border:1px solid #ff444444;padding:4px 16px;border-radius:2px;
+  margin-bottom:16px;font-weight:700;
+  animation:pulse 1.5s infinite;
+}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.5}}
+.intro-headline{
+  font-family:'Noto Sans KR',sans-serif;font-weight:900;
+  font-size:clamp(1.5rem,5vw,3rem);
+  color:#fff;text-align:center;line-height:1.3;
+  max-width:700px;padding:0 20px;
+  text-shadow:0 0 40px rgba(255,255,255,0.1);
+}
+.intro-sub{
+  font-size:0.75rem;color:#33ff3366;margin-top:12px;
+  letter-spacing:0.15em;
+}
+.intro-hint{
+  font-size:0.55rem;color:#ffffff22;margin-top:24px;
+  letter-spacing:0.1em;
+}
 .hud-tl{position:fixed;top:10px;left:12px;z-index:10;pointer-events:none}
 .hud-headline{font-family:'Noto Sans KR',sans-serif;font-weight:900;font-size:clamp(0.55rem,1.3vw,0.85rem);color:#ff4444;text-shadow:0 0 8px rgba(255,68,68,0.3);line-height:1.35;max-width:220px}
 .hud-tr{position:fixed;top:10px;right:12px;z-index:10;pointer-events:none;text-align:right;font-size:0.65rem;line-height:1.9}
@@ -26,6 +56,26 @@ canvas#scene{position:fixed;inset:0;z-index:1}
 .ab-changes .ch-break{color:#ff4444aa}
 .ab-changes .ch-new{color:#33ff33aa}
 .typing-zone{position:fixed;bottom:0;left:0;right:0;z-index:10;background:rgba(8,18,28,0.92);border-top:1px solid #33ff3322;padding:8px 14px 12px}
+
+.toast-area{
+  position:fixed;bottom:85px;left:50%;transform:translateX(-50%);z-index:12;
+  display:flex;flex-direction:column;align-items:center;gap:4px;
+  pointer-events:none;max-width:520px;width:90vw;
+}
+.toast{
+  padding:8px 16px;border-radius:6px;
+  font-family:'Noto Sans KR',sans-serif;font-size:0.7rem;font-weight:700;
+  text-align:center;line-height:1.4;
+  animation:toastIn 0.3s ease,toastOut 0.4s ease 2.8s forwards;
+  white-space:pre-line;
+}
+.toast.success{background:rgba(51,255,51,0.12);border:1px solid #33ff3344;color:#33ff33}
+.toast.fail{background:rgba(255,68,68,0.12);border:1px solid #ff444444;color:#ff4444}
+.toast.neutral{background:rgba(255,170,51,0.12);border:1px solid #ffaa3344;color:#ffaa33}
+.toast .toast-title{font-size:0.85rem;margin-bottom:2px}
+.toast .toast-stmt{font-size:0.6rem;opacity:0.7;margin-top:2px}
+@keyframes toastIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+@keyframes toastOut{to{opacity:0;transform:translateY(-10px)}}
 .typing-label{text-align:center;margin-bottom:4px;font-size:clamp(0.8rem,2vw,1.2rem);font-weight:700;font-family:'Noto Sans KR',sans-serif;min-height:1.4em;color:#ffaa33;text-shadow:0 0 5px rgba(255,170,51,0.2)}
 .typing-input-wrap{display:flex;align-items:center;justify-content:center;max-width:480px;margin:0 auto}
 #typing-input{width:100%;padding:7px 12px;background:#0b1622;border:1px solid #33ff3344;border-radius:4px;color:#33ff33;font-family:'Noto Sans KR','Share Tech Mono',monospace;font-size:clamp(0.9rem,2.2vw,1.3rem);font-weight:700;outline:none;text-align:center;caret-color:#33ff33}
@@ -110,6 +160,13 @@ canvas#scene{position:fixed;inset:0;z-index:1}
 </head>
 <body>
 <canvas id="scene"></canvas>
+
+<div class="intro-overlay" id="intro-overlay">
+  <div class="intro-tag">BREAKING NEWS</div>
+  <div class="intro-headline" id="intro-headline">美, 휴전 시한 앞두고 이란 선박 전격 나포…이란 압박 극대화</div>
+  <div class="intro-sub" id="intro-sub">호르무즈 해협 통제 시뮬레이션</div>
+  <div class="intro-hint" id="intro-hint"></div>
+</div>
 <div class="hud-tl"><div class="hud-headline">美, 휴전 시한 앞두고<br>이란 선박 전격 나포…<br>이란 압박 극대화</div></div>
 <div class="hud-tr">
   <div><span class="label">SCORE</span><br><span class="val" id="score">0</span></div>
@@ -117,6 +174,7 @@ canvas#scene{position:fixed;inset:0;z-index:1}
   <div><span class="label">NEXT SHIFT</span><br><span class="timer" id="timer">2</span><span style="color:#ffaa3344">척</span></div>
 </div>
 <div class="allies-bar"><div class="ab-title">▸ ALLIED NATIONS 동맹국 ◂</div><div class="ab-list" id="ab-list"></div><div class="ab-changes" id="ab-changes"></div></div>
+<div class="toast-area" id="toast-area"></div>
 <div class="typing-zone">
   <div class="typing-label" id="typing-label">선박 대기 중…</div>
   <div class="typing-input-wrap"><input type="text" id="typing-input" placeholder="선박명 입력" autocomplete="off" autofocus></div>
@@ -145,6 +203,8 @@ canvas#scene{position:fixed;inset:0;z-index:1}
 </div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.2/anime.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/baffle@0.3.6/dist/baffle.min.js"></script>
 <script>
 const cv=document.getElementById('scene'),cx=cv.getContext('2d');
 let W,H;
@@ -260,7 +320,7 @@ const SIZES=[
 // STATE
 // ═══════════════════════════════════════
 let allies=new Set(),ships=[],score=0,hp=3;
-let gameOver=false,alliancePhase=false,announcePause=false;
+let gameOver=false,alliancePhase=false;
 let allianceTimer=60,lastAllianceTick=Date.now();
 let shipId=0,spawnAcc=0,gateOpen=false,gateAnim=0,seizedCount=0;
 let smokeParticles=[];
@@ -363,9 +423,12 @@ function pickAllies(){
   for(let i=pool.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[pool[i],pool[j]]=[pool[j],pool[i]];}
   allies=new Set(pool.slice(0,10).map(c=>c.name));
 }
-function updateAlliesBar(){document.getElementById('ab-list').innerHTML=[...allies].map(a=>`<div class="ab-item">${a}</div>`).join('');}
+function updateAlliesBar(){
+  const el=document.getElementById('ab-list');
+  el.innerHTML=[...allies].map(a=>`<div class="ab-item">${a}</div>`).join('');
+}
+
 function showAllianceOverlay(){
-  // Inline alliance change — no fullscreen overlay
   const currentAllies=[...allies];
   const nonAllies=COUNTRIES.filter(c=>!allies.has(c.name)).map(c=>c.name);
   const breakCount=1+Math.floor(Math.random()*3);
@@ -373,31 +436,43 @@ function showAllianceOverlay(){
   const toBreak=currentAllies.sort(()=>Math.random()-0.5).slice(0,Math.min(breakCount,currentAllies.length));
   const toAdd=nonAllies.sort(()=>Math.random()-0.5).slice(0,Math.min(newCount,nonAllies.length));
 
-  // Show changes text below allies bar
-  const changesEl=document.getElementById('ab-changes');
-  const breakText=toBreak.map(n=>`✕ ${n}`).join('  ');
-  const addText=toAdd.map(n=>`✓ ${n}`).join('  ');
-  changesEl.innerHTML=`<span class="ch-break">${breakText}</span>  <span class="ch-new">${addText}</span>`;
-
-  // Animate removal
-  toBreak.forEach(n=>{
-    const items=document.querySelectorAll('.ab-item');
-    items.forEach(el=>{if(el.textContent===n) el.classList.add('removing');});
+  // Animate out removed allies
+  const items=document.querySelectorAll('.ab-item');
+  items.forEach(el=>{
+    if(toBreak.includes(el.textContent)){
+      if(typeof gsap!=='undefined'){
+        gsap.to(el,{opacity:0,scale:0.5,y:-10,duration:0.4,onComplete:()=>{
+          toBreak.forEach(n=>allies.delete(n));
+          toAdd.forEach(n=>allies.add(n));
+          updateAlliesBar();
+          // Animate in new allies
+          const newItems=document.querySelectorAll('.ab-item');
+          newItems.forEach(nel=>{
+            if(toAdd.includes(nel.textContent)){
+              nel.style.borderColor='#ffaa3355';nel.style.color='#ffaa33';
+              gsap.from(nel,{opacity:0,scale:0.5,y:10,duration:0.4});
+              setTimeout(()=>{nel.style.borderColor='';nel.style.color='';},2000);
+            }
+          });
+        }});
+      }
+    }
   });
 
-  // After animation, apply changes and rebuild
-  setTimeout(()=>{
-    toBreak.forEach(n=>allies.delete(n));
-    toAdd.forEach(n=>allies.add(n));
-    updateAlliesBar();
-    // Mark new ones
-    toAdd.forEach(n=>{
-      const items=document.querySelectorAll('.ab-item');
-      items.forEach(el=>{if(el.textContent===n) el.classList.add('adding');});
-    });
-  },500);
+  // Toast notification
+  const area=document.getElementById('toast-area');
+  const toast=document.createElement('div');
+  toast.className='toast neutral';
+  const breakText=toBreak.map(n=>`✕${n}`).join(' ');
+  const addText=toAdd.map(n=>`✓${n}`).join(' ');
+  toast.innerHTML=`<div class="toast-title">🔄 동맹 재편</div><div class="toast-stmt"><span style="color:#ff4444">${breakText}</span> <span style="color:#33ff33">${addText}</span></div>`;
+  area.appendChild(toast);
+  if(typeof baffle!=='undefined'){const b=baffle(toast.querySelector('.toast-title'),{characters:'░▒▓',speed:40});b.start();setTimeout(()=>b.reveal(400),50);}
+  setTimeout(()=>{if(toast.parentNode)toast.remove();},3500);
 
-  // Clear changes text after a few seconds
+  // Show changes below allies bar
+  const changesEl=document.getElementById('ab-changes');
+  changesEl.innerHTML=`<span class="ch-break">${breakText}</span> <span class="ch-new">${addText}</span>`;
   setTimeout(()=>{changesEl.innerHTML='';},4000);
 }
 
@@ -475,16 +550,6 @@ function executeAction(action){
 
 inputEl.addEventListener('keydown',e=>{
   if(gameOver)return;
-  // Dismiss announcement
-  if(announcePause){
-    if(e.key==='Enter'||e.key==='Escape'){
-      e.preventDefault();
-      document.getElementById('announce-overlay').classList.remove('show');
-      announcePause=false;
-      inputEl.focus();
-    }
-    return;
-  }
   if(alliancePhase)return;
   if(e.key==='Enter'){
     e.preventDefault();
@@ -500,25 +565,26 @@ inputEl.addEventListener('keydown',e=>{
     e.preventDefault();
     if(Date.now()<deferCooldown) return;
     const first=getFirst();if(!first) return;
-    // Send to back of queue — no typing needed
     deferCooldown=Date.now()+2000;
-    first.t=-0.08; // push back
-    first.state='approaching';
+    // Set to 'deferring' state — will animate backward
+    first.state='deferring';
+    first.deferTarget=first.t-0.15-Math.random()*0.05; // go back
+    // Spawn angry speech
+    const DEFER_LINES=['뭐?! 돌아가라고?','아 진짜...','왜 나만!','항의한다!','이게 나라냐','기다렸는데!','연료비 누가 내?','짜증나네 진짜'];
+    speechBubbles.push({shipId:first.id,offsetY:-15*first.sz.s,text:DEFER_LINES[Math.floor(Math.random()*DEFER_LINES.length)],life:100,age:0,size:Math.max(9,10+first.sz.s*2)});
+    clearInput();
     // Move to end of ships array
     const idx=ships.indexOf(first);
     if(idx>-1){ships.splice(idx,1);ships.push(first);}
-    reindexQueue();
-    clearInput();
     updateLabel();
-    // Visual feedback
     document.getElementById('typing-label').innerHTML=
       `<span style="color:#ffaa33">↩ ${first.flag} ${first.label} 계류</span>`;
-    setTimeout(updateLabel,800);
+    setTimeout(updateLabel,1000);
   }
 });
 function updateLabel(){
   const el=document.getElementById('typing-label');const first=getFirst();
-  if(!first||gameOver||alliancePhase||announcePause){el.innerHTML=`<span style="color:#33ff3322">${alliancePhase?'해협 폐쇄 중…':announcePause?'':'선박 대기 중…'}</span>`;return;}
+  if(!first||gameOver||alliancePhase){el.innerHTML=`<span style="color:#33ff3322">${alliancePhase?'해협 폐쇄 중…':'선박 대기 중…'}</span>`;return;}
   el.textContent=`${first.flag} ${first.label}`;
 }
 let seizedList=[];
@@ -601,7 +667,7 @@ let trumpBonusMultiplier=1;
 let missileParticles=[];
 
 function checkTrumpEvent(){
-  if(announcePause||alliancePhase) return;
+  if(alliancePhase) return;
   const queueCount=ships.filter(s=>s.state==='queuing').length;
   if(queueCount>=5 && processedCount-lastTrumpAt>=3){
     lastTrumpAt=processedCount;
@@ -662,27 +728,15 @@ function triggerSpecialEvent(){
 }
 
 function showSpecialAnnounce(badge,text,color){
-  const overlay=document.getElementById('announce-overlay');
-  const badgeEl=document.getElementById('ann-badge');
-  const title=document.getElementById('ann-title');
-  const sub=document.getElementById('ann-sub');
-  const stmts=document.getElementById('ann-statements');
-
-  badgeEl.className='ann-badge';badgeEl.style.cssText=`border-color:${color}55;color:${color};background:${color}22`;
-  badgeEl.textContent=badge;
-  title.className='ann-title';title.style.color=color;title.style.textShadow=`0 0 20px ${color}66`;
+  const area=document.getElementById('toast-area');
+  const toast=document.createElement('div');
+  toast.className='toast neutral';
+  toast.style.borderColor=color+'44';toast.style.background=color+'18';toast.style.color=color;
   const lines=text.split('\n');
-  title.textContent=lines[0];
-  sub.className='ann-sub';sub.style.color=color+'88';
-  sub.textContent=lines[1]||'';
-  stmts.innerHTML='';
-
-  overlay.classList.add('show');
-  announcePause=true;
-
-  if(typeof confetti==='function' && color==='#ffaa33'){
-    confetti({particleCount:40,spread:50,origin:{y:0.5},colors:['#ffaa33','#ff6600','#ffcc00']});
-  }
+  toast.innerHTML=`<div class="toast-title">${lines[0]}</div>${lines[1]?'<div class="toast-stmt">'+lines[1]+'</div>':''}`;
+  area.appendChild(toast);
+  if(typeof confetti==='function'){confetti({particleCount:30,spread:40,origin:{y:0.7},colors:[color,'#fff']});}
+  setTimeout(()=>{if(toast.parentNode)toast.remove();},3500);
 }
 
 function showAnnounce(type, ship){
@@ -692,52 +746,36 @@ function showAnnounce(type, ship){
   else if(type==='seize-ally') stats.allySeized++;
   else if(type==='pass-enemy') stats.enemyPassed++;
 
-  const overlay=document.getElementById('announce-overlay');
-  const badge=document.getElementById('ann-badge');
-  const title=document.getElementById('ann-title');
-  const sub=document.getElementById('ann-sub');
-  const stmts=document.getElementById('ann-statements');
-
-  const isGood = type==='seize-enemy';
-
-  badge.style.cssText='';title.style.cssText='';sub.style.cssText='';
-  badge.className='ann-badge '+(isGood?'success':'fail');
-  title.className='ann-title '+(isGood?'success':'fail');
-  sub.className='ann-sub '+(isGood?'success':'fail');
-
+  const area=document.getElementById('toast-area');
   const cn=ship.country.name;
-  if(type==='seize-enemy'){
-    badge.textContent='나포 성공';
-    title.textContent=`${ship.flag} ${cn} 선박 나포!`;
-    sub.textContent=`+20점 — ${cn} 비동맹국 선박을 성공적으로 나포`;
-  } else if(type==='seize-ally'){
-    badge.textContent='⚠ 외교 사고';
-    title.textContent=`${ship.flag} ${cn} 동맹국 나포!`;
-    sub.textContent=`HP -1 — ${cn} 동맹국 선박을 나포하는 외교적 참사`;
-  } else if(type==='pass-enemy'){
-    badge.textContent='⚠ 적국 통과';
-    title.textContent=`${ship.flag} ${cn} 통과 허용`;
-    sub.textContent=`HP -1 — ${cn} 비동맹국 선박을 통과시켰습니다`;
-  }
+  const isGood=type==='seize-enemy';
 
-  stmts.innerHTML='';
+  let titleText='',cls='';
+  if(type==='seize-enemy'){titleText=`🎯 ${ship.flag} ${cn} 나포 성공! +${20*trumpBonusMultiplier}점`;cls='success';}
+  else if(type==='seize-ally'){titleText=`⚠ ${ship.flag} ${cn} 동맹국 나포! HP-1`;cls='fail';}
+  else if(type==='pass-enemy'){titleText=`⚠ ${ship.flag} ${cn} 적국 통과! HP-1`;cls='fail';}
+
   const chosen=getStatements(type,ship.country);
-  chosen.forEach((text)=>{
-    const el=document.createElement('div');
-    el.className='ann-stmt '+(isGood?'ally':(type==='pass-enemy'?'neutral':'enemy'));
-    el.textContent=text;
-    stmts.appendChild(el);
-  });
+  const stmtHtml=chosen.map(t=>`<div class="toast-stmt">${t}</div>`).join('');
 
-  overlay.classList.add('show');
-  announcePause=true;
+  const toast=document.createElement('div');
+  toast.className='toast '+cls;
+  toast.innerHTML=`<div class="toast-title">${titleText}</div>${stmtHtml}`;
+  area.appendChild(toast);
+
+  // Baffle effect on title
+  const titleEl=toast.querySelector('.toast-title');
+  if(typeof baffle!=='undefined'){
+    const b=baffle(titleEl,{characters:'█▓▒░',speed:50});
+    b.start();setTimeout(()=>b.reveal(600),100);
+  }
 
   if(isGood && typeof confetti==='function'){
-    confetti({particleCount:80,spread:70,origin:{y:0.5},colors:['#33ff33','#00aa44','#88ff88']});
+    confetti({particleCount:60,spread:60,origin:{y:0.7},colors:['#33ff33','#00aa44','#88ff88']});
   }
-  if(typeof gsap!=='undefined'){
-    gsap.fromTo('.ann-stmt',{opacity:0,y:15},{opacity:1,y:0,stagger:0.2,delay:0.3,duration:0.4});
-  }
+
+  // Auto-remove
+  setTimeout(()=>{if(toast.parentNode)toast.remove();},4000);
 }
 
 // ═══════════════════════════════════════
@@ -1086,6 +1124,16 @@ function renderShips(){
       // Random speech when jostling
       if(Math.random()<0.003) spawnSpeech(s);
     }
+    else if(s.state==='deferring'){
+      // Animate backward slowly
+      s.t+=(s.deferTarget-s.t)*0.04;
+      s.vox+=(Math.random()-0.5)*0.3;s.voy+=(Math.random()-0.5)*0.3;
+      if(Math.abs(s.t-s.deferTarget)<0.005){
+        s.state='approaching';
+        s.t=s.deferTarget;
+        reindexQueue();
+      }
+    }
     else if(s.state==='transiting'){s.t+=s.baseSpeed*2.5;if(s.t>1.05)s.state='gone';}
     else if(s.state==='seized'){
       s.flash=Math.max(0,s.flash-0.008);
@@ -1179,7 +1227,7 @@ function renderShips(){
 
 function loop(){
   if(!gameOver){
-    if(!alliancePhase&&!announcePause){
+    if(!alliancePhase){
       document.getElementById('timer').textContent=Math.max(0,nextAllianceAt-processedCount);
       // Clear expired effects
       if(activeEffect && Date.now()>effectEndTime) activeEffect=null;
@@ -1201,8 +1249,48 @@ function loop(){
 }
 
 pickAllies();updateAlliesBar();updateHUD();
-for(let i=0;i<4;i++)spawnShip();
-inputEl.focus();loop();
+
+// ═══════════════════════════════════════
+// INTRO SEQUENCE
+// ═══════════════════════════════════════
+let gameStarted=false;
+
+// Start baffle on headline
+const introHL=document.getElementById('intro-headline');
+const introSub=document.getElementById('intro-sub');
+const introHint=document.getElementById('intro-hint');
+
+if(typeof baffle!=='undefined'){
+  const b=baffle(introHL,{characters:'█▓▒░<>/',speed:80});
+  b.start();
+  setTimeout(()=>b.reveal(1500),500);
+  const b2=baffle(introSub,{characters:'·•◦○',speed:60});
+  b2.start();
+  setTimeout(()=>b2.reveal(1000),1500);
+}
+setTimeout(()=>{introHint.textContent='Enter를 눌러 시작';},3000);
+
+// Draw map in background during intro
+function introLoop(){
+  if(gameStarted) return;
+  drawMap();drawGate();
+  requestAnimationFrame(introLoop);
+}
+introLoop();
+
+document.addEventListener('keydown',function introKey(e){
+  if(e.key==='Enter' && !gameStarted){
+    e.preventDefault();
+    gameStarted=true;
+    document.getElementById('intro-overlay').classList.add('hide');
+    setTimeout(()=>{document.getElementById('intro-overlay').style.display='none';},800);
+    // Start game
+    for(let i=0;i<4;i++)spawnShip();
+    inputEl.focus();
+    loop();
+    document.removeEventListener('keydown',introKey);
+  }
+});
 </script>
 </body>
 </html>
