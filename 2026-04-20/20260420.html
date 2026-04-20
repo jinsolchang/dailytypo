@@ -177,7 +177,7 @@ canvas#scene{position:fixed;inset:0;z-index:1}
 <div class="hud-tr">
   <div><span class="label">SCORE</span><br><span class="val" id="score">0</span></div>
   <div><span class="label">HP</span><br><span class="hp" id="hp">♥♥♥</span></div>
-  <div><span class="label">NEXT SHIFT</span><br><span class="timer" id="timer">2</span><span style="color:#ffaa3344">척</span></div>
+  <div><span class="label">QUEUE</span><br><span class="timer" id="timer">0</span><span style="color:#ffaa3344">/20</span></div>
 </div>
 <div class="allies-bar"><div class="ab-title">▸ ALLIED NATIONS 동맹국 ◂</div><div class="ab-list" id="ab-list"></div></div>
 <div class="toast-area" id="toast-area"></div>
@@ -1517,7 +1517,10 @@ function renderShips(){
 function loop(){
   if(!gameOver){
     if(!alliancePhase){
-      document.getElementById('timer').textContent=Math.max(0,nextAllianceAt-processedCount);
+      const qc=ships.filter(s=>s.state==='queuing').length;
+      const timerEl=document.getElementById('timer');
+      timerEl.textContent=qc;
+      timerEl.style.color=qc>=15?'#ff4444':qc>=10?'#ffaa33':'#33ff33';
       // Clear expired effects
       if(activeEffect && Date.now()>effectEndTime) activeEffect=null;
       spawnAcc++;
