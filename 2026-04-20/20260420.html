@@ -426,7 +426,7 @@ function getFirst(){
 // ALLIANCE
 // ═══════════════════════════════════════
 function pickAllies(){
-  const pool=[...COUNTRIES];
+  const pool=COUNTRIES.filter(c=>c.name!=='이란');
   for(let i=pool.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[pool[i],pool[j]]=[pool[j],pool[i]];}
   allies=new Set(pool.slice(0,10).map(c=>c.name));
 }
@@ -437,7 +437,7 @@ function updateAlliesBar(){
 
 function showAllianceOverlay(){
   const currentAllies=[...allies];
-  const nonAllies=COUNTRIES.filter(c=>!allies.has(c.name)).map(c=>c.name);
+  const nonAllies=COUNTRIES.filter(c=>c.name!=='이란'&&!allies.has(c.name)).map(c=>c.name);
   const breakCount=1+Math.floor(Math.random()*3);
   const newCount=1+Math.floor(Math.random()*3);
   const toBreak=currentAllies.sort(()=>Math.random()-0.5).slice(0,Math.min(breakCount,currentAllies.length));
