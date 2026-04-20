@@ -665,42 +665,53 @@ let missileParticles=[];
 function checkTrumpEvent(){
   if(alliancePhase) return;
   const queueCount=ships.filter(s=>s.state==='queuing').length;
-  if(queueCount>=5 && processedCount-lastTrumpAt>=3){
+  if(queueCount>=3 && processedCount-lastTrumpAt>=4){
     lastTrumpAt=processedCount;
     const tweet=TRUMP_TWEETS[Math.floor(Math.random()*TRUMP_TWEETS.length)];
     showSpecialAnnounce('🇺🇸 TRUTH SOCIAL',tweet.text,'#ff6600');
 
-    // Apply effect after dismiss
+    // Apply effect immediately
     const eff=tweet.effect;
     if(eff==='missile'){
-      // Missile hits a random queuing ship (destroys it)
-      setTimeout(()=>{
-        const targets=ships.filter(s=>s.state==='queuing');
-        if(targets.length>0){
-          const t=targets[Math.floor(Math.random()*targets.length)];
-          // Explosion particles
-          const p=t.pos();
-          for(let i=0;i<20;i++){
-            missileParticles.push({
-              x:p.x,y:p.y,
-              vx:(Math.random()-0.5)*4,vy:(Math.random()-0.5)*4,
-              life:40+Math.random()*30,age:0,
-              size:2+Math.random()*4,
-              color:Math.random()>0.5?'#ff4444':'#ffaa33',
-            });
-          }
-          t.state='gone';t.opacity=0;
-          score+=5;updateHUD();
-          reindexQueue();
+      const targets=ships.filter(s=>s.state==='queuing');
+      if(targets.length>0){
+        const victim=targets[Math.floor(Math.random()*targets.length)];
+        const vp=victim.pos();
+        // Explosion particles
+        for(let i=0;i<30;i++){
+          missileParticles.push({
+            x:vp.x,y:vp.y,
+            vx:(Math.random()-0.5)*5,vy:(Math.random()-0.5)*5,
+            life:50+Math.random()*30,age:0,
+            size:2+Math.random()*5,
+            color:['#ff4444','#ffaa33','#ff6600','#ffcc00'][Math.floor(Math.random()*4)],
+          });
         }
-      },200);
+        victim.state='gone';victim.opacity=0;
+        score+=5;updateHUD();reindexQueue();
+        // Toast for the hit
+        const area=document.getElementById('toast-area');
+        const t2=document.createElement('div');t2.className='toast fail';
+        t2.innerHTML=`<div class="toast-title">💥 ${victim.flag} ${victim.label} 격침!</div>`;
+        area.appendChild(t2);
+        setTimeout(()=>{if(t2.parentNode)t2.remove();},3000);
+        if(typeof confetti==='function') confetti({particleCount:50,spread:80,origin:{y:0.5},colors:['#ff4444','#ff6600','#ffaa33']});
+      }
     } else if(eff==='blockade'){
-      // Force gate closed for 4 seconds
       gateOpen=false;gateOpenTimer=0;
-      setTimeout(()=>{/* gate stays closed until next action */},0);
+      // Toast
+      const area=document.getElementById('toast-area');
+      const t2=document.createElement('div');t2.className='toast fail';
+      t2.innerHTML=`<div class="toast-title">🚫 해협 강제 봉쇄!</div>`;
+      area.appendChild(t2);
+      setTimeout(()=>{if(t2.parentNode)t2.remove();},3000);
     } else if(eff==='sanction'){
-      // Next 3 seize actions give double points
       trumpBonusMultiplier=2;
+      const area=document.getElementById('toast-area');
+      const t2=document.createElement('div');t2.className='toast success';
+      t2.innerHTML=`<div class="toast-title">💰 제재 강화! 나포 점수 2배 (15초)</div>`;
+      area.appendChild(t2);
+      setTimeout(()=>{if(t2.parentNode)t2.remove();},3000);
       setTimeout(()=>{trumpBonusMultiplier=1;},15000);
     }
   }
