@@ -94,10 +94,10 @@ canvas#scene{position:fixed;inset:0;z-index:1}
 .alliance-overlay .ao-timer{margin-top:12px;font-size:0.5rem;color:#33ff3333}
 .gameover{position:fixed;inset:0;z-index:200;background:rgba(8,0,0,0.95);display:flex;flex-direction:column;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity 0.5s}
 .gameover.show{opacity:1;pointer-events:auto}
-.gameover .go-title{font-family:'Noto Sans KR',sans-serif;font-weight:900;font-size:clamp(1.8rem,5vw,3.2rem);color:#ff4444;text-shadow:0 0 30px rgba(255,0,0,0.5)}
-.gameover .go-sub{font-size:0.75rem;color:#ff444455;margin-top:4px}
-.gameover .go-score{font-size:0.95rem;color:#ffaa33;margin-top:10px}
-.gameover .go-restart{margin-top:16px;padding:7px 20px;background:#ff4444;color:#000;border:none;border-radius:3px;font-size:0.75rem;font-weight:700;cursor:pointer;font-family:'Share Tech Mono',monospace}
+.gameover .go-title{font-family:'Noto Sans KR',sans-serif;font-weight:900;font-size:clamp(2.5rem,8vw,5rem);color:#ff4444;text-shadow:0 0 40px rgba(255,0,0,0.5)}
+.gameover .go-sub{font-size:clamp(0.8rem,2vw,1.2rem);color:#ff444466;margin-top:6px}
+.gameover .go-score{font-size:1.1rem;color:#ffaa33;margin-top:16px}
+.gameover .go-restart{margin-top:20px;font-size:0.55rem;color:#ffffff22;letter-spacing:0.1em;animation:blink 1.5s infinite;border:none;background:none;cursor:pointer;font-family:'Share Tech Mono',monospace}
 
 .seized-panel{
   position:fixed;bottom:90px;left:12px;z-index:10;pointer-events:none;
@@ -197,7 +197,7 @@ canvas#scene{position:fixed;inset:0;z-index:1}
 <div class="gameover" id="gameover">
   <div class="go-title">GAME OVER</div><div class="go-sub">해협 통제 실패</div>
   <div class="go-score" id="go-score"></div>
-  <button class="go-restart" onclick="location.reload()">다시 시작</button>
+  <button class="go-restart">Enter를 눌러 재시작</button>
 </div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
@@ -597,10 +597,24 @@ document.addEventListener('click',()=>{if(!gameOver&&!alliancePhase)inputEl.focu
 function updateHUD(){document.getElementById('score').textContent=score;document.getElementById('hp').textContent='♥'.repeat(Math.max(0,hp))+'♡'.repeat(Math.max(0,3-hp));}
 function endGame(){
   gameOver=true;
-  stats.passed++; // count the last one
-  const el=document.getElementById('go-score');
-  el.innerHTML=`최종 점수: ${score}<br><span style="font-size:0.7rem;color:#ffffff44">통과 ${stats.passed} | 나포 ${stats.seized} | 외교사고 ${stats.allySeized} | 적국통과 ${stats.enemyPassed}</span>`;
-  setTimeout(()=>document.getElementById('gameover').classList.add('show'),400);
+  stats.passed++;
+  const overlay=document.getElementById('gameover');
+  document.getElementById('go-score').innerHTML=`최종 점수: ${score}<br><span style="font-size:0.7rem;color:#ffffff44">통과 ${stats.passed} | 나포 ${stats.seized} | 외교사고 ${stats.allySeized} | 적국통과 ${stats.enemyPassed}</span>`;
+  setTimeout(()=>{
+    overlay.classList.add('show');
+    if(typeof baffle!=='undefined'){
+      baffle('.go-title',{characters:'█▓▒░<>/',speed:80}).start().reveal(1500);
+      baffle('.go-sub',{characters:'·•◦',speed:60}).start().reveal(1000);
+    }
+    // Enter to restart
+    document.addEventListener('keydown',function restartKey(e){
+      if(e.key==='Enter'){
+        e.preventDefault();
+        document.removeEventListener('keydown',restartKey);
+        location.reload();
+      }
+    });
+  },600);
 }
 
 // ═══════════════════════════════════════
