@@ -451,18 +451,24 @@ function showAllianceOverlay(){
   bar.appendChild(tag);
   setTimeout(()=>{if(tag.parentNode)tag.remove();},3000);
 
-  // Baffle the entire allies list
-  const listEl=document.getElementById('ab-list');
+  // Baffle each ally item individually (keeps border/badge, scrambles text only)
   if(typeof baffle!=='undefined'){
-    const b=baffle(listEl,{characters:'█▓▒░◆■',speed:60});
-    b.start();
-    // After scramble, apply changes and reveal
+    const items=document.querySelectorAll('.ab-item');
+    items.forEach(el=>{
+      const b=baffle(el,{characters:'█▓▒░◆■',speed:50});
+      b.start();
+    });
     setTimeout(()=>{
       toBreak.forEach(n=>allies.delete(n));
       toAdd.forEach(n=>allies.add(n));
       updateAlliesBar();
-      b.reveal(800);
-    },800);
+      // Reveal new items
+      const newItems=document.querySelectorAll('.ab-item');
+      newItems.forEach(el=>{
+        const b2=baffle(el,{characters:'█▓▒░◆■',speed:50});
+        b2.start();b2.reveal(600);
+      });
+    },700);
   } else {
     toBreak.forEach(n=>allies.delete(n));
     toAdd.forEach(n=>allies.add(n));
@@ -1018,11 +1024,10 @@ function drawMap(){
   }
   cx.setLineDash([]);
 
-  // Radar sweep — 1 revolution per second with slight acceleration
+  // Radar sweep — 1 revolution per 4 seconds
   const t=Date.now()*0.001;
-  const radarSpeed=Math.PI*2; // 1 rev/sec
-  const accel=Math.sin(t*0.7)*0.3; // slight speed variation
-  radarAngle=(t*(radarSpeed+accel))%(Math.PI*2);
+  const radarSpeed=Math.PI*0.5; // 1 rev per 4 sec
+  radarAngle=(t*radarSpeed)%(Math.PI*2);
   const rCx=W*0.535,rCy=H*0.46,rR=W*0.35;
 
   // Sweep cone
