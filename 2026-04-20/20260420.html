@@ -24,6 +24,7 @@ canvas#scene{position:fixed;inset:0;z-index:1}
 .typing-input-wrap{display:flex;align-items:center;justify-content:center;max-width:480px;margin:0 auto}
 #typing-input{width:100%;padding:7px 12px;background:#0b1622;border:1px solid #33ff3344;border-radius:4px;color:#33ff33;font-family:'Noto Sans KR','Share Tech Mono',monospace;font-size:clamp(0.9rem,2.2vw,1.3rem);font-weight:700;outline:none;text-align:center;caret-color:#33ff33}
 #typing-input:focus{border-color:#33ff33}
+@keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-6px)}40%{transform:translateX(6px)}60%{transform:translateX(-4px)}80%{transform:translateX(4px)}}
 #typing-input::placeholder{color:#33ff3322}
 .typing-actions{display:flex;justify-content:center;gap:12px;margin-top:4px;font-size:0.5rem}
 .typing-actions span{padding:1px 5px;border-radius:2px}
@@ -113,7 +114,7 @@ canvas#scene{position:fixed;inset:0;z-index:1}
 <div class="typing-zone">
   <div class="typing-label" id="typing-label">선박 대기 중…</div>
   <div class="typing-input-wrap"><input type="text" id="typing-input" placeholder="선박명 입력" autocomplete="off" autofocus></div>
-  <div class="typing-actions"><span class="pass">Enter → 통과</span><span class="seize">Esc → 나포</span></div>
+  <div class="typing-actions"><span class="pass">Enter → 통과</span><span class="seize">Esc → 나포</span><span class="pass" style="border-color:#ffaa3322;color:#ffaa3355">Tab → 계류</span></div>
 </div>
 
 <div class="seized-panel" id="seized-panel">
@@ -406,6 +407,7 @@ function showAllianceOverlay(){
 const inputEl=document.getElementById('typing-input');
 let isComposing=false,pendingClear=false;
 let pendingAction=null; // 'pass' or 'seize'
+let deferCooldown=0; // timestamp when defer is available again
 
 inputEl.addEventListener('compositionstart',()=>{isComposing=true;});
 inputEl.addEventListener('compositionend',()=>{
@@ -423,7 +425,21 @@ function executeAction(action){
   if(gameOver||alliancePhase)return;
   const first=getFirst();if(!first)return;
   const val=inputEl.value.trim();
-  if(val!==first.label)return;
+  if(val!==first.label){
+    // Wrong input — shake + flash
+    if(val.length>0){
+      inputEl.style.borderColor='#ff4444';
+      inputEl.style.animation='shake 0.3s';
+      document.getElementById('typing-label').innerHTML=
+        `<span style="color:#ff4444">⚠ 오입력! — 정확히 입력하세요</span>`;
+      setTimeout(()=>{
+        inputEl.style.borderColor='#33ff3344';
+        inputEl.style.animation='';
+        updateLabel();
+      },800);
+    }
+    return;
+  }
 
   // Open gate briefly
   gateOpen=true;
@@ -434,7 +450,7 @@ function executeAction(action){
     else{hp--;first.flash=1;showAnnounce('pass-enemy',first);}
     first.state='transiting';
   } else {
-    if(!first.isAlly()){score+=20;showAnnounce('seize-enemy',first);}
+    if(!first.isAlly()){score+=20*trumpBonusMultiplier;showAnnounce('seize-enemy',first);}
     else{hp--;showAnnounce('seize-ally',first);}
     first.state='seized';first.flash=1;
     addToSeizedList(first);
@@ -480,6 +496,25 @@ inputEl.addEventListener('keydown',e=>{
     e.preventDefault();
     if(isComposing){pendingAction='seize';return;}
     executeAction('seize');
+  }
+  if(e.key==='Tab'){
+    e.preventDefault();
+    if(Date.now()<deferCooldown) return;
+    const first=getFirst();if(!first) return;
+    // Send to back of queue — no typing needed
+    deferCooldown=Date.now()+2000;
+    first.t=-0.08; // push back
+    first.state='approaching';
+    // Move to end of ships array
+    const idx=ships.indexOf(first);
+    if(idx>-1){ships.splice(idx,1);ships.push(first);}
+    reindexQueue();
+    clearInput();
+    updateLabel();
+    // Visual feedback
+    document.getElementById('typing-label').innerHTML=
+      `<span style="color:#ffaa33">↩ ${first.flag} ${first.label} 계류</span>`;
+    setTimeout(updateLabel,800);
   }
 });
 function updateLabel(){
@@ -554,22 +589,58 @@ const STATEMENTS = {
 
 // Trump special tweets when queue gets long
 const TRUMP_TWEETS=[
-  '🇺🇸 트럼프 @realDonaldTrump:\n"해협이 막히고 있다! WEAK! 내가 했으면 5분 만에 해결했을 것. SAD!"',
-  '🇺🇸 트럼프 @realDonaldTrump:\n"배가 너무 많다! FIRE THE MISSILES! 농담 아님!"',
-  '🇺🇸 트럼프 @realDonaldTrump:\n"이란이 웃고 있다. 해협을 완전히 봉쇄해야 한다. TOTAL BLOCKADE!"',
-  '🇺🇸 트럼프 @realDonaldTrump:\n"내 임기였으면 배 한 척도 못 지나갔을 것. NOBODY does it better than me!"',
-  '🇺🇸 트럼프 @realDonaldTrump:\n"유가가 폭등하고 있다! 해협 관리자를 해고하라! YOU\'RE FIRED!"',
-  '🇺🇸 트럼프 @realDonaldTrump:\n"중국 배가 지나갔다고? CHINA IS LAUGHING AT US! 관세 500%!"',
-  '🇺🇸 트럼프 @realDonaldTrump:\n"B-2 폭격기를 보내겠다. 아니 B-52. 아니 둘 다! MAXIMUM PRESSURE!"',
+  {text:'🇺🇸 트럼프 @realDonaldTrump:\n"해협이 막히고 있다! WEAK! 미사일 발사!"',effect:'missile'},
+  {text:'🇺🇸 트럼프 @realDonaldTrump:\n"FIRE THE MISSILES! 농담 아님!"',effect:'missile'},
+  {text:'🇺🇸 트럼프 @realDonaldTrump:\n"해협을 완전히 봉쇄해야 한다. TOTAL BLOCKADE!"',effect:'blockade'},
+  {text:'🇺🇸 트럼프 @realDonaldTrump:\n"내 임기였으면 배 한 척도 못 지나갔을 것!"',effect:'blockade'},
+  {text:'🇺🇸 트럼프 @realDonaldTrump:\n"유가가 폭등! 해협 관리자를 해고하라! YOU\'RE FIRED!"',effect:'sanction'},
+  {text:'🇺🇸 트럼프 @realDonaldTrump:\n"MAXIMUM PRESSURE! 제재를 500% 강화한다!"',effect:'sanction'},
+  {text:'🇺🇸 트럼프 @realDonaldTrump:\n"B-52 폭격기를 보내겠다. SHOW OF FORCE!"',effect:'missile'},
 ];
 let lastTrumpAt=0;
+let trumpBonusMultiplier=1;
+let missileParticles=[];
 
 function checkTrumpEvent(){
   const queueCount=ships.filter(s=>s.state==='queuing').length;
   if(queueCount>=5 && processedCount-lastTrumpAt>=3){
     lastTrumpAt=processedCount;
     const tweet=TRUMP_TWEETS[Math.floor(Math.random()*TRUMP_TWEETS.length)];
-    showSpecialAnnounce('🇺🇸 TRUTH SOCIAL',tweet,'#ff6600');
+    showSpecialAnnounce('🇺🇸 TRUTH SOCIAL',tweet.text,'#ff6600');
+
+    // Apply effect after dismiss
+    const eff=tweet.effect;
+    if(eff==='missile'){
+      // Missile hits a random queuing ship (destroys it)
+      setTimeout(()=>{
+        const targets=ships.filter(s=>s.state==='queuing');
+        if(targets.length>0){
+          const t=targets[Math.floor(Math.random()*targets.length)];
+          // Explosion particles
+          const p=t.pos();
+          for(let i=0;i<20;i++){
+            missileParticles.push({
+              x:p.x,y:p.y,
+              vx:(Math.random()-0.5)*4,vy:(Math.random()-0.5)*4,
+              life:40+Math.random()*30,age:0,
+              size:2+Math.random()*4,
+              color:Math.random()>0.5?'#ff4444':'#ffaa33',
+            });
+          }
+          t.state='gone';t.opacity=0;
+          score+=5;updateHUD();
+          reindexQueue();
+        }
+      },200);
+    } else if(eff==='blockade'){
+      // Force gate closed for 4 seconds
+      gateOpen=false;gateOpenTimer=0;
+      setTimeout(()=>{/* gate stays closed until next action */},0);
+    } else if(eff==='sanction'){
+      // Next 3 seize actions give double points
+      trumpBonusMultiplier=2;
+      setTimeout(()=>{trumpBonusMultiplier=1;},15000);
+    }
   }
 }
 
@@ -1068,6 +1139,18 @@ function renderShips(){
 
   // Speech bubbles
   renderSpeechBubbles();
+
+  // Missile/explosion particles
+  for(let i=missileParticles.length-1;i>=0;i--){
+    const p=missileParticles[i];
+    p.x+=p.vx;p.y+=p.vy;p.vy+=0.05;p.age++;
+    if(p.age>=p.life){missileParticles.splice(i,1);continue;}
+    const t=p.age/p.life;
+    cx.save();cx.globalAlpha=(1-t)*0.8;
+    cx.fillStyle=p.color;
+    cx.beginPath();cx.arc(p.x,p.y,p.size*(1-t*0.5),0,Math.PI*2);cx.fill();
+    cx.restore();
+  }
 }
 
 function loop(){
