@@ -102,18 +102,18 @@ canvas#scene{position:fixed;inset:0;z-index:1}
 .alliance-overlay .ao-timer{margin-top:12px;font-size:0.5rem;color:#33ff3333}
 
 .trump-warn{
-  position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:30;
+  position:fixed;top:10px;left:12px;z-index:30;
   pointer-events:none;text-align:center;
   background:rgba(40,0,0,0.85);border:2px solid #ff4444;
-  border-radius:10px;padding:16px 32px;
+  border-radius:8px;padding:10px 20px;
   display:none;
   animation:warnPulse 1s infinite;
 }
 .trump-warn.show{display:block}
-.tw-flag{font-size:2rem}
-.tw-text{font-family:'Noto Sans KR',sans-serif;font-weight:900;font-size:0.85rem;color:#ff4444;margin-top:4px;letter-spacing:0.05em}
-.tw-count{font-size:2.5rem;font-weight:900;color:#ff4444;font-family:'Share Tech Mono',monospace;text-shadow:0 0 20px rgba(255,0,0,0.5)}
-.tw-sub{font-size:0.6rem;color:#ff444488;margin-top:2px}
+.tw-flag{font-size:1.2rem;display:inline}
+.tw-text{font-family:'Noto Sans KR',sans-serif;font-weight:900;font-size:0.7rem;color:#ff4444;margin-top:2px}
+.tw-count{font-size:1.8rem;font-weight:900;color:#ff4444;font-family:'Share Tech Mono',monospace;text-shadow:0 0 15px rgba(255,0,0,0.5)}
+.tw-sub{font-size:0.5rem;color:#ff444466}
 @keyframes warnPulse{0%,100%{border-color:#ff4444;box-shadow:0 0 20px rgba(255,0,0,0.2)}50%{border-color:#ff6600;box-shadow:0 0 40px rgba(255,0,0,0.4)}}
 
 .gameover{position:fixed;inset:0;z-index:200;background:rgba(8,0,0,0.95);display:flex;flex-direction:column;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity 0.5s}
@@ -747,6 +747,7 @@ let trumpBonusMultiplier=1;
 let missileParticles=[];
 let flyingObjects=[]; // missiles, bombers flying across screen
 let trumpWarned=false;
+let bomberLaunched=false;
 
 function checkTrumpEvent(){
   if(alliancePhase) return;
@@ -762,8 +763,9 @@ function checkTrumpEvent(){
   }
   trumpWarned=queueCount>=15;
 
-  // 20+ ships: bomber destroys gate, game over
-  if(queueCount>=20){
+  // 20+ ships: bomber destroys gate, game over — ONCE only
+  if(queueCount>=20 && !bomberLaunched){
+    bomberLaunched=true;
     warnEl.classList.remove('show');
     flyingObjects.push({type:'bomber',x:-100,y:H*0.2,targetX:GATE.x*W,targetY:GATE.topY*H,speed:4,phase:'approach',timer:0});
     showSpecialAnnounce('🇺🇸 미 공군','B-52 전략폭격기 출격 — 호르무즈 해협 폭격 명령','#ff0000');
