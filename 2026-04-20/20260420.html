@@ -1516,8 +1516,12 @@ function loop(){
       // Clear expired effects
       if(activeEffect && Date.now()>effectEndTime) activeEffect=null;
       spawnAcc++;
-      const rate=Math.max(200,450-score*0.6);
-      if(spawnAcc>=rate){spawnAcc=0;spawnShip();}
+      const rate=Math.max(80, 400 - score * 2);
+      if(spawnAcc>=rate){spawnAcc=0;spawnShip();
+        // Bonus spawn at high scores
+        if(score>=100 && Math.random()<0.3) spawnShip();
+        if(score>=200 && Math.random()<0.3) spawnShip();
+      }
       // Trump check — independent of announce state
       checkTrumpEvent();
     }
