@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>"소주 들고 와 경찰 앞 '원샷'"…보란 듯 술타기하다 결국</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&family=Black+Han+Sans&family=Gasoek+One&display=swap');
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a0a;overflow:hidden;height:100vh;font-family:'Noto Sans KR',sans-serif;user-select:none}
+canvas#scene{position:fixed;inset:0;z-index:1}
+.ui{position:fixed;z-index:10;pointer-events:none}
+.caption{
+  top:20px;left:0;right:0;
+  text-align:center;
+  font-family:'Gasoek One','Black Han Sans',sans-serif;
+  font-weight:400;
+  font-size:clamp(1.8rem,4.5vw,3rem);
+  color:rgba(255,255,255,0.3);letter-spacing:0.02em;
+  transition:all 0.4s;
+  line-height:1.2;
+}
+.hint{
+  bottom:56px;left:0;right:0;
+  text-align:center;font-size:0.65rem;
+  color:rgba(255,255,255,0.18);letter-spacing:0.1em;
+  transition:opacity 0.4s;
+}
+.shot-count{
+  top:20px;right:24px;
+  font-size:1.8rem;font-weight:900;
+  color:rgba(140,200,120,0.2);
+  transition:color 0.3s;
+}
+</style>
+</head>
+<body>
+<canvas id="scene"></canvas>
+<div class="ui caption" id="caption"></div>
+<div class="ui hint" id="hint"></div>
+<div class="ui shot-count" id="shotCount"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script>
+const cv = document.getElementById('scene');
+const cx = cv.getContext('2d');
+let W, H, CX, CY, GLASS_R;
+
+function resize() {
+  W = cv.width = innerWidth;
+  H = cv.height = innerHeight;
+  CX = W / 2;
+  CY = H / 2;
+  GLASS_R = Math.min(W, H) * 0.16;
+}
+resize();
+window.addEventListener('resize', resize);
+
+// ═══════════════════════════════════════
+const HEADLINE = '"소주 들고 와 경찰 앞 \'원샷\'" …보란 듯 술타기하다 결국';
+const CHARS = [...HEADLINE];
+
+// ═══════════════════════════════════════
+// 상태
+// ═══════════════════════════════════════
+let shotCount = 0;
+let drunkLevel = 0;
+
+let phase = 'wait';
+let fillLevel = 0;
+let bottleX = -200;
+let bottleAngle = 0;
+let pourStream = 0;
+
+let drinkZoom = 1;
+let drinkBlur = 0;
+let drinkOffsetY = 0;
+
+let textRotation = 0;
+
+// 글자 파티클: 병에서 쏟아져 잔 안으로
+const charParticles = [];
+let charsRevealed = 0; // 몇 글자까지 쏟아졌는지
+
+// 액체 독립 흔들림
+let liquidOffX = 0;
+let liquidOffY = 0;
+let liquidRot = 0;
+
+// ═══════════════════════════════════════
+// 라운드
+// ═══════════════════════════════════════
+const CAPTIONS = [
+  '경찰 앞, 한 남성이 소주잔을 꺼내 들었다',
+  '"이거 봐라" — 보란 듯이 원샷!',
+  '"한 잔 더!" — 거침없이 두 번째',
+  '세상이 슬슬 흔들리기 시작한다…',
+  '…멈출 생각이 없다',
+  '시야가 빙글빙글…',
+  '"이보세요!! 그만 하세요!!"',
+  '현장 검거! 면허 취소!',
+];
+
+// ═══════════════════════════════════════
+// 타이틀 글자 박히기 애니메이션
+// ═══════════════════════════════════════
+const titleChars = []; // { char, x, y, scale, alpha, settled }
+let currentCaption = '';
+
+function caption(text) {
+  // DOM은 숨기고 Canvas로 그림
+  document.getElementById('caption').textContent = '';
+  currentCaption = text;
+  titleChars.length = 0;
+
+  const chars = [...text];
+  const fontSize = Math.min(W * 0.08, 84);
+  cx.font = `400 ${fontSize}px "Noto Sans KR",sans-serif`;
+
+  // 글자별 x 위치 계산 (중앙 정렬)
+  const charWidths = chars.map(c => cx.measureText(c).width);
+  const totalW = charWidths.reduce((a, b) => a + b, 0);
+  let curX = CX - totalW / 2;
+  const baseY = Math.min(H * 0.07, 60);
+
+  chars.forEach((c, i) => {
+    const tc = {
+      char: c,
+      x: curX + charWidths[i] / 2,
+      y: baseY,
+      scale: 12,       // 시작: 엄청 크게
+      alpha: 0,
+      targetScale: 1,
+      settled: false,
+    };
+    titleChars.push(tc);
+    curX += charWidths[i];
+
+    // 딜레이를 두고 하나씩 박히기
+    gsap.delayedCall(i * 0.06, () => {
+      gsap.to(tc, {
+        scale: 1, alpha: 1,
+        duration: 0.25,
+        ease: 'back.out(2)',
+        onComplete() { tc.settled = true; }
+      });
+    });
+  });
+
+  // 등장 완료 후 1.5초 뒤 바닥으로 떨어뜨리기
+  const fallDelay = chars.length * 0.06 + 1.5;
+  chars.forEach((c, i) => {
+    gsap.delayedCall(fallDelay + i * 0.03, () => {
+      const tc = titleChars[i];
+      if (!tc) return;
+      gsap.to(tc, {
+        y: H + 50,
+        alpha: 0,
+        duration: 0.6 + Math.random() * 0.4,
+        ease: 'power2.in',
+      });
+    });
+  });
+}
+
+function drawTitle(drunk) {
+  if (titleChars.length === 0) return;
+  const t = Date.now() * 0.001;
+  const fontSize = Math.min(W * 0.08, 84);
+
+  for (const tc of titleChars) {
+    if (tc.alpha < 0.01) continue;
+    cx.save();
+    cx.translate(tc.x, tc.y);
+
+    // settled 후 가벼운 흔들림
+    if (tc.settled && drunk > 0.05) {
+      const idx = titleChars.indexOf(tc);
+      const sx = Math.sin(t * 0.8 + idx * 1.1) * drunk * 1.5;
+      const sy = Math.cos(t * 0.6 + idx * 1.4) * drunk * 1;
+      const sr = Math.sin(t * 0.9 + idx * 0.7) * drunk * 0.015;
+      cx.translate(sx, sy);
+      cx.rotate(sr);
+    }
+
+    cx.scale(tc.scale, tc.scale);
+    cx.globalAlpha = tc.alpha * 0.35;
+    cx.font = `400 ${fontSize}px "Noto Sans KR"`;
+    cx.textAlign = 'center';
+    cx.textBaseline = 'middle';
+    cx.fillStyle = '#fff';
+    cx.fillText(tc.char, 0, 0);
+
+    // 박히는 순간 임팩트 글로우
+    if (tc.scale > 1.5) {
+      cx.globalAlpha = (tc.scale - 1) * 0.06;
+      cx.fillStyle = 'rgba(200,240,180,1)';
+      cx.fillText(tc.char, 0, 0);
+    }
+
+    cx.restore();
+  }
+}
+
+function startRound() {
+  phase = 'pour';
+  fillLevel = 0;
+  pourStream = 0;
+  charsRevealed = 0;
+  charParticles.length = 0;
+  document.getElementById('hint').style.opacity = '0';
+
+  // 첫 라운드는 이미 caption이 표시되어 있으므로 건너뜀
+  // 이후 라운드: shotCount = 마신 잔 수, 다음 자막 표시
+  if (shotCount > 0) {
+    const idx = Math.min(shotCount, CAPTIONS.length - 2);
+    caption(CAPTIONS[idx]);
+  }
+
+  // 병 슬라이드 인
+  bottleX = -200;
+  bottleAngle = 0;
+  const targetX = CX - GLASS_R * 1.1;
+
+  const b = { x: -200, a: 0 };
+  gsap.to(b, {
+    x: targetX, a: 0.5,
+    duration: 0.9, ease: 'power2.out',
+    onUpdate() { bottleX = b.x; bottleAngle = b.a; }
+  });
+
+  // 따르기 + 글자 쏟아짐
+  gsap.delayedCall(0.9, () => {
+    pourStream = 1;
+    const f = { v: 0 };
+    gsap.to(f, {
+      v: 1, duration: 2.2, ease: 'power1.inOut',
+      onUpdate() {
+        fillLevel = f.v;
+        // 글자를 하나씩 쏟아냄
+        const target = Math.floor(f.v * CHARS.length);
+        while (charsRevealed < target) {
+          spawnCharParticle(charsRevealed);
+          charsRevealed++;
+        }
+      },
+      onComplete() {
+        // 남은 글자 전부
+        while (charsRevealed < CHARS.length) {
+          spawnCharParticle(charsRevealed);
+          charsRevealed++;
+        }
+        pourStream = 0;
+        const bo = { x: bottleX, a: bottleAngle };
+        gsap.to(bo, {
+          x: -200, a: 0, duration: 0.6, ease: 'power2.in',
+          onUpdate() { bottleX = bo.x; bottleAngle = bo.a; }
+        });
+        gsap.delayedCall(0.4, () => {
+          phase = 'ready';
+          document.getElementById('hint').textContent = '클릭하여 원샷';
+          document.getElementById('hint').style.opacity = '1';
+        });
+      }
+    });
+  });
+}
+
+function spawnCharParticle(idx) {
+  // 병 끝 위치 (대략)
+  const bTipX = bottleX + GLASS_R * 0.15;
+  const bTipY = CY - GLASS_R * 1.2;
+  
+  // 잔 안 원형 배치 목표 위치
+  const charAngle = (Math.PI * 2 * idx) / CHARS.length - Math.PI / 2;
+  const targetR = GLASS_R * 0.7;
+  const tgtX = CX + Math.cos(charAngle) * targetR;
+  const tgtY = CY + Math.sin(charAngle) * targetR;
+
+  const p = {
+    char: CHARS[idx],
+    idx: idx,
+    x: bTipX,
+    y: bTipY,
+    targetX: tgtX,
+    targetY: tgtY,
+    angle: charAngle,
+    progress: 0, // 0→1 날아가는 중
+    settled: false,
+    spin: (Math.random() - 0.5) * 10, // 날아가는 중 회전
+    scale: 0.5 + Math.random() * 0.5,
+  };
+  charParticles.push(p);
+
+  // 날아가기 애니메이션
+  gsap.to(p, {
+    progress: 1,
+    duration: 0.4 + Math.random() * 0.3,
+    ease: 'power2.out',
+    onComplete() { p.settled = true; }
+  });
+}
+
+function drinkShot() {
+  if (phase !== 'ready') return;
+  phase = 'drink';
+  document.getElementById('hint').style.opacity = '0';
+  shotCount++;
+  drunkLevel = Math.min(shotCount * 0.4, 2.5);
+  document.getElementById('shotCount').textContent = `${shotCount}잔째`;
+
+  if (shotCount >= 7) {
+    // 블랙아웃 — 상단 자막 없이 Canvas에서 직접 표시
+    titleChars.length = 0; // 상단 자막 제거
+    // 블랙아웃: 줌+블러 → 완전 암전 → "현장 검거!" 표시
+    const d = { fill: fillLevel, zoom: 1, blur: 0, offY: 0, blackout: 0 };
+    gsap.to(d, {
+      fill: 0, zoom: 2.0, blur: 40, offY: -120, blackout: 1,
+      duration: 2.5, ease: 'power2.in',
+      onUpdate() {
+        fillLevel = d.fill; drinkZoom = d.zoom;
+        drinkBlur = d.blur; drinkOffsetY = d.offY;
+        blackoutAlpha = d.blackout;
+      },
+      onComplete() { phase = 'blackout'; }
+    });
+    return;
+  }
+
+  const d = { fill: fillLevel, zoom: 1, blur: 0, offY: 0 };
+  gsap.to(d, {
+    fill: 0,
+    zoom: 1.35 + drunkLevel * 0.15,
+    blur: 12 + drunkLevel * 10,
+    offY: -70 - drunkLevel * 15,
+    duration: 1.0, ease: 'power2.inOut',
+    onUpdate() {
+      fillLevel = d.fill; drinkZoom = d.zoom;
+      drinkBlur = d.blur; drinkOffsetY = d.offY;
+    },
+    onComplete() {
+      phase = 'recover';
+      charParticles.length = 0;
+      charsRevealed = 0;
+      const r = { zoom: drinkZoom, blur: drinkBlur, offY: drinkOffsetY };
+      gsap.to(r, {
+        zoom: 1, blur: 0, offY: 0,
+        duration: 0.8, ease: 'power2.out',
+        onUpdate() {
+          drinkZoom = r.zoom; drinkBlur = r.blur; drinkOffsetY = r.offY;
+        },
+        onComplete() {
+          phase = 'wait';
+          gsap.delayedCall(Math.max(0.4, 1.2 - drunkLevel * 0.3), startRound);
+        }
+      });
+    }
+  });
+}
+
+cv.addEventListener('click', drinkShot);
+
+gsap.delayedCall(0.5, () => caption(CAPTIONS[0]));
+gsap.delayedCall(3.0, startRound);
+
+// ═══════════════════════════════════════
+// 그리기: 소주잔
+// ═══════════════════════════════════════
+function drawGlass(drunk) {
+  cx.save();
+  cx.translate(CX, CY);
+
+  // 그림자
+  cx.beginPath();
+  cx.arc(5, 5, GLASS_R + 5, 0, Math.PI * 2);
+  cx.fillStyle = 'rgba(0,0,0,0.3)';
+  cx.fill();
+
+  // 소주 액체 — 독립적으로 출렁임
+  if (fillLevel > 0.01) {
+    cx.save();
+    const t = Date.now() * 0.001;
+    // 액체 자체 흔들림 (잔과 별개)
+    const lqShakeX = Math.sin(t * 1.7 + 0.5) * drunk * 6 + Math.sin(t * 3.1) * 2;
+    const lqShakeY = Math.cos(t * 1.3 + 1.2) * drunk * 5 + Math.cos(t * 2.7) * 1.5;
+    const lqRot = Math.sin(t * 2.0) * drunk * 0.06;
+    cx.translate(lqShakeX, lqShakeY);
+    cx.rotate(lqRot);
+
+    const lr = GLASS_R * 0.84 * Math.min(fillLevel * 0.85 + 0.15, 1);
+    cx.beginPath();
+    cx.arc(0, 0, lr, 0, Math.PI * 2);
+    const g = cx.createRadialGradient(0, 0, 0, 0, 0, lr);
+    g.addColorStop(0, `rgba(195,230,175,${0.15 + fillLevel * 0.25})`);
+    g.addColorStop(0.6, `rgba(155,205,135,${0.10 + fillLevel * 0.20})`);
+    g.addColorStop(1, `rgba(115,175,95,${0.05 + fillLevel * 0.15})`);
+    cx.fillStyle = g;
+    cx.fill();
+
+    // 표면 하이라이트
+    cx.beginPath();
+    cx.ellipse(-lr * 0.28, -lr * 0.22, lr * 0.32, lr * 0.1, -0.5, 0, Math.PI * 2);
+    cx.fillStyle = `rgba(235,255,235,${fillLevel * 0.1})`;
+    cx.fill();
+
+    // 파문
+    if (pourStream > 0) {
+      for (let i = 0; i < 3; i++) {
+        const rr = (10 + i * 12 + (t * 20) % 40) * fillLevel;
+        cx.beginPath();
+        cx.arc(0, 0, rr, 0, Math.PI * 2);
+        cx.strokeStyle = `rgba(220,255,210,${Math.max(0, 0.08 - i * 0.025)})`;
+        cx.lineWidth = 0.8;
+        cx.stroke();
+      }
+    }
+    cx.restore();
+  }
+
+  // 유리 외벽
+  cx.beginPath();
+  cx.arc(0, 0, GLASS_R, 0, Math.PI * 2);
+  cx.strokeStyle = `rgba(255,255,255,${0.2 - drunk * 0.03})`;
+  cx.lineWidth = 3;
+  cx.stroke();
+
+  // 취했을 때 잔 테두리 복시
+  if (drunk > 0.2) {
+    cx.beginPath();
+    cx.arc(drunk * 3, -drunk * 2, GLASS_R, 0, Math.PI * 2);
+    cx.strokeStyle = `rgba(255,150,150,${drunk * 0.04})`;
+    cx.lineWidth = 2;
+    cx.stroke();
+    cx.beginPath();
+    cx.arc(-drunk * 2, drunk * 2, GLASS_R, 0, Math.PI * 2);
+    cx.strokeStyle = `rgba(150,150,255,${drunk * 0.03})`;
+    cx.lineWidth = 2;
+    cx.stroke();
+  }
+
+  // 유리 내벽
+  cx.beginPath();
+  cx.arc(0, 0, GLASS_R * 0.85, 0, Math.PI * 2);
+  cx.strokeStyle = 'rgba(255,255,255,0.06)';
+  cx.lineWidth = 1;
+  cx.stroke();
+
+  // 반사
+  cx.beginPath();
+  cx.ellipse(-GLASS_R * 0.33, -GLASS_R * 0.33, GLASS_R * 0.36, GLASS_R * 0.09, -0.7, 0, Math.PI * 2);
+  cx.fillStyle = 'rgba(255,255,255,0.06)';
+  cx.fill();
+
+  // 바닥
+  cx.beginPath();
+  cx.arc(0, 0, GLASS_R * 0.3, 0, Math.PI * 2);
+  cx.strokeStyle = 'rgba(255,255,255,0.04)';
+  cx.lineWidth = 1;
+  cx.stroke();
+
+  cx.restore();
+}
+
+// ═══════════════════════════════════════
+// 그리기: 소주병
+// ═══════════════════════════════════════
+function drawBottle() {
+  if (bottleX < -180) return;
+  cx.save();
+  cx.translate(bottleX, CY);
+  cx.rotate(bottleAngle);
+
+  const bW = GLASS_R * 0.6;
+  const bH = GLASS_R * 2.2;
+  const nW = GLASS_R * 0.2;
+  const nH = GLASS_R * 0.9;
+
+  cx.fillStyle = 'rgba(40,90,45,0.55)';
+  cx.strokeStyle = 'rgba(80,150,85,0.22)';
+  cx.lineWidth = 1.5;
+  cx.beginPath();
+  cx.roundRect(-bW, -bH / 2, bW * 2, bH, bW * 0.3);
+  cx.fill(); cx.stroke();
+
+  cx.beginPath();
+  cx.moveTo(-bW, -bH / 2);
+  cx.quadraticCurveTo(-bW * 0.5, -bH / 2 - nH * 0.35, -nW, -bH / 2 - nH * 0.45);
+  cx.lineTo(nW, -bH / 2 - nH * 0.45);
+  cx.quadraticCurveTo(bW * 0.5, -bH / 2 - nH * 0.35, bW, -bH / 2);
+  cx.closePath();
+  cx.fill(); cx.stroke();
+
+  cx.beginPath();
+  cx.roundRect(-nW, -bH / 2 - nH, nW * 2, nH * 0.6, nW * 0.4);
+  cx.fill(); cx.stroke();
+
+  cx.fillStyle = 'rgba(70,130,75,0.6)';
+  cx.beginPath();
+  cx.roundRect(-nW * 1.1, -bH / 2 - nH - nW * 0.5, nW * 2.2, nW, nW * 0.3);
+  cx.fill();
+
+  cx.fillStyle = 'rgba(255,255,255,0.12)';
+  const lW = bW * 0.65;
+  cx.fillRect(-lW, -bH * 0.15, lW * 2, bH * 0.28);
+  cx.fillStyle = 'rgba(40,90,45,0.4)';
+  cx.font = `900 ${Math.round(bW * 0.42)}px "Noto Sans KR"`;
+  cx.textAlign = 'center'; cx.textBaseline = 'middle';
+  cx.fillText('소주', 0, 0);
+
+  cx.fillStyle = 'rgba(255,255,255,0.035)';
+  cx.fillRect(-bW * 0.6, -bH / 2, bW * 0.15, bH + nH * 0.4);
+
+  // 따르는 줄기 — 넓고 부드러운 곡선
+  if (pourStream > 0) {
+    const tipX = nW * 0.8;
+    const tipY = -bH / 2 - nH - nW * 0.2;
+    const tgtX = CX - bottleX;
+    const tgtY = 0;
+    const midX = (tipX + tgtX) * 0.5 + 15;
+    const midY = (tipY + tgtY) * 0.5;
+    // 넓은 줄기
+    cx.beginPath();
+    cx.moveTo(tipX - 3, tipY);
+    cx.bezierCurveTo(midX - 5, midY - 10, midX + 5, midY + 10, tgtX - 4, tgtY);
+    cx.lineTo(tgtX + 4, tgtY);
+    cx.bezierCurveTo(midX + 8, midY + 10, midX - 2, midY - 10, tipX + 3, tipY);
+    cx.closePath();
+    cx.fillStyle = `rgba(190,230,170,${pourStream * 0.35})`;
+    cx.fill();
+  }
+
+  cx.restore();
+}
+
+// ═══════════════════════════════════════
+// 그리기: 글자 파티클 (병→잔)
+// ═══════════════════════════════════════
+function drawCharParticles(drunk) {
+  const t = Date.now() * 0.001;
+  const fontSize = Math.max(11, Math.min(GLASS_R * 0.14, 18));
+  const total = CHARS.length;
+
+  // 날아가는 중인 글자
+  for (const p of charParticles) {
+    if (p.settled) continue;
+    const prog = p.progress;
+    const midX = (p.x + p.targetX) / 2;
+    const midY = Math.min(p.y, p.targetY) - 50;
+    const t1 = 1 - prog;
+    const px = t1 * t1 * p.x + 2 * t1 * prog * midX + prog * prog * p.targetX;
+    const py = t1 * t1 * p.y + 2 * t1 * prog * midY + prog * prog * p.targetY;
+    
+    cx.save();
+    cx.translate(px, py);
+    cx.rotate(p.spin * t1);
+    cx.globalAlpha = 0.4 + prog * 0.5;
+    cx.font = `900 ${fontSize + 4}px "Noto Sans KR"`;
+    cx.textAlign = 'center'; cx.textBaseline = 'middle';
+    cx.fillStyle = 'rgba(200,240,180,0.8)';
+    cx.fillText(p.char, 0, 0);
+    cx.restore();
+  }
+
+  // settled 글자 → 잔 안 원형 배치
+  let hasSettled = false;
+  for (const p of charParticles) { if (p.settled) { hasSettled = true; break; } }
+  if (!hasSettled) return;
+
+  cx.save();
+  cx.translate(CX, CY);
+
+  textRotation += 0.003 + drunk * 0.01;
+  const wobble = Math.sin(t * (1.5 + drunk * 2.5)) * (0.05 + drunk * 0.3);
+  cx.rotate(textRotation + wobble);
+
+  const r = GLASS_R * 0.7;
+  const alpha = Math.min(fillLevel * 1.3 + 0.1, 0.85);
+
+  // 복시 (1패스로 합침)
+  if (drunk > 0.2) {
+    drawSettledCharsOpt(r + drunk * 3, fontSize, 255, 100, 100, drunk * 0.1, drunk, t, total, drunk * 0.05);
+    drawSettledCharsOpt(r + drunk * 3, fontSize, 100, 100, 255, drunk * 0.07, drunk, t, total, -drunk * 0.04);
+  }
+
+  // 메인
+  drawSettledCharsOpt(r, fontSize, 255, 255, 255, alpha, drunk, t, total, 0);
+
+  cx.restore();
+}
+
+function drawSettledCharsOpt(radius, fontSize, cr, cg, cb, baseAlpha, drunk, t, total, rotOff) {
+  cx.textAlign = 'center'; cx.textBaseline = 'middle';
+
+  if (rotOff !== 0) {
+    cx.save();
+    cx.rotate(rotOff + Math.sin(t * 2.5) * drunk * 0.03);
+  }
+
+  for (const p of charParticles) {
+    if (!p.settled) continue;
+    const charAngle = (Math.PI * 2 * p.idx) / total - Math.PI / 2;
+    cx.save();
+    cx.rotate(charAngle);
+    cx.translate(0, -radius);
+
+    const d = drunk;
+    const charSpin = d * Math.sin(t * (1.5 + p.idx * 0.3) + p.idx * 1.7) * 0.7;
+    const charDx = d * Math.sin(t * 2.1 + p.idx * 2.3) * 4;
+    const charDy = d * Math.cos(t * 1.8 + p.idx * 1.9) * 4;
+    cx.translate(charDx, charDy);
+    cx.rotate(Math.PI / 2 + charAngle + charSpin);
+
+    const pulseSpeed = 0.3 + (p.idx * 7.13 % 1) * 1.2;
+    const pulse = d > 0.01 ? 1 + Math.sin(t * pulseSpeed + p.idx * 2.71) * 0.5 * Math.min(d, 1.5) : 1;
+    const sz = fontSize * pulse;
+
+    cx.globalAlpha = baseAlpha;
+    cx.font = `900 ${sz}px "Noto Sans KR"`;
+    cx.fillStyle = `rgb(${cr},${cg},${cb})`;
+    cx.fillText(p.char, 0, 0);
+    cx.restore();
+  }
+
+  if (rotOff !== 0) cx.restore();
+}
+
+// 부드러운 월드 흔들림용 보간 상태
+let smoothSX = 0, smoothSY = 0, smoothRot = 0;
+let blackoutAlpha = 0;
+
+// ═══════════════════════════════════════
+// 메인 루프
+// ═══════════════════════════════════════
+function loop() {
+  const t = Date.now();
+  const drunk = drunkLevel;
+
+  // 매 프레임 완전 클리어 (trail 대신 clearRect — 성능)
+  cx.clearRect(0, 0, W, H);
+
+  // 배경
+  cx.fillStyle = 'rgb(10,12,8)';
+  cx.fillRect(0, 0, W, H);
+
+  // === 월드 트랜스폼 ===
+  cx.save();
+
+  if (drinkZoom !== 1 || drinkOffsetY !== 0) {
+    cx.translate(CX, CY);
+    cx.scale(drinkZoom, drinkZoom);
+    cx.translate(-CX, -CY + drinkOffsetY);
+  }
+
+  // 취한 흔들림 — lerp
+  if (drunk > 0.05) {
+    const targetRot = Math.sin(t * 0.0007) * drunk * 0.06;
+    const targetSX = Math.sin(t * 0.0009) * drunk * 35 + Math.cos(t * 0.0019) * drunk * 15;
+    const targetSY = Math.cos(t * 0.0008) * drunk * 28 + Math.sin(t * 0.0017) * drunk * 12;
+    smoothSX += (targetSX - smoothSX) * 0.035;
+    smoothSY += (targetSY - smoothSY) * 0.035;
+    smoothRot += (targetRot - smoothRot) * 0.035;
+    cx.translate(CX + smoothSX, CY + smoothSY);
+    cx.rotate(smoothRot);
+    cx.translate(-CX, -CY);
+  }
+
+  drawGlass(drunk);
+  drawCharParticles(drunk);
+  drawBottle();
+
+  cx.restore();
+
+  // 타이틀 (월드 밖)
+  drawTitle(drunk);
+
+  // 블러 오버레이
+  if (drinkBlur > 0.5) {
+    cx.fillStyle = `rgba(10,12,8,${Math.min(drinkBlur / 20, 0.7)})`;
+    cx.fillRect(0, 0, W, H);
+  }
+
+  // 블랙아웃 오버레이 + 검거 텍스트
+  if (blackoutAlpha > 0.01) {
+    cx.fillStyle = `rgba(0,0,0,${blackoutAlpha})`;
+    cx.fillRect(0, 0, W, H);
+
+    if (blackoutAlpha > 0.6) {
+      const textAlpha = Math.min((blackoutAlpha - 0.6) * 2.5, 1);
+      cx.save();
+      cx.globalAlpha = textAlpha;
+      cx.font = `900 ${Math.min(W * 0.08, 72)}px "Noto Sans KR"`;
+      cx.textAlign = 'center'; cx.textBaseline = 'middle';
+      cx.fillStyle = '#cc0000';
+      cx.fillText('현장 검거!', CX, CY - 30);
+      cx.font = `700 ${Math.min(W * 0.04, 36)}px "Noto Sans KR"`;
+      cx.fillStyle = 'rgba(255,255,255,0.6)';
+      cx.fillText('면허 취소', CX, CY + 30);
+      cx.restore();
+    }
+  }
+
+  // 잔 수 UI
+  if (shotCount > 0) {
+    const el = document.getElementById('shotCount');
+    el.style.transform = `rotate(${Math.sin(t * 0.003) * drunk * 5}deg)`;
+  }
+
+  requestAnimationFrame(loop);
+}
+
+loop();
+</script>
+</body>
+</html>
