@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🍶 주시 대결 — 누가 오래 버티나</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&family=Black+Han+Sans&display=swap');
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a0a;overflow:hidden;height:100vh;font-family:'Noto Sans KR',sans-serif;cursor:none;user-select:none}
+canvas{position:fixed;inset:0;z-index:1}
+#ui{position:fixed;inset:0;z-index:10;pointer-events:none}
+#cursor{position:fixed;z-index:100;pointer-events:none;width:24px;height:24px;border:2px solid rgba(255,255,255,0.6);border-radius:50%;transform:translate(-50%,-50%);transition:border-color 0.2s}
+#cursor.inside{border-color:rgba(140,255,140,0.8);box-shadow:0 0 10px rgba(140,255,140,0.3)}
+#cursor.outside{border-color:rgba(255,100,100,0.8);box-shadow:0 0 10px rgba(255,100,100,0.3)}
+.overlay{position:fixed;inset:0;z-index:50;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(0,0,0,0.85);transition:opacity 0.5s}
+.overlay.hidden{opacity:0;pointer-events:none}
+.title{font-family:'Black Han Sans',sans-serif;font-size:clamp(2rem,8vw,5rem);color:#fff;text-align:center;line-height:1.2}
+.subtitle{font-size:clamp(0.8rem,2vw,1.1rem);color:rgba(255,255,255,0.5);margin-top:12px;text-align:center}
+.start-btn{margin-top:32px;padding:14px 48px;font-family:'Noto Sans KR',sans-serif;font-size:1.1rem;font-weight:700;background:#2a6e2a;color:#fff;border:none;border-radius:8px;cursor:pointer;pointer-events:all;transition:all 0.2s}
+.start-btn:hover{background:#3a8e3a;transform:scale(1.05)}
+.rules{margin-top:24px;font-size:0.75rem;color:rgba(255,255,255,0.3);text-align:center;line-height:1.8;pointer-events:all}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="cursor"></div>
+<div id="ui"></div>
+
+<div class="overlay" id="startScreen">
+  <div class="title">🍶 주시 대결</div>
+  <div class="subtitle">누가 오래 버티나 — 토할 때까지!</div>
+  <button class="start-btn" id="startBtn">시작</button>
+  <div class="rules">
+    🎯 초록 영역에 마우스를 올려놓고<br>
+    ⌨️ 스페이스바를 눌러 술을 마셔<br>
+    🥴 마실수록 화면이 취해져<br>
+    🤮 끝까지 버텨봐!
+  </div>
+</div>
+
+<div class="overlay hidden" id="gameoverScreen">
+  <div class="title" id="goTitle">🤮</div>
+  <div class="subtitle" id="goSub"></div>
+  <button class="start-btn" id="retryBtn">다시 도전</button>
+</div>
+
+<script>
+const cv = document.getElementById('c');
+const cx = cv.getContext('2d');
+const cursor = document.getElementById('cursor');
+let W, H;
+
+function resize() {
+  W = cv.width = innerWidth;
+  H = cv.height = innerHeight;
+}
+resize();
+addEventListener('resize', resize);
+
+// ── 상태 ──
+let gameState = 'menu'; // menu, playing, gameover
+let mx = W/2, my = H/2;
+let shots = 0;
+let drunk = 0;          // 0 ~ 1 (1 = 토함)
+let gazeInside = false;
+let gazeTimer = 0;       // 영역 안에 있는 시간
+let penaltyTimer = 0;    // 영역 밖에 있는 시간
+let canDrink = false;
+let drinkCooldown = 0;
+let totalTime = 0;
+
+// 주시 영역
+let zone = { x: 0, y: 0, r: 80 };
+let zoneWobble = { x: 0, y: 0 }; // 취하면 영역이 움직임
+
+// 취함 효과
+let worldShake = { x: 0, y: 0, rot: 0 };
+let smoothShake = { x: 0, y: 0, rot: 0 };
+
+// 파티클 (배경 글자)
+const WORDS = ['소주','한잔','원샷','건배','짠','캬~','벌컥','우웩','헉','으악','비틀','흔들'];
+const bgParticles = [];
+for (let i = 0; i < 40; i++) {
+  bgParticles.push({
+    word: WORDS[Math.floor(Math.random() * WORDS.length)],
+    x: Math.random() * 2000,
+    y: Math.random() * 2000,
+    size: 10 + Math.random() * 16,
+    speed: 0.2 + Math.random() * 0.5,
+    alpha: 0.03 + Math.random() * 0.06,
+    angle: Math.random() * Math.PI * 2,
+  });
+}
+
+// 소주잔 파티클 (마실 때 튀는 효과)
+const splashParticles = [];
+
+function spawnZone() {
+  const margin = 120;
+  zone.x = margin + Math.random() * (W - margin * 2);
+  zone.y = margin + Math.random() * (H - margin * 2);
+  zone.r = Math.max(50, 80 - drunk * 30); // 취할수록 작아짐
+}
+
+function startGame() {
+  gameState = 'playing';
+  shots = 0;
+  drunk = 0;
+  gazeTimer = 0;
+  penaltyTimer = 0;
+  canDrink = false;
+  drinkCooldown = 0;
+  totalTime = 0;
+  smoothShake = { x: 0, y: 0, rot: 0 };
+  splashParticles.length = 0;
+  document.getElementById('startScreen').classList.add('hidden');
+  document.getElementById('gameoverScreen').classList.add('hidden');
+  spawnZone();
+}
+
+function gameOver() {
+  gameState = 'gameover';
+  const el = document.getElementById('gameoverScreen');
+  el.classList.remove('hidden');
+  document.getElementById('goTitle').textContent = shots >= 10 ? '🤮💀' : '🤮';
+  const msgs = [
+    `${shots}잔 마시고 리타이어!`,
+    `총 ${Math.floor(totalTime)}초 버텼다`,
+  ];
+  if (shots >= 15) msgs.push('전설의 주당...');
+  else if (shots >= 10) msgs.push('꽤 버텼다!');
+  else if (shots >= 5) msgs.push('아직 멀었어~');
+  else msgs.push('이게 최선?');
+  document.getElementById('goSub').innerHTML = msgs.join('<br>');
+}
+
+// ── 입력 ──
+addEventListener('mousemove', e => {
+  mx = e.clientX;
+  my = e.clientY;
+  cursor.style.left = mx + 'px';
+  cursor.style.top = my + 'px';
+});
+
+addEventListener('keydown', e => {
+  if (e.code === 'Space' && gameState === 'playing') {
+    e.preventDefault();
+    if (canDrink && drinkCooldown <= 0) {
+      drink();
+    }
+  }
+});
+
+document.getElementById('startBtn').addEventListener('click', startGame);
+document.getElementById('retryBtn').addEventListener('click', startGame);
+
+function drink() {
+  shots++;
+  drinkCooldown = 0.8; // 쿨다운
+  
+  // 취함 증가 — 갈수록 더 많이
+  const increment = 0.04 + shots * 0.008;
+  drunk = Math.min(drunk + increment, 1);
+  
+  // 스플래시 파티클
+  for (let i = 0; i < 8; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 2 + Math.random() * 5;
+    splashParticles.push({
+      x: zone.x, y: zone.y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed - 3,
+      life: 1,
+      char: ['🍶','🥃','💧','✨'][Math.floor(Math.random()*4)],
+      size: 14 + Math.random() * 10,
+    });
+  }
+
+  // 새 주시 영역
+  setTimeout(() => {
+    if (gameState === 'playing') spawnZone();
+  }, 300);
+
+  // 토함 체크
+  if (drunk >= 1) {
+    setTimeout(gameOver, 500);
+  }
+}
+
+// ── 메인 루프 ──
+let lastTime = performance.now();
+
+function loop(now) {
+  const dt = Math.min((now - lastTime) / 1000, 0.05);
+  lastTime = now;
+
+  cx.clearRect(0, 0, W, H);
+
+  if (gameState === 'playing') {
+    totalTime += dt;
+    drinkCooldown = Math.max(0, drinkCooldown - dt);
+
+    // 주시 영역 흔들림 (취할수록 심해짐)
+    const t = now * 0.001;
+    zoneWobble.x = Math.sin(t * 0.7 + 1.3) * drunk * 60 + Math.sin(t * 1.9) * drunk * 25;
+    zoneWobble.y = Math.cos(t * 0.5 + 0.7) * drunk * 50 + Math.cos(t * 1.7) * drunk * 20;
+
+    const zx = zone.x + zoneWobble.x;
+    const zy = zone.y + zoneWobble.y;
+
+    // 마우스가 영역 안인지
+    const dist = Math.hypot(mx - zx, my - zy);
+    gazeInside = dist < zone.r;
+
+    if (gazeInside) {
+      gazeTimer += dt;
+      penaltyTimer = Math.max(0, penaltyTimer - dt * 2);
+      canDrink = gazeTimer > 0.5; // 0.5초 이상 주시해야 마실 수 있음
+      cursor.className = 'inside';
+    } else {
+      gazeTimer = 0;
+      canDrink = false;
+      penaltyTimer += dt;
+      cursor.className = 'outside';
+      // 패널티: 밖에 오래 있으면 취함 증가
+      if (penaltyTimer > 2) {
+        drunk = Math.min(drunk + dt * 0.05, 1);
+        if (drunk >= 1) gameOver();
+      }
+    }
+
+    // 월드 흔들림
+    const targetSX = Math.sin(t * 0.8) * drunk * 40 + Math.cos(t * 2.1) * drunk * 15;
+    const targetSY = Math.cos(t * 0.6) * drunk * 35 + Math.sin(t * 1.8) * drunk * 12;
+    const targetRot = Math.sin(t * 0.5) * drunk * 0.04;
+    smoothShake.x += (targetSX - smoothShake.x) * 0.03;
+    smoothShake.y += (targetSY - smoothShake.y) * 0.03;
+    smoothShake.rot += (targetRot - smoothShake.rot) * 0.03;
+  }
+
+  // ── 그리기 ──
+  cx.save();
+
+  // 취한 월드 트랜스폼
+  if (drunk > 0.05 && gameState === 'playing') {
+    cx.translate(W/2 + smoothShake.x, H/2 + smoothShake.y);
+    cx.rotate(smoothShake.rot);
+    cx.translate(-W/2, -H/2);
+  }
+
+  // 배경
+  const bgHue = 120 + drunk * 40; // 초록 → 노란빛
+  cx.fillStyle = `hsl(${bgHue}, 8%, ${4 + drunk * 2}%)`;
+  cx.fillRect(-50, -50, W+100, H+100);
+
+  // 배경 글자 파티클
+  for (const p of bgParticles) {
+    p.y -= p.speed;
+    p.x += Math.sin(p.angle + now * 0.0003) * 0.3;
+    if (p.y < -30) { p.y = H + 30; p.x = Math.random() * W; }
+    cx.save();
+    cx.globalAlpha = p.alpha + drunk * 0.02;
+    cx.font = `900 ${p.size}px "Noto Sans KR"`;
+    cx.fillStyle = `rgba(140,200,120,1)`;
+    cx.fillText(p.word, p.x, p.y);
+    cx.restore();
+  }
+
+  if (gameState === 'playing') {
+    const zx = zone.x + zoneWobble.x;
+    const zy = zone.y + zoneWobble.y;
+
+    // 주시 영역
+    // 외곽 글로우
+    const glowR = zone.r + 20 + Math.sin(now * 0.003) * 5;
+    const glow = cx.createRadialGradient(zx, zy, zone.r * 0.5, zx, zy, glowR);
+    glow.addColorStop(0, gazeInside ? 'rgba(100,255,100,0.08)' : 'rgba(255,255,100,0.05)');
+    glow.addColorStop(1, 'rgba(0,0,0,0)');
+    cx.fillStyle = glow;
+    cx.beginPath();
+    cx.arc(zx, zy, glowR, 0, Math.PI * 2);
+    cx.fill();
+
+    // 영역 원
+    cx.beginPath();
+    cx.arc(zx, zy, zone.r, 0, Math.PI * 2);
+    cx.strokeStyle = gazeInside 
+      ? `rgba(100,255,100,${0.4 + Math.sin(now*0.005)*0.1})` 
+      : `rgba(255,200,50,${0.25 + Math.sin(now*0.004)*0.05})`;
+    cx.lineWidth = 2;
+    cx.setLineDash([8, 6]);
+    cx.lineDashOffset = -now * 0.02;
+    cx.stroke();
+    cx.setLineDash([]);
+
+    // 영역 안 소주잔 아이콘
+    cx.font = `${Math.max(24, zone.r * 0.5)}px sans-serif`;
+    cx.textAlign = 'center';
+    cx.textBaseline = 'middle';
+    cx.fillText('🍶', zx, zy);
+
+    // 마실 수 있으면 표시
+    if (canDrink && drinkCooldown <= 0) {
+      cx.font = '700 14px "Noto Sans KR"';
+      cx.fillStyle = 'rgba(140,255,140,0.7)';
+      cx.fillText('SPACE로 마셔!', zx, zy + zone.r + 24);
+    } else if (gazeInside && !canDrink) {
+      // 게이지 표시
+      const prog = Math.min(gazeTimer / 0.5, 1);
+      cx.beginPath();
+      cx.arc(zx, zy, zone.r + 8, -Math.PI/2, -Math.PI/2 + Math.PI*2*prog);
+      cx.strokeStyle = 'rgba(140,255,140,0.4)';
+      cx.lineWidth = 3;
+      cx.stroke();
+    }
+
+    // ── HUD ──
+    // 잔 수
+    cx.save();
+    cx.setTransform(1,0,0,1,0,0); // HUD는 흔들림 없이
+    
+    cx.font = '900 28px "Noto Sans KR"';
+    cx.textAlign = 'right';
+    cx.fillStyle = `rgba(255,255,255,${0.3 + drunk * 0.3})`;
+    cx.fillText(`${shots}잔`, W - 24, 40);
+
+    // 취함 게이지
+    const barW = 200, barH = 8;
+    const barX = W - 24 - barW, barY = 52;
+    cx.fillStyle = 'rgba(255,255,255,0.08)';
+    cx.fillRect(barX, barY, barW, barH);
+    
+    const drunkColor = drunk < 0.5 ? `rgba(140,255,140,0.6)` 
+                     : drunk < 0.8 ? `rgba(255,200,50,0.7)` 
+                     : `rgba(255,80,80,0.8)`;
+    cx.fillStyle = drunkColor;
+    cx.fillRect(barX, barY, barW * drunk, barH);
+
+    cx.font = '600 11px "Noto Sans KR"';
+    cx.textAlign = 'right';
+    cx.fillStyle = 'rgba(255,255,255,0.25)';
+    cx.fillText(drunk < 0.3 ? '멀쩡' : drunk < 0.5 ? '살짝 왔다' : drunk < 0.7 ? '흔들흔들' : drunk < 0.9 ? '세상이 빙글빙글' : '우웩...', W - 24, barY + 22);
+
+    // 시간
+    cx.font = '400 12px "Noto Sans KR"';
+    cx.fillStyle = 'rgba(255,255,255,0.15)';
+    cx.textAlign = 'left';
+    cx.fillText(`${Math.floor(totalTime)}초`, 24, 36);
+
+    // 패널티 경고
+    if (!gazeInside && penaltyTimer > 1) {
+      const warn = Math.min((penaltyTimer - 1), 1);
+      cx.font = `900 ${20 + warn * 10}px "Noto Sans KR"`;
+      cx.textAlign = 'center';
+      cx.fillStyle = `rgba(255,80,80,${0.3 + warn * 0.5 + Math.sin(now*0.01)*0.2})`;
+      cx.fillText('⚠️ 영역 밖! 돌아와!', W/2, H - 60);
+    }
+
+    cx.restore();
+
+    // 스플래시 파티클
+    for (let i = splashParticles.length - 1; i >= 0; i--) {
+      const p = splashParticles[i];
+      p.x += p.vx;
+      p.y += p.vy;
+      p.vy += 0.15; // 중력
+      p.life -= dt * 1.5;
+      if (p.life <= 0) { splashParticles.splice(i, 1); continue; }
+      cx.save();
+      cx.globalAlpha = p.life;
+      cx.font = `${p.size}px sans-serif`;
+      cx.textAlign = 'center';
+      cx.fillText(p.char, p.x, p.y);
+      cx.restore();
+    }
+
+    // 취함 비네팅
+    if (drunk > 0.2) {
+      const vg = cx.createRadialGradient(W/2, H/2, W*0.2, W/2, H/2, W*0.7);
+      vg.addColorStop(0, 'rgba(0,0,0,0)');
+      vg.addColorStop(1, `rgba(0,0,0,${drunk * 0.5})`);
+      cx.save();
+      cx.setTransform(1,0,0,1,0,0);
+      cx.fillStyle = vg;
+      cx.fillRect(0, 0, W, H);
+      cx.restore();
+    }
+
+    // 색수차 (취하면)
+    if (drunk > 0.4) {
+      cx.save();
+      cx.setTransform(1,0,0,1,0,0);
+      cx.globalAlpha = drunk * 0.06;
+      cx.globalCompositeOperation = 'screen';
+      cx.fillStyle = `rgba(255,0,0,1)`;
+      cx.fillRect(drunk * 3, 0, W, H);
+      cx.fillStyle = `rgba(0,0,255,1)`;
+      cx.fillRect(-drunk * 3, 0, W, H);
+      cx.restore();
+    }
+  }
+
+  cx.restore();
+  requestAnimationFrame(loop);
+}
+
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
