@@ -50,32 +50,41 @@ body{background:#0a0a0a;font-family:'Noto Sans KR',sans-serif;color:#fff;min-hei
   <div class="ticker-label">속보</div>
   <div class="ticker-track">
     <div class="ticker-text">
+      "자다 깼더니 바다 한가운데"…대부도 찾은 여성 날벼락 &nbsp;│&nbsp;
       "소주 들고 와 경찰 앞 '원샷'"…보란 듯 술타기하다 결국 &nbsp;│&nbsp;
       美, 휴전 시한 앞두고 이란 선박 전격 나포…이란 압박 극대화 &nbsp;│&nbsp;
       "6월 역대급 장마 온다" 퍼지자…기상청이 내놓은 답 &nbsp;│&nbsp;
       KOSPI 6,150 — 미국-이란 협상 기대감에 급등 &nbsp;│&nbsp;
-      "소주 들고 와 경찰 앞 '원샷'"…보란 듯 술타기하다 결국
+      "자다 깼더니 바다 한가운데"…대부도 찾은 여성 날벼락
     </div>
   </div>
 </div>
 
 <div class="main">
 
-  <!-- 히어로: 최신 기사 (4/21) -->
-  <a class="hero" href="2026-04-21/20260421.html">
+  <!-- 히어로: 최신 기사 (4/22) -->
+  <a class="hero" href="2026-04-22/20260422.html">
     <div class="hero-visual">
       <canvas id="hero-canvas"></canvas>
     </div>
     <div class="hero-body">
       <div class="hero-tag">사회</div>
-      <div class="hero-title">"소주 들고 와 경찰 앞 '원샷'"…보란 듯 술타기하다 결국</div>
-      <div class="hero-meta">2026.04.21</div>
+      <div class="hero-title">"자다 깼더니 바다 한가운데"…대부도 찾은 여성 날벼락</div>
+      <div class="hero-meta">2026.04.22</div>
     </div>
   </a>
 
   <!-- 이전 기사 -->
   <div class="section-label">이전 기사</div>
   <div class="grid">
+    <a class="card" href="2026-04-21/20260421.html">
+      <div class="card-body">
+        <div class="card-tag">사회</div>
+        <div class="card-title">"소주 들고 와 경찰 앞 '원샷'"…보란 듯 술타기하다 결국</div>
+        <div class="card-date">2026.04.21</div>
+      </div>
+      <div class="card-thumb"><canvas id="thumb-soju" width="100" height="72"></canvas></div>
+    </a>
     <a class="card" href="2026-04-20/20260420.html">
       <div class="card-body">
         <div class="card-tag">국제</div>
@@ -107,7 +116,7 @@ body{background:#0a0a0a;font-family:'Noto Sans KR',sans-serif;color:#fff;min-hei
 <div class="footer">NEWSROOM — This is fiction. 실제 뉴스가 아닙니다.</div>
 
 <script>
-// ── 히어로: 소주잔 탑뷰 ──
+// ── 히어로: 바다 물결 ~~  ──
 (function(){
   const cv = document.getElementById('hero-canvas');
   const rect = cv.parentElement.getBoundingClientRect();
@@ -116,71 +125,73 @@ body{background:#0a0a0a;font-family:'Noto Sans KR',sans-serif;color:#fff;min-hei
   const cx = cv.getContext('2d');
   cx.scale(devicePixelRatio, devicePixelRatio);
   const W = rect.width, H = rect.height;
-  const GR = Math.min(W, H) * 0.2;
 
-  const WORDS = ['소주','원샷','한잔더','건배','짠','캬~','벌컥','음주','경찰','단속','면허'];
-  const particles = [];
-  for (let i = 0; i < 20; i++) {
-    particles.push({
-      word: WORDS[Math.floor(Math.random() * WORDS.length)],
-      angle: Math.random() * Math.PI * 2,
-      r: GR * 0.3 + Math.random() * GR * 0.45,
-      speed: 0.002 + Math.random() * 0.004,
-      size: 7 + Math.random() * 6,
-      opacity: 0.08 + Math.random() * 0.12,
+  const waves = [];
+  for (let i = 0; i < 60; i++) {
+    waves.push({
+      x: Math.random() * W * 1.3 - W * 0.15, y: Math.random() * H,
+      speed: 0.2 + Math.random() * 0.5, phase: Math.random() * Math.PI * 2,
+      amp: 1 + Math.random() * 3, freq: 0.2 + Math.random() * 0.4,
+      size: 8 + Math.random() * 5, alpha: 0.04 + Math.random() * 0.08,
+      pattern: ['~','~~','~~~'][Math.floor(Math.random() * 3)],
     });
   }
 
   function loop() {
-    cx.clearRect(0, 0, W, H);
-    cx.fillStyle = '#0a0c08';
-    cx.fillRect(0, 0, W, H);
-
-    cx.save();
-    cx.translate(W / 2, H / 2);
-
-    // 소주 액체
-    const lr = GR * 0.82;
-    cx.beginPath();
-    cx.arc(0, 0, lr, 0, Math.PI * 2);
-    const g = cx.createRadialGradient(0, 0, 0, 0, 0, lr);
-    g.addColorStop(0, 'rgba(190,225,170,0.25)');
-    g.addColorStop(0.7, 'rgba(150,200,130,0.18)');
-    g.addColorStop(1, 'rgba(110,170,90,0.10)');
-    cx.fillStyle = g;
-    cx.fill();
-
-    // 잔 테두리
-    cx.beginPath();
-    cx.arc(0, 0, GR, 0, Math.PI * 2);
-    cx.strokeStyle = 'rgba(255,255,255,0.18)';
-    cx.lineWidth = 2.5;
-    cx.stroke();
-
-    // 원형 텍스트
     const t = Date.now() * 0.001;
-    for (const p of particles) {
-      p.angle += p.speed;
-      const x = Math.cos(p.angle) * p.r;
-      const y = Math.sin(p.angle) * p.r;
-      cx.save();
-      cx.translate(x, y);
-      cx.rotate(p.angle + Math.PI / 2);
-      cx.font = `900 ${p.size}px "Noto Sans KR"`;
-      cx.textAlign = 'center';
-      cx.fillStyle = `rgba(220,255,200,${p.opacity})`;
-      cx.fillText(p.word, 0, 0);
-      cx.restore();
+    cx.clearRect(0, 0, W, H);
+    cx.fillStyle = '#020406'; cx.fillRect(0, 0, W, H);
+    cx.textBaseline = 'middle'; cx.textAlign = 'center';
+    for (const w of waves) {
+      w.x += w.speed; if (w.x > W + 60) { w.x = -60; w.y = Math.random() * H; }
+      const py = w.y + Math.sin(t * w.freq + w.phase) * w.amp;
+      const dep = py / H;
+      cx.font = `200 ${w.size}px "Noto Sans KR"`;
+      cx.fillStyle = `hsla(${195+dep*20},${35+(1-dep)*20}%,${35+(1-dep)*25}%,${w.alpha})`;
+      cx.fillText(w.pattern, w.x, py);
     }
-
-    // 반사
-    cx.beginPath();
-    cx.ellipse(-GR * 0.3, -GR * 0.3, GR * 0.35, GR * 0.08, -0.7, 0, Math.PI * 2);
-    cx.fillStyle = 'rgba(255,255,255,0.05)';
-    cx.fill();
-
-    cx.restore();
+    // 손전등 스팟 (중앙에서 천천히 이동)
+    const sx = W/2 + Math.sin(t*0.3)*W*0.15;
+    const sy = H/2 + Math.cos(t*0.2)*H*0.1;
+    const grd = cx.createRadialGradient(sx, sy, 0, sx, sy, 120);
+    grd.addColorStop(0, 'rgba(80,100,120,0.06)');
+    grd.addColorStop(1, 'rgba(0,0,0,0)');
+    cx.fillStyle = grd; cx.fillRect(0, 0, W, H);
     requestAnimationFrame(loop);
+  }
+  loop();
+})();
+
+// ── 썸네일: 소주잔 ──
+(function(){
+  const cv = document.getElementById('thumb-soju');
+  if (!cv) return;
+  cv.width = 200; cv.height = 144;
+  const cx = cv.getContext('2d');
+  const W = 200, H = 144, GR = 30;
+  const WORDS = ['소주','원샷','건배','짠','벌컥'];
+  const ps = [];
+  for (let i = 0; i < 10; i++) {
+    ps.push({ word: WORDS[Math.floor(Math.random()*WORDS.length)],
+      angle: Math.random()*Math.PI*2, r: GR*0.3+Math.random()*GR*0.5,
+      speed: 0.003+Math.random()*0.005, size: 5+Math.random()*4, op: 0.1+Math.random()*0.15 });
+  }
+  function loop() {
+    cx.clearRect(0,0,W,H); cx.fillStyle='#0a0c08'; cx.fillRect(0,0,W,H);
+    cx.save(); cx.translate(W/2,H/2);
+    cx.beginPath(); cx.arc(0,0,GR*0.82,0,Math.PI*2);
+    const g=cx.createRadialGradient(0,0,0,0,0,GR*0.82);
+    g.addColorStop(0,'rgba(190,225,170,0.2)'); g.addColorStop(1,'rgba(110,170,90,0.08)');
+    cx.fillStyle=g; cx.fill();
+    cx.beginPath(); cx.arc(0,0,GR,0,Math.PI*2);
+    cx.strokeStyle='rgba(255,255,255,0.15)'; cx.lineWidth=1.5; cx.stroke();
+    for(const p of ps){ p.angle+=p.speed;
+      cx.save(); cx.translate(Math.cos(p.angle)*p.r,Math.sin(p.angle)*p.r);
+      cx.rotate(p.angle+Math.PI/2);
+      cx.font=`900 ${p.size}px "Noto Sans KR"`; cx.textAlign='center';
+      cx.fillStyle=`rgba(220,255,200,${p.op})`; cx.fillText(p.word,0,0); cx.restore();
+    }
+    cx.restore(); requestAnimationFrame(loop);
   }
   loop();
 })();
