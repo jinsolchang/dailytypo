@@ -50,33 +50,42 @@ body{background:#0a0a0a;font-family:'Noto Sans KR',sans-serif;color:#fff;min-hei
   <div class="ticker-label">속보</div>
   <div class="ticker-track">
     <div class="ticker-text">
+      휴대폰 개통 안면인증, "보이스피싱 예방" vs "내 개인정보 어떡하라고?" &nbsp;│&nbsp;
       "자다 깼더니 바다 한가운데"…대부도 찾은 여성 날벼락 &nbsp;│&nbsp;
       "소주 들고 와 경찰 앞 '원샷'"…보란 듯 술타기하다 결국 &nbsp;│&nbsp;
       美, 휴전 시한 앞두고 이란 선박 전격 나포…이란 압박 극대화 &nbsp;│&nbsp;
       "6월 역대급 장마 온다" 퍼지자…기상청이 내놓은 답 &nbsp;│&nbsp;
       KOSPI 6,150 — 미국-이란 협상 기대감에 급등 &nbsp;│&nbsp;
-      "자다 깼더니 바다 한가운데"…대부도 찾은 여성 날벼락
+      휴대폰 개통 안면인증, "보이스피싱 예방" vs "내 개인정보 어떡하라고?"
     </div>
   </div>
 </div>
 
 <div class="main">
 
-  <!-- 히어로: 최신 기사 (4/22) -->
-  <a class="hero" href="2026-04-22/20260422.html">
+  <!-- 히어로: 최신 기사 (4/23) -->
+  <a class="hero" href="2026-04-23/20260423.html">
     <div class="hero-visual">
       <canvas id="hero-canvas"></canvas>
     </div>
     <div class="hero-body">
-      <div class="hero-tag">사회</div>
-      <div class="hero-title">"자다 깼더니 바다 한가운데"…대부도 찾은 여성 날벼락</div>
-      <div class="hero-meta">2026.04.22</div>
+      <div class="hero-tag">IT·사회</div>
+      <div class="hero-title">휴대폰 개통 안면인증, "보이스피싱 예방" vs "내 개인정보 어떡하라고?"</div>
+      <div class="hero-meta">2026.04.23</div>
     </div>
   </a>
 
   <!-- 이전 기사 -->
   <div class="section-label">이전 기사</div>
   <div class="grid">
+    <a class="card" href="2026-04-22/20260422.html">
+      <div class="card-body">
+        <div class="card-tag">사회</div>
+        <div class="card-title">"자다 깼더니 바다 한가운데"…대부도 찾은 여성 날벼락</div>
+        <div class="card-date">2026.04.22</div>
+      </div>
+      <div class="card-thumb"><canvas id="thumb-sea" width="100" height="72"></canvas></div>
+    </a>
     <a class="card" href="2026-04-21/20260421.html">
       <div class="card-body">
         <div class="card-tag">사회</div>
@@ -116,7 +125,7 @@ body{background:#0a0a0a;font-family:'Noto Sans KR',sans-serif;color:#fff;min-hei
 <div class="footer">NEWSROOM — This is fiction. 실제 뉴스가 아닙니다.</div>
 
 <script>
-// ── 히어로: 바다 물결 ~~  ──
+// ── 히어로: Voxel Face 느낌 ──
 (function(){
   const cv = document.getElementById('hero-canvas');
   const rect = cv.parentElement.getBoundingClientRect();
@@ -126,92 +135,113 @@ body{background:#0a0a0a;font-family:'Noto Sans KR',sans-serif;color:#fff;min-hei
   cx.scale(devicePixelRatio, devicePixelRatio);
   const W = rect.width, H = rect.height;
 
-  const waves = [];
-  for (let i = 0; i < 120; i++) {
-    waves.push({
-      x: Math.random() * W * 1.3 - W * 0.15, y: Math.random() * H,
-      speed: 0.2 + Math.random() * 0.5, phase: Math.random() * Math.PI * 2,
-      amp: 1 + Math.random() * 3, freq: 0.2 + Math.random() * 0.4,
-      size: 10 + Math.random() * 6, alpha: 0.2 + Math.random() * 0.25,
-      pattern: ['~','~~','~~~'][Math.floor(Math.random() * 3)],
-    });
-  }
+  // 얼굴을 복셀 그리드로 근사 (정면 반원형)
+  const CX = W * 0.5, CY = H * 0.55;
+  const FW = Math.min(W, H) * 0.35;
+  const CELL = 10;
 
-  // 갯바위 몇 개
-  const rocks = [];
-  for (let i = 0; i < 6; i++) {
-    const pts = [];
-    const n = 5 + Math.floor(Math.random()*3);
-    const seed = Math.random();
-    for (let j = 0; j < n; j++) {
-      const a = (Math.PI*2*j)/n;
-      const r = 0.5 + (Math.sin(seed*100+j*3.7)*0.5+0.5)*0.5;
-      pts.push({x:Math.cos(a)*r, y:Math.sin(a)*r});
+  // 얼굴 마스크: 타원 안쪽 셀만
+  const voxels = [];
+  for (let gy = -FW; gy <= FW; gy += CELL) {
+    for (let gx = -FW; gx <= FW; gx += CELL) {
+      const nx = gx / FW, ny = gy / (FW * 1.2);
+      if (nx*nx + ny*ny < 1) {
+        // 이목구비 영역: 눈(2개), 코, 입
+        const leftEye = Math.hypot(gx + FW*0.3, gy + FW*0.2) < FW*0.12;
+        const rightEye = Math.hypot(gx - FW*0.3, gy + FW*0.2) < FW*0.12;
+        const nose = Math.abs(gx) < FW*0.08 && gy > -FW*0.1 && gy < FW*0.2;
+        const mouth = Math.abs(gx) < FW*0.25 && gy > FW*0.35 && gy < FW*0.5;
+        const feature = leftEye || rightEye || nose || mouth;
+        // 얼굴 깊이: 중심일수록 앞으로 (z값)
+        const z = Math.sqrt(1 - nx*nx - ny*ny) * FW * 0.5;
+        voxels.push({
+          gx, gy, z, feature,
+          phase: Math.random() * Math.PI * 2,
+        });
+      }
     }
-    rocks.push({
-      x: W*0.1 + Math.random()*W*0.8,
-      y: H*0.2 + Math.random()*H*0.5,
-      size: 8 + Math.random()*16,
-      rot: Math.random()*Math.PI*2,
-      pts, shade: 0.1+Math.random()*0.08
-    });
   }
 
-  // 사람 (작은 실루엣)
-  const px = W*0.5 + (Math.random()-0.5)*W*0.3;
-  const py = H*0.4 + Math.random()*H*0.15;
-
+  let rot = 0;
   function loop() {
     const t = Date.now() * 0.001;
-    cx.clearRect(0, 0, W, H);
-    cx.fillStyle = '#081220'; cx.fillRect(0, 0, W, H);
+    rot = Math.sin(t * 0.3) * 0.4;
 
-    // 손전등 스팟 (자동 이동)
-    const sx = W/2 + Math.sin(t*0.25)*W*0.2;
-    const sy = H/2 + Math.cos(t*0.18)*H*0.12;
-    const FR = 140;
+    cx.clearRect(0,0,W,H);
+    // 배경
+    const bg = cx.createLinearGradient(0,0,0,H);
+    bg.addColorStop(0,'#001a1c'); bg.addColorStop(1,'#000405');
+    cx.fillStyle = bg; cx.fillRect(0,0,W,H);
 
-    cx.textBaseline = 'middle'; cx.textAlign = 'center';
+    // 그리드 바닥
+    cx.strokeStyle = 'rgba(12,239,211,0.04)';
+    cx.lineWidth = 0.5;
+    for (let y = 0; y < H; y += 20) { cx.beginPath(); cx.moveTo(0,y); cx.lineTo(W,y); cx.stroke(); }
+    for (let x = 0; x < W; x += 20) { cx.beginPath(); cx.moveTo(x,0); cx.lineTo(x,H); cx.stroke(); }
+
+    // 복셀 그리기 (깊이순 정렬)
+    const sorted = [...voxels].sort((a,b)=>a.z-b.z);
+    for (const v of sorted) {
+      const cosR = Math.cos(rot), sinR = Math.sin(rot);
+      const rx = v.gx * cosR - v.z * sinR;
+      const rz = v.gx * sinR + v.z * cosR;
+      const x = CX + rx;
+      const y = CY + v.gy;
+      const size = CELL - 2 + (rz/FW)*2;
+      const bright = 0.2 + (rz/FW + 1) * 0.4;
+
+      if (v.feature) {
+        // 이목구비는 밝게
+        cx.fillStyle = `rgba(12,239,211,${bright * 0.95})`;
+      } else {
+        cx.fillStyle = `rgba(12,200,180,${bright * 0.35})`;
+      }
+      cx.fillRect(x - size/2, y - size/2, size, size);
+      // 와이어프레임
+      cx.strokeStyle = `rgba(12,239,211,${bright * 0.3})`;
+      cx.lineWidth = 0.5;
+      cx.strokeRect(x - size/2, y - size/2, size, size);
+    }
+
+    // 스캔 라인
+    const sy = ((t * 60) % (H + 40)) - 20;
+    cx.fillStyle = 'rgba(12,239,211,0.06)';
+    cx.fillRect(0, sy - 15, W, 30);
+    cx.fillStyle = 'rgba(12,239,211,0.4)';
+    cx.fillRect(0, sy, W, 1);
+
+    requestAnimationFrame(loop);
+  }
+  loop();
+})();
+
+// ── 썸네일: 바다 물결 ──
+(function(){
+  const cv = document.getElementById('thumb-sea');
+  if (!cv) return;
+  cv.width = 200; cv.height = 144;
+  const cx = cv.getContext('2d');
+  const W = 200, H = 144;
+  const waves = [];
+  for (let i = 0; i < 25; i++) {
+    waves.push({ x: Math.random()*W*1.3-20, y: Math.random()*H,
+      speed: 0.2+Math.random()*0.5, phase: Math.random()*Math.PI*2,
+      size: 7+Math.random()*3, op: 0.1+Math.random()*0.15,
+      ch: ['~','~~','〜'][Math.floor(Math.random()*3)] });
+  }
+  function loop(){
+    const t = Date.now()*0.001;
+    cx.clearRect(0,0,W,H);
+    cx.fillStyle = '#061424'; cx.fillRect(0,0,W,H);
+    cx.textBaseline='middle'; cx.textAlign='center';
     for (const w of waves) {
-      w.x += w.speed; if (w.x > W + 60) { w.x = -60; w.y = Math.random() * H; }
-      const wy = w.y + Math.sin(t * w.freq + w.phase) * w.amp;
-      const dep = wy / H;
-      let a = w.alpha;
-      const d = Math.hypot(w.x-sx, wy-sy);
-      a += Math.max(0,1-d/FR)**2 * 0.5;
-      cx.font = `200 ${w.size}px "Noto Sans KR"`;
-      cx.fillStyle = `hsla(${195+dep*20},${35+(1-dep)*25}%,${50+(1-dep)*25}%,${Math.min(0.7,a)})`;
-      cx.fillText(w.pattern, w.x, wy);
+      w.x += w.speed;
+      if (w.x > W+20) { w.x = -20; w.y = Math.random()*H; }
+      const py = w.y + Math.sin(t*0.5 + w.phase)*2;
+      cx.font = `300 ${w.size}px "Noto Sans KR"`;
+      cx.fillStyle = `rgba(100,170,200,${w.op})`;
+      cx.fillText(w.ch, w.x, py);
     }
-
-    // 갯바위
-    for (const r of rocks) {
-      const d = Math.hypot(r.x-sx, r.y-sy);
-      let a = 0.1 + Math.max(0,1-d/FR)**2 * 0.6;
-      cx.save(); cx.translate(r.x,r.y); cx.rotate(r.rot); cx.scale(r.size,r.size);
-      cx.beginPath(); cx.moveTo(r.pts[0].x,r.pts[0].y);
-      for(let i=1;i<r.pts.length;i++) cx.quadraticCurveTo(r.pts[i-1].x+0.08,r.pts[i-1].y-0.04,r.pts[i].x,r.pts[i].y);
-      cx.closePath();
-      cx.fillStyle=`rgba(50,45,40,${Math.min(0.7,a)})`;cx.fill();
-      cx.restore();
-    }
-
-    // 사람
-    const pd = Math.hypot(px-sx, py-sy);
-    const pa = Math.max(0.03, Math.max(0,1-pd/FR)**2 * 0.7);
-    cx.save(); cx.translate(px,py); cx.scale(0.6,0.6); cx.globalAlpha=pa;
-    cx.fillStyle='#888';
-    cx.beginPath();cx.ellipse(0,0,6,9,0,0,Math.PI*2);cx.fill();
-    cx.beginPath();cx.arc(0,-10,4.5,0,Math.PI*2);cx.fill();
-    cx.globalAlpha=1; cx.restore();
-
-    // 글로우
-    const grd = cx.createRadialGradient(sx, sy, 0, sx, sy, FR*1.2);
-    grd.addColorStop(0, 'rgba(80,110,130,0.1)');
-    grd.addColorStop(0.7, 'rgba(50,70,90,0.04)');
-    grd.addColorStop(1, 'rgba(0,0,0,0)');
-    cx.fillStyle = grd; cx.fillRect(0, 0, W, H);
-
     requestAnimationFrame(loop);
   }
   loop();

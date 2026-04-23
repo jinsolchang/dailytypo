@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Voxel Face</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #000000; }
+  canvas { display: block; }
+  video { display: none; }
+  #hidden, #segCanvas { display: none; }
+
+  #overlay {
+    position: fixed; inset: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    background: #000000;
+    z-index: 10;
+    gap: 16px;
+    transition: opacity 0.6s;
+  }
+  #overlay.hidden { opacity: 0; pointer-events: none; }
+  #overlay p { font-family: sans-serif; font-size: 15px; color: rgba(255,255,255,0.75); letter-spacing: 1px; }
+  #overlay button {
+    padding: 13px 34px;
+    background: rgba(255,255,255,0.18);
+    border: 1.5px solid rgba(255,255,255,0.45);
+    border-radius: 40px; color: white;
+    font-size: 15px; cursor: pointer; letter-spacing: 0.5px;
+  }
+  #overlay button:hover { background: rgba(255,255,255,0.3); }
+
+  #progress-wrap {
+    display: none;
+    width: 220px;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+  }
+  #progress-wrap.show { display: flex; }
+  #progress-bar-bg {
+    width: 100%; height: 4px;
+    background: rgba(255,255,255,0.12);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  #progress-bar {
+    height: 100%; width: 0%;
+    background: #0cefd3;
+    border-radius: 2px;
+    transition: width 0.3s ease;
+  }
+  #progress-text {
+    font-family: sans-serif;
+    font-size: 12px;
+    color: rgba(255,255,255,0.5);
+    letter-spacing: 0.5px;
+  }
+</style>
+</head>
+<body>
+
+<div id="overlay">
+  <p>카메라로 얼굴을 복셀 3D로 변환합니다</p>
+  <button id="startBtn" onclick="startCamera()">카메라 켜기</button>
+  <div id="progress-wrap">
+    <div id="progress-bar-bg"><div id="progress-bar"></div></div>
+    <span id="progress-text"></span>
+  </div>
+</div>
+
+<video id="video" autoplay playsinline muted></video>
+<canvas id="hidden"></canvas>
+<canvas id="segCanvas"></canvas>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/selfie_segmentation.js" crossorigin="anonymous"></script>
+<script>
+const video     = document.getElementById('video');
+const hidden    = document.getElementById('hidden');
+const hctx      = hidden.getContext('2d', { willReadFrequently: true });
+const segCanvas = document.getElementById('segCanvas');
+const segCtx    = segCanvas.getContext('2d', { willReadFrequently: true });
+
+// ── SCENE ──
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(window.devicePixelRatio);
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setClearColor(0x000000);
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.fog   = new THREE.Fog(0x000000, 60, 130);
+
+const camera = new THREE.PerspectiveCamera(42, window.innerWidth / window.innerHeight, 0.1, 200);
+camera.position.set(0, 0, 70);
+
+window.addEventListener('resize', () => {
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+});
+
+// ── LIGHT ──
+scene.add(new THREE.AmbientLight(0x224444, 0.5));
+const dirLight = new THREE.DirectionalLight(0xffffff, 1.0);
+dirLight.position.set(-3, 6, 14);
+scene.add(dirLight);
+const dirLight2 = new THREE.DirectionalLight(0x0cefd3, 0.35);
+dirLight2.position.set(8, -2, 6);
+scene.add(dirLight2);
+const rimLight = new THREE.DirectionalLight(0x0cefd3, 0.25);
+rimLight.position.set(-6, 2, -4);
+scene.add(rimLight);
+
+// ── VOXEL GRID PARAMS ──
+const BASE_COLS = 160;
+const VSIZE     = 0.37;
+const MAX_DEPTH = 20.0;
+const BG_DEPTH  = -8.0;
+const SMOOTH    = 0.15;
+
+let COLS, ROWS, totalVoxels;
+let mesh, curDepth, tgtDepth;
+let gridReady = false;
+let bgColors = null;
+let segMask = null;
+
+function buildGrid(vidW, vidH) {
+  const aspect = vidH / vidW;
+  COLS = BASE_COLS;
+  ROWS = Math.round(COLS * aspect);
+  totalVoxels = COLS * ROWS;
+
+  if (mesh) scene.remove(mesh);
+
+  const geo = new THREE.BoxGeometry(VSIZE, VSIZE, VSIZE);
+  const mat = new THREE.MeshLambertMaterial();
+  mesh = new THREE.InstancedMesh(geo, mat, totalVoxels);
+  mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  scene.add(mesh);
+
+  curDepth = new Float32Array(totalVoxels).fill(BG_DEPTH);
+  tgtDepth = new Float32Array(totalVoxels).fill(BG_DEPTH);
+  segMask  = new Float32Array(totalVoxels).fill(0);
+  bgColors = new Float32Array(totalVoxels * 3).fill(0);
+
+  const dist = 70;
+  const gridHeight = ROWS * VSIZE;
+  const fovRad = 2 * Math.atan((gridHeight * 0.5) / dist) * 1.08;
+  camera.fov = THREE.MathUtils.radToDeg(fovRad);
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+
+  gridReady = true;
+}
+
+const dummy = new THREE.Object3D();
+
+// ── 색상 그라데이션 ──
+const COLOR_DARK   = new THREE.Color(0x012a26);
+const COLOR_MID    = new THREE.Color(0x0cefd3);
+const COLOR_BRIGHT = new THREE.Color(0x8dfff0);
+const tmpColor     = new THREE.Color();
+
+// ── MEDIAPIPE SELFIE SEGMENTATION ──
+const selfieSegmentation = new SelfieSegmentation({
+  locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/${file}`
+});
+selfieSegmentation.setOptions({ modelSelection: 0 });
+selfieSegmentation.onResults((results) => {
+  if (!gridReady) return;
+  segCanvas.width  = COLS;
+  segCanvas.height = ROWS;
+  // 좌우 반전 (비디오 미러링과 일치)
+  segCtx.save();
+  segCtx.translate(COLS, 0);
+  segCtx.scale(-1, 1);
+  segCtx.drawImage(results.segmentationMask, 0, 0, COLS, ROWS);
+  segCtx.restore();
+  const maskData = segCtx.getImageData(0, 0, COLS, ROWS).data;
+  for (let i = 0; i < totalVoxels; i++) {
+    segMask[i] = maskData[i * 4] / 255;
+  }
+});
+
+// ── MEDIAPIPE HANDS ──
+let handLandmarks = null;
+let prevHandPos = null;
+const handSpeed = { x: 0, y: 0 };
+
+const hands = new Hands({
+  locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+});
+hands.setOptions({
+  maxNumHands: 2,
+  modelComplexity: 0,
+  minDetectionConfidence: 0.5,
+  minTrackingConfidence: 0.5
+});
+hands.onResults((results) => {
+  if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+    handLandmarks = results.multiHandLandmarks;
+    const wrist = results.multiHandLandmarks[0][0];
+    const curPos = { x: wrist.x, y: wrist.y };
+    if (prevHandPos) {
+      handSpeed.x = curPos.x - prevHandPos.x;
+      handSpeed.y = curPos.y - prevHandPos.y;
+    }
+    prevHandPos = curPos;
+  } else {
+    handLandmarks = null;
+    prevHandPos = null;
+    handSpeed.x = 0;
+    handSpeed.y = 0;
+  }
+});
+
+// ── 파티클 시스템 ──
+const MAX_PARTICLES = 600;
+const pPos    = new Float32Array(MAX_PARTICLES * 3);
+const pColors = new Float32Array(MAX_PARTICLES * 3);
+const pSizes  = new Float32Array(MAX_PARTICLES);
+const pGeo    = new THREE.BufferGeometry();
+pGeo.setAttribute('position', new THREE.BufferAttribute(pPos, 3));
+pGeo.setAttribute('color', new THREE.BufferAttribute(pColors, 3));
+pGeo.setAttribute('size', new THREE.BufferAttribute(pSizes, 1));
+
+const pMat = new THREE.PointsMaterial({
+  size: 0.6, vertexColors: true, transparent: true, opacity: 0.85,
+  blending: THREE.AdditiveBlending, depthWrite: false, sizeAttenuation: true
+});
+scene.add(new THREE.Points(pGeo, pMat));
+
+const particles = Array.from({ length: MAX_PARTICLES }, () => ({
+  alive: false, life: 0, maxLife: 0,
+  x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0,
+  r: 0, g: 0, b: 0
+}));
+
+function emitParticles(wx, wy, wz, count, speedMult) {
+  let emitted = 0;
+  for (let i = 0; i < MAX_PARTICLES && emitted < count; i++) {
+    if (!particles[i].alive) {
+      const p = particles[i];
+      p.alive = true; p.life = 0;
+      p.maxLife = 40 + Math.random() * 60;
+      p.x = wx + (Math.random() - 0.5) * 2;
+      p.y = wy + (Math.random() - 0.5) * 2;
+      p.z = wz + Math.random() * 3;
+      const angle = Math.random() * Math.PI * 2;
+      const spd = (0.15 + Math.random() * 0.25) * speedMult;
+      p.vx = Math.cos(angle) * spd + handSpeed.x * -80;
+      p.vy = Math.sin(angle) * spd + handSpeed.y * -80;
+      p.vz = (Math.random() - 0.3) * 0.3;
+      const h = Math.random() * 0.3;
+      p.r = 0.05 + h * 0.2;
+      p.g = 0.8 + Math.random() * 0.2;
+      p.b = 0.7 + Math.random() * 0.3;
+      emitted++;
+    }
+  }
+}
+
+function updateParticles() {
+  for (let i = 0; i < MAX_PARTICLES; i++) {
+    const p = particles[i];
+    if (!p.alive) { pSizes[i] = 0; continue; }
+    p.life++;
+    if (p.life > p.maxLife) { p.alive = false; pSizes[i] = 0; continue; }
+    p.x += p.vx; p.y += p.vy; p.z += p.vz;
+    p.vx *= 0.96; p.vy *= 0.96; p.vz *= 0.96;
+    const lr = 1 - p.life / p.maxLife;
+    pPos[i*3] = p.x; pPos[i*3+1] = p.y; pPos[i*3+2] = p.z;
+    pColors[i*3] = p.r * lr; pColors[i*3+1] = p.g * lr; pColors[i*3+2] = p.b * lr;
+    pSizes[i] = lr * 1.2;
+  }
+  pGeo.attributes.position.needsUpdate = true;
+  pGeo.attributes.color.needsUpdate = true;
+  pGeo.attributes.size.needsUpdate = true;
+}
+
+function handToWorld(lm) {
+  if (!gridReady) return null;
+  const nx = 1 - lm.x, ny = lm.y;
+  const gw = COLS * VSIZE, gh = ROWS * VSIZE;
+  return { x: (nx - 0.5) * gw, y: (0.5 - ny) * gh, z: MAX_DEPTH + 2 };
+}
+
+function isFingerOpen(lms, tip, pip) { return lms[tip].y < lms[pip].y; }
+function isOpenHand(lms) {
+  return isFingerOpen(lms,8,6) && isFingerOpen(lms,12,10)
+      && isFingerOpen(lms,16,14) && isFingerOpen(lms,20,18);
+}
+
+// ── 프로그레스 바 ──
+const progressBar  = document.getElementById('progress-bar');
+const progressText = document.getElementById('progress-text');
+const progressWrap = document.getElementById('progress-wrap');
+const startBtn     = document.getElementById('startBtn');
+
+function setProgress(pct, text) {
+  progressBar.style.width = pct + '%';
+  progressText.textContent = text;
+}
+
+// ── 카메라 시작 ──
+async function startCamera() {
+  startBtn.style.display = 'none';
+  progressWrap.classList.add('show');
+  setProgress(0, '카메라 연결 중...');
+
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } }
+    });
+    video.srcObject = stream;
+    await video.play();
+    setProgress(20, '카메라 준비 완료');
+
+    await new Promise((resolve) => {
+      const check = () => (video.videoWidth && video.videoHeight) ? resolve() : requestAnimationFrame(check);
+      check();
+    });
+    buildGrid(video.videoWidth, video.videoHeight);
+    setProgress(30, '세그멘테이션 모델 로딩...');
+
+    await selfieSegmentation.send({ image: video });
+    setProgress(65, '손 인식 모델 로딩...');
+
+    await hands.send({ image: video });
+    setProgress(90, '거의 다 됐어요...');
+
+    // getUserMedia 재호출 없이 직접 프레임 전송
+    async function sendFrames() {
+      if (video.readyState >= 2) {
+        await Promise.all([
+          hands.send({ image: video }),
+          selfieSegmentation.send({ image: video })
+        ]);
+      }
+      requestAnimationFrame(sendFrames);
+    }
+    sendFrames();
+
+    setProgress(100, '완료!');
+    await new Promise(r => setTimeout(r, 300));
+    document.getElementById('overlay').classList.add('hidden');
+    animate();
+  } catch(e) {
+    alert('카메라 권한을 허용해주세요.');
+    startBtn.style.display = '';
+    progressWrap.classList.remove('show');
+  }
+}
+
+// ── 샘플링 (세그멘테이션 마스크 기반) ──
+function sampleVideo() {
+  if (!video.videoWidth) return;
+
+  hidden.width  = COLS;
+  hidden.height = ROWS;
+  hctx.save();
+  hctx.translate(COLS, 0);
+  hctx.scale(-1, 1);
+  hctx.drawImage(video, 0, 0, COLS, ROWS);
+  hctx.restore();
+
+  const pixels = hctx.getImageData(0, 0, COLS, ROWS).data;
+
+  for (let row = 0; row < ROWS; row++) {
+    for (let col = 0; col < COLS; col++) {
+      const i   = row * COLS + col;
+      const idx = i * 4;
+      const r = pixels[idx] / 255;
+      const g = pixels[idx+1] / 255;
+      const b = pixels[idx+2] / 255;
+      const lum = r * 0.299 + g * 0.587 + b * 0.114;
+
+      const personProb = segMask ? segMask[i] : 0;
+
+      let depth;
+      if (personProb > 0.65) {
+        const clampedLum = Math.min(lum, 0.75);
+        const t = Math.max(0, Math.min(1, (clampedLum - 0.1) / 0.65));
+        const s = t * t * (3 - 2 * t);
+        const boosted = Math.pow(s, 0.6);
+        depth = BG_DEPTH + boosted * (MAX_DEPTH - BG_DEPTH);
+      } else if (personProb > 0.3) {
+        const blend = (personProb - 0.3) / 0.35;
+        const clampedLum = Math.min(lum, 0.75);
+        const t = Math.max(0, Math.min(1, (clampedLum - 0.1) / 0.65));
+        const s = t * t * (3 - 2 * t);
+        const boosted = Math.pow(s, 0.6);
+        const personDepth = BG_DEPTH + boosted * (MAX_DEPTH - BG_DEPTH);
+        depth = BG_DEPTH + (personDepth - BG_DEPTH) * blend;
+      } else {
+        depth = BG_DEPTH;
+        bgColors[i * 3]     = r * 0.35;
+        bgColors[i * 3 + 1] = g * 0.35;
+        bgColors[i * 3 + 2] = b * 0.35;
+      }
+
+      tgtDepth[i] = depth;
+    }
+  }
+}
+
+// ── 메인 애니메이션 ──
+function animate() {
+  requestAnimationFrame(animate);
+  if (!gridReady) return;
+  sampleVideo();
+
+  // 손 파티클
+  if (handLandmarks) {
+    for (const lms of handLandmarks) {
+      const speed = Math.sqrt(handSpeed.x ** 2 + handSpeed.y ** 2);
+      if (isOpenHand(lms) && speed > 0.008) {
+        for (const tip of [8, 12, 16, 20]) {
+          const pos = handToWorld(lms[tip]);
+          if (pos) emitParticles(pos.x, pos.y, pos.z, 2, 1 + speed * 30);
+        }
+      } else if (speed > 0.02) {
+        const pos = handToWorld(lms[0]);
+        if (pos) emitParticles(pos.x, pos.y, pos.z, 4, 1 + speed * 40);
+      }
+    }
+  }
+  updateParticles();
+
+  const offX = -(COLS * VSIZE) / 2 + VSIZE / 2;
+  const offY = -(ROWS * VSIZE) / 2 + VSIZE / 2;
+
+  for (let i = 0; i < totalVoxels; i++) {
+    curDepth[i] += (tgtDepth[i] - curDepth[i]) * SMOOTH;
+
+    const col = i % COLS;
+    const row = Math.floor(i / COLS);
+    dummy.position.set(offX + col * VSIZE, offY + (ROWS - 1 - row) * VSIZE, curDepth[i]);
+
+    const dn = Math.max(0, Math.min(1, (curDepth[i] - BG_DEPTH) / (MAX_DEPTH - BG_DEPTH)));
+    if (dn > 0.05) {
+      dummy.scale.set(1, 1, 1);
+    } else {
+      dummy.scale.set(0.3, 0.3, 0.3);
+    }
+
+    dummy.updateMatrix();
+    mesh.setMatrixAt(i, dummy.matrix);
+
+    if (dn <= 0.05 && bgColors) {
+      tmpColor.setRGB(bgColors[i * 3], bgColors[i * 3 + 1], bgColors[i * 3 + 2]);
+    } else if (dn < 0.5) {
+      tmpColor.copy(COLOR_DARK).lerp(COLOR_MID, dn * 2);
+    } else {
+      tmpColor.copy(COLOR_MID).lerp(COLOR_BRIGHT, (dn - 0.5) * 2);
+    }
+    mesh.setColorAt(i, tmpColor);
+  }
+
+  mesh.instanceMatrix.needsUpdate = true;
+  if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+
+  const t = Date.now() * 0.0005;
+  camera.position.x = Math.sin(t * 0.4) * 1.2;
+  camera.position.y = Math.cos(t * 0.3) * 0.7;
+  camera.lookAt(0, 0, 0);
+
+  renderer.render(scene, camera);
+}
+</script>
+</body>
+</html>
