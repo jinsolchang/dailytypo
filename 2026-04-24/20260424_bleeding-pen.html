@@ -14,14 +14,11 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
 #paper{z-index:1}
 #ink{z-index:2}
 #smudge{z-index:3}
-#overlay{position:fixed;inset:0;z-index:10;pointer-events:none;display:flex;flex-direction:column;justify-content:space-between}
-.ui-top{padding:22px 32px;display:flex;justify-content:space-between;align-items:flex-start;font-size:10px;letter-spacing:0.18em;color:#666;font-weight:700;text-transform:uppercase}
-.ui-top .date{text-align:right;font-family:'Noto Serif KR',serif;font-weight:400;letter-spacing:0.12em;color:#1a1a1a}
-.ui-top .date .y{display:block;font-size:12px}
-.ui-top .date .d{display:block;font-size:10px;color:#888;margin-top:2px}
-.ui-bottom{padding:20px 32px 22px;display:flex;justify-content:space-between;align-items:flex-end;font-size:10px;color:#888;letter-spacing:0.1em;font-weight:400}
-.ui-bottom .l{max-width:48%;line-height:1.6}
-.ui-bottom .r{text-align:right;font-family:'Noto Serif KR',serif}
+#overlay{position:fixed;inset:0;z-index:10;pointer-events:none}
+.ui-top{position:absolute;top:0;left:0;right:0;padding:14px 24px;display:flex;justify-content:space-between;align-items:center;font-size:10px;letter-spacing:0.2em;color:#888;font-weight:700;pointer-events:none}
+.ui-top .home{pointer-events:auto;color:#888;text-decoration:none;letter-spacing:0.2em}
+.ui-top .home:hover{color:#1a1a1a}
+.ui-top .date{font-family:'Noto Serif KR',serif;font-weight:400;letter-spacing:0.12em;color:#666}
 .crosshair{position:absolute;width:1px;height:1px;pointer-events:none;z-index:20;mix-blend-mode:multiply}
 .crosshair::before,.crosshair::after{content:'';position:absolute;background:rgba(20,20,20,0.35)}
 .crosshair::before{left:-8px;top:0;width:16px;height:1px}
@@ -36,40 +33,9 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
 .intro-title{font-family:'Noto Serif KR',serif;font-weight:700;font-size:clamp(1.6rem,3.6vw,2.6rem);line-height:1.5;text-align:center;max-width:720px;color:#1a1a1a}
 .intro-sub{margin-top:40px;font-size:11px;letter-spacing:0.2em;color:#aaa;animation:blink 1.8s infinite}
 @keyframes blink{0%,100%{opacity:0.2}50%{opacity:0.8}}
-
-/* 제출 버튼 */
-#submit{position:fixed;bottom:64px;left:50%;transform:translateX(-50%);z-index:11;padding:11px 38px;background:transparent;border:1px solid #1a1a1a;color:#1a1a1a;font-family:'Noto Sans KR',sans-serif;font-size:11px;letter-spacing:0.3em;font-weight:700;cursor:pointer;transition:all 0.25s;opacity:0;pointer-events:none}
-#submit.show{opacity:1;pointer-events:auto}
-#submit:hover{background:#1a1a1a;color:#ededea}
-
-/* 아웃트로 */
-#outro{position:fixed;inset:0;z-index:40;background:rgba(237,237,234,0.96);display:none;flex-direction:column;justify-content:center;align-items:center;padding:60px 40px;overflow:hidden}
-#outro.show{display:flex}
-.scan{position:absolute;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,#c00000 40%,#ff2020 50%,#c00000 60%,transparent);box-shadow:0 0 12px rgba(204,0,0,0.6);z-index:2}
-.error-label{font-family:'Noto Sans KR',sans-serif;font-size:11px;letter-spacing:0.35em;color:#c00000;font-weight:900;margin-bottom:14px;opacity:0}
-.error-title{font-family:'Noto Serif KR',serif;font-size:clamp(2rem,5.6vw,4rem);font-weight:700;color:#1a1a1a;letter-spacing:-0.01em;opacity:0;margin-bottom:40px}
-.error-title .x{color:#c00000}
-.testimony{max-width:880px;width:100%;opacity:0;font-family:'Noto Serif KR',serif;font-size:13px;line-height:1.9;color:#333;columns:2;column-gap:40px;max-height:38vh;overflow:hidden}
-.testimony p{margin-bottom:12px;break-inside:avoid}
-.testimony p::before{content:'"';color:#c00000;font-weight:700;margin-right:3px}
-.testimony p::after{content:'"';color:#c00000;font-weight:700;margin-left:3px}
-.verdict{margin-top:40px;opacity:0;text-align:center;font-family:'Noto Serif KR',serif;font-size:clamp(0.95rem,1.6vw,1.2rem);line-height:1.75;color:#1a1a1a;letter-spacing:0.02em;max-width:640px}
-.verdict .strong{display:block;margin-top:10px;font-weight:700;color:#c00000}
-.reveal{animation:reveal 1.2s ease forwards}
-@keyframes reveal{to{opacity:1}}
-.delay-1{animation-delay:1.2s}
-.delay-2{animation-delay:1.8s}
-.delay-3{animation-delay:2.8s}
-.delay-4{animation-delay:3.8s}
-
-/* 홈 */
-.home{position:fixed;top:22px;left:32px;z-index:50;font-size:10px;letter-spacing:0.2em;color:#888;text-decoration:none;font-weight:700}
-.home:hover{color:#1a1a1a}
 </style>
 </head>
 <body>
-
-<a class="home" href="../index.html">← NEWSROOM</a>
 
 <div id="intro">
   <div class="intro-date">2025. 11. 13. 대학수학능력시험</div>
@@ -85,35 +51,12 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
 
 <div id="overlay">
   <div class="ui-top">
-    <div>
-      <div>OMR RESPONSE SHEET</div>
-      <div style="margin-top:4px;font-weight:400;letter-spacing:0.12em;color:#aaa">第 17 回 大學修學能力試驗</div>
-    </div>
-    <div class="date">
-      <span class="y">2025. 11. 13.</span>
-      <span class="d">08:40 — 제 1 교시</span>
-    </div>
-  </div>
-  <div class="ui-bottom">
-    <div class="l">답안은 반드시 컴퓨터용 사인펜(흑색)으로 표기하며, 수정테이프·수정액 사용을 금한다.<br>펜의 결함은 수험자의 책임이 아니나, 결과는 수험자의 책임이다.</div>
-    <div class="r">—<br>SHEET · 001 / 001</div>
+    <a class="home" href="../index.html">← NEWSROOM</a>
+    <div class="date">2025. 11. 13.&nbsp;&nbsp;08:40 · 제 1 교시</div>
   </div>
 </div>
 
 <div class="crosshair" id="crosshair"></div>
-
-<button id="submit">제출 · SUBMIT</button>
-
-<div id="outro">
-  <div class="scan" id="scan"></div>
-  <div class="error-label reveal delay-1">READ ERROR · 판독 불가</div>
-  <div class="error-title reveal delay-2">판독<span class="x">불가</span></div>
-  <div class="testimony reveal delay-3" id="testimony"></div>
-  <div class="verdict reveal delay-4">
-    결함은 당신의 실수가 아닙니다.
-    <span class="strong">그러나 책임은 당신이 집니다.</span>
-  </div>
-</div>
 
 <script>
 /* ===== 레이아웃 · OMR 카드 그리기 ===== */
@@ -141,94 +84,350 @@ function resize(){
 
 function drawPaper(){
   const ctx = pctx;
-  // 시트지 색
+  // 배경
   ctx.fillStyle = '#ededea';
   ctx.fillRect(0,0,W,H);
 
-  // 종이 영역 (가운데 큰 흰색)
-  const pad = Math.min(W,H) * 0.05;
-  const pw = Math.min(W - pad*2, 1080);
-  const ph = Math.min(H - pad*2, 720);
+  // 종이 영역 (실제 OMR 비율 ≈ 1.4:1)
+  const pad = Math.min(W,H) * 0.04;
+  let pw = Math.min(W - pad*2, 1280);
+  let ph = pw * 0.7;
+  if (ph > H - pad*2) { ph = H - pad*2; pw = ph / 0.7; }
   const px = (W - pw)/2, py = (H - ph)/2;
 
-  // 종이 그림자
+  // 종이 그림자 + 흰색
   ctx.save();
   ctx.shadowColor = 'rgba(0,0,0,0.12)';
-  ctx.shadowBlur = 28;
-  ctx.shadowOffsetY = 4;
+  ctx.shadowBlur = 24; ctx.shadowOffsetY = 3;
   ctx.fillStyle = '#fbfaf6';
   ctx.fillRect(px, py, pw, ph);
   ctx.restore();
 
-  // 종이 질감 (미세 점)
-  const img = ctx.getImageData(px, py, pw, ph);
-  const d = img.data;
-  for (let i = 0; i < d.length; i += 4) {
-    const n = (Math.random()-0.5)*10;
-    d[i] = Math.max(0, Math.min(255, d[i]+n));
-    d[i+1] = Math.max(0, Math.min(255, d[i+1]+n));
-    d[i+2] = Math.max(0, Math.min(255, d[i+2]+n));
+  // 좌우 상단/하단 검은색 타이밍 마커 (실제 OMR 인식용 4각 사각형)
+  ctx.fillStyle = '#1a1a1a';
+  const mk = Math.min(pw,ph)*0.018;
+  ctx.fillRect(px+mk*1.2, py+mk*1.2, mk*2.2, mk*1.3);
+  ctx.fillRect(px+pw-mk*3.4, py+mk*1.2, mk*2.2, mk*1.3);
+  ctx.fillRect(px+mk*1.2, py+ph-mk*2.5, mk*2.2, mk*1.3);
+  ctx.fillRect(px+pw-mk*3.4, py+ph-mk*2.5, mk*2.2, mk*1.3);
+  // 좌측 중간 타이밍 마커 4개
+  for (let i = 0; i < 4; i++) {
+    ctx.fillRect(px+mk*1.2, py+ph*(0.16 + i*0.06), mk*1.6, mk*0.8);
   }
-  ctx.putImageData(img, px, py);
+  ctx.fillRect(px+mk*1.2, py+ph*0.5, mk*1.4, mk*0.8);
 
-  // 헤더
+  // 헤더 텍스트
   ctx.fillStyle = '#1a1a1a';
+  ctx.textBaseline = 'top'; ctx.textAlign = 'left';
   ctx.font = `700 13px 'Noto Serif KR',serif`;
-  ctx.textBaseline = 'top';
-  ctx.fillText('2025학년도 대학수학능력시험 답안지', px+24, py+22);
-  ctx.font = `400 10px 'Noto Sans KR',sans-serif`;
-  ctx.fillStyle = '#666';
-  ctx.fillText('제 1 교시 · 국어영역', px+24, py+44);
-  ctx.textAlign = 'right';
-  ctx.fillStyle = '#1a1a1a';
-  ctx.font = `400 10px 'Noto Sans KR',sans-serif`;
-  ctx.fillText('수험번호 □□□□□□□□    성명 □□□', px+pw-24, py+26);
-  ctx.textAlign = 'left';
+  ctx.fillText('대학수학능력시험 답안지', px + pw*0.08, py + ph*0.04);
+  ctx.font = `400 9px 'Noto Sans KR',sans-serif`;
+  ctx.fillStyle = '#333';
+  ctx.fillText('※ 답안지 작성(표기)은 반드시 검은색 컴퓨터용 사인펜만을 사용하고, 연필 또는 샤프 등의 필기구를 절대 사용하지 마십시오.', px + pw*0.36, py + ph*0.045);
 
-  // OMR 그리드: 2열 × 각 열 15문항, 5지선다
-  const colX = [px + pw*0.08, px + pw*0.54];
-  const colW = pw * 0.38;
-  const gridTop = py + 88;
-  const rowH = (ph - 110) / 15;
-  const cells = [];
-  ctx.font = `400 11px 'Noto Sans KR',sans-serif`;
+  // ① 교시 + 국어영역 (크게)
   ctx.fillStyle = '#1a1a1a';
-  for (let c = 0; c < 2; c++) {
-    for (let r = 0; r < 15; r++) {
-      const num = c*15 + r + 1;
-      const cy = gridTop + r*rowH + rowH/2;
-      // 번호
-      ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+  ctx.font = `900 22px 'Noto Sans KR',sans-serif`;
+  // ① 원형 숫자
+  const jX = px + pw*0.08, jY = py + ph*0.105;
+  ctx.beginPath(); ctx.arc(jX+12, jY+14, 13, 0, Math.PI*2);
+  ctx.fillStyle = '#1a1a1a'; ctx.fill();
+  ctx.fillStyle = '#fbfaf6';
+  ctx.font = `900 15px 'Noto Sans KR'`;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText('1', jX+12, jY+15);
+  ctx.fillStyle = '#1a1a1a';
+  ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+  ctx.font = `400 11px 'Noto Sans KR'`;
+  ctx.fillText('교시', jX+30, jY+3);
+  ctx.font = `900 22px 'Noto Sans KR'`;
+  ctx.fillText('국  어  영  역', jX+55, jY-2);
+
+  /* ===== 좌측 영역: 결시자확인/필적/성명/전화/시험고유번호/감독관 ===== */
+  const lx = px + pw*0.06, ly = py + ph*0.19;
+  const lw = pw*0.27;
+
+  // ── 결시자 확인 박스 ──
+  const rsY = ly;
+  const rsH = ph*0.085;
+  // 외부 타이틀 바 (박스 상단에 얹힘)
+  const titleH = 16;
+  ctx.fillStyle = '#1a1a1a';
+  ctx.fillRect(lx, rsY - titleH, lw*0.44, titleH);
+  ctx.fillStyle = '#fbfaf6';
+  ctx.font = `700 10px 'Noto Sans KR'`;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText('결시자 확인', lx + lw*0.22, rsY - titleH/2);
+  // 우측 주석
+  ctx.fillStyle = '#666';
+  ctx.font = `400 8.5px 'Noto Sans KR'`;
+  ctx.textAlign = 'left';
+  ctx.fillText('(수험생은 표기하지 말 것)', lx + lw*0.46, rsY - titleH/2 + 0.5);
+  // 박스 본체
+  ctx.strokeStyle = '#1a1a1a'; ctx.lineWidth = 1;
+  ctx.strokeRect(lx, rsY, lw, rsH);
+  // 본문 설명
+  ctx.fillStyle = '#333';
+  ctx.font = `400 8.5px 'Noto Sans KR'`;
+  ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+  ctx.fillText('검은색 컴퓨터용 사인펜을 사용하여', lx + 8, rsY + 8);
+  ctx.fillText('수험번호란과 옆란을 표기', lx + 8, rsY + 22);
+  // 결시자 표기 원
+  ctx.beginPath(); ctx.arc(lx + lw - 22, rsY + rsH/2, 10, 0, Math.PI*2);
+  ctx.strokeStyle = '#c92a3e'; ctx.lineWidth = 1.2; ctx.stroke();
+
+  // ── 필적 확인란 ──
+  const pfY = rsY + rsH + 22;
+  const pfH = ph*0.09;
+  // 상단 주석 (박스 위)
+  ctx.fillStyle = '#333';
+  ctx.font = `400 8px 'Noto Sans KR'`;
+  ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
+  ctx.fillText('※ 문제지 표지에 안내된 필적 확인 문구를 아래', lx, pfY - 10);
+  ctx.fillText("'필적 확인란'에 정자로 반드시 기재하여야 합니다.", lx, pfY - 1);
+  // 박스 본체
+  ctx.strokeStyle = '#1a1a1a'; ctx.lineWidth = 1;
+  ctx.strokeRect(lx, pfY, lw, pfH);
+  // 좌측 라벨 영역
+  ctx.strokeRect(lx, pfY, lw*0.22, pfH);
+  ctx.fillStyle = '#1a1a1a';
+  ctx.font = `700 11px 'Noto Sans KR'`;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText('필  적', lx + lw*0.11, pfY + pfH/2 - 8);
+  ctx.fillText('확인란', lx + lw*0.11, pfY + pfH/2 + 8);
+
+  // ── 성명 ──
+  const smY = pfY + pfH + 16;
+  const smH = ph*0.045;
+  ctx.fillStyle = '#1a1a1a';
+  ctx.font = `700 11px 'Noto Sans KR'`;
+  ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+  ctx.fillText('성  명', lx + 4, smY + smH/2);
+  ctx.strokeStyle = '#1a1a1a'; ctx.lineWidth = 0.8;
+  ctx.strokeRect(lx + lw*0.22, smY, lw*0.78, smH);
+
+  // ── 전화번호 + 시험 고유번호 라벨 ──
+  const phY = smY + smH + 12;
+  ctx.fillStyle = '#1a1a1a';
+  ctx.font = `700 10px 'Noto Sans KR'`;
+  ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+  ctx.fillText('전 화 번 호 (010제외)', lx, phY);
+  ctx.fillText('시험 고유번호', lx + lw*0.56, phY);
+
+  // 월/일/백/십/일 소라벨
+  ctx.font = `400 7px 'Noto Sans KR'`;
+  ctx.fillStyle = '#666';
+  ctx.textAlign = 'center';
+  const rightStart0 = lx + lw*0.56;
+  const rightW0 = lw*0.44;
+  const rCellW0 = rightW0 / 5;
+  ['월','일','백','십','일'].forEach((ch, i) => {
+    ctx.fillText(ch, rightStart0 + (i+0.5)*rCellW0, phY + 11);
+  });
+
+  /* 수험번호 버블: 좌측 8칸(전화) + 우측 5칸(고유번호) */
+  const bubY = phY + 24;
+  const leftCols = 8;
+  const dashCol = 3;
+  const bubCellW = lw / leftCols;
+  const bubR = Math.min(bubCellW*0.33, 5.5);
+  const bubRows = 10;
+
+  // 좌측 8칸: 상단 빈 박스 (대시 칸 제외)
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  for (let c = 0; c < leftCols; c++) {
+    if (c === dashCol) {
       ctx.fillStyle = '#1a1a1a';
-      ctx.fillText(String(num).padStart(2,'0'), colX[c]+18, cy);
-      // 5개 원
-      const bubbleStart = colX[c] + 34;
-      const bubbleW = colW - 40;
-      const radius = Math.min(rowH*0.32, bubbleW/12);
-      for (let o = 0; o < 5; o++) {
-        const bx = bubbleStart + (bubbleW/5)*o + bubbleW/10;
-        ctx.beginPath();
-        ctx.arc(bx, cy, radius, 0, Math.PI*2);
-        ctx.strokeStyle = '#1a1a1a';
-        ctx.lineWidth = 1;
-        ctx.stroke();
-        // 원 안 숫자
-        ctx.font = `400 ${Math.max(8,radius*0.9)}px 'Noto Sans KR'`;
-        ctx.fillStyle = '#999';
-        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        ctx.fillText(['①','②','③','④','⑤'][o], bx, cy);
-        cells.push({ x:bx, y:cy, r:radius, num, opt:o });
-      }
-      ctx.font = `400 11px 'Noto Sans KR',sans-serif`;
+      ctx.font = `700 14px 'Noto Sans KR'`;
+      ctx.fillText('—', lx + (c+0.5)*bubCellW, bubY + 5);
+      continue;
+    }
+    ctx.strokeStyle = '#1a1a1a'; ctx.lineWidth = 0.5;
+    ctx.strokeRect(lx + c*bubCellW + 1.5, bubY, bubCellW - 3, 11);
+  }
+  // 0~9 버블
+  const bubSpaceY = bubR*2 + 1.5;
+  for (let r = 0; r < bubRows; r++) {
+    const by = bubY + 15 + r * bubSpaceY + bubR;
+    for (let c = 0; c < leftCols; c++) {
+      if (c === dashCol) continue;
+      const bx = lx + (c+0.5)*bubCellW;
+      ctx.beginPath(); ctx.arc(bx, by, bubR, 0, Math.PI*2);
+      ctx.strokeStyle = '#c92a3e'; ctx.lineWidth = 0.7; ctx.stroke();
+      ctx.fillStyle = '#c92a3e';
+      ctx.font = `400 ${bubR*1.05}px 'Noto Sans KR'`;
+      ctx.fillText(String(r), bx, by);
     }
   }
 
-  // 가이드 라인
-  ctx.strokeStyle = 'rgba(0,0,0,0.06)';
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(px+pw/2, py+80); ctx.lineTo(px+pw/2, py+ph-24);
-  ctx.stroke();
+  // 우측 5칸 상단 빈 박스
+  const rCellW = rightW0 / 5;
+  const rBubR = Math.min(rCellW*0.33, 5);
+  for (let c = 0; c < 5; c++) {
+    ctx.strokeStyle = '#1a1a1a'; ctx.lineWidth = 0.5;
+    ctx.strokeRect(rightStart0 + c*rCellW + 1.5, bubY, rCellW - 3, 11);
+  }
+  // 0~9 버블
+  for (let r = 0; r < bubRows; r++) {
+    const by = bubY + 15 + r * (rBubR*2 + 1.5) + rBubR;
+    for (let c = 0; c < 5; c++) {
+      const bx = rightStart0 + (c+0.5)*rCellW;
+      ctx.beginPath(); ctx.arc(bx, by, rBubR, 0, Math.PI*2);
+      ctx.strokeStyle = '#c92a3e'; ctx.lineWidth = 0.7; ctx.stroke();
+      ctx.fillStyle = '#c92a3e';
+      ctx.font = `400 ${rBubR*1.05}px 'Noto Sans KR'`;
+      ctx.fillText(String(r), bx, by);
+    }
+  }
+
+  // ── 감독관 확인 박스 ──
+  const skH = ph*0.1;
+  const skY = py + ph - skH - ph*0.02;
+  ctx.strokeStyle = '#1a1a1a'; ctx.lineWidth = 1;
+  ctx.strokeRect(lx, skY, lw, skH);
+  // 좌측 라벨 컬럼
+  ctx.strokeRect(lx, skY, lw*0.28, skH);
+  ctx.fillStyle = '#1a1a1a';
+  ctx.font = `700 11px 'Noto Sans KR'`;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText('감독관', lx + lw*0.14, skY + skH*0.25);
+  ctx.fillText('확  인', lx + lw*0.14, skY + skH*0.45);
+  ctx.font = `400 7px 'Noto Sans KR'`;
+  ctx.fillStyle = '#666';
+  ctx.fillText('(수험생은 표기', lx + lw*0.14, skY + skH*0.7);
+  ctx.fillText('하지 말 것)', lx + lw*0.14, skY + skH*0.85);
+  // 중앙 서명 박스
+  const sigX = lx + lw*0.3, sigY = skY + skH*0.12;
+  const sigW = lw*0.26, sigH = skH*0.76;
+  ctx.strokeStyle = '#1a1a1a'; ctx.lineWidth = 0.6;
+  ctx.strokeRect(sigX, sigY, sigW, sigH);
+  ctx.fillStyle = '#1a1a1a';
+  ctx.font = `400 9px 'Noto Sans KR'`;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText('서  명', sigX + sigW/2, sigY + sigH*0.25);
+  ctx.fillText('또는', sigX + sigW/2, sigY + sigH*0.55);
+  ctx.fillText('날  인', sigX + sigW/2, sigY + sigH*0.85);
+  // 우측 안내문
+  ctx.font = `400 8px 'Noto Sans KR'`;
+  ctx.fillStyle = '#333';
+  ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+  ctx.fillText('본인 여부, 수험번호', lx + lw*0.6, skY + 8);
+  ctx.fillText('및 문형의 표기가', lx + lw*0.6, skY + 20);
+  ctx.fillText('정확한지 확인,', lx + lw*0.6, skY + 32);
+  ctx.fillText('옆란에 서명 또는', lx + lw*0.6, skY + 44);
+  ctx.fillText('날인', lx + lw*0.6, skY + 56);
+
+  /* ===== 3개 답안 열: 공통(1~20), 공통(21~34), 선택(35~45) ===== */
+  const cells = [];
+  const answerStartX = px + pw*0.37;
+  const answerW = pw*0.57;
+  const answerY = py + ph*0.15;
+  const answerH = ph*0.8;
+
+  // 각 열의 폭 비율
+  const colWidths = [0.34, 0.34, 0.32]; // 20, 14, 11 문항
+  const colStartsQ = [1, 21, 35];
+  const colEndsQ = [20, 34, 45];
+  const colLabels = [
+    {top:'공통 과목', side:'공 통 과 목'},
+    {top:'공통 과목', side:'공 통 과 목'},
+    {top:'선택 과목', side:'선 택 과 목'},
+  ];
+
+  let xAcc = answerStartX;
+  for (let ci = 0; ci < 3; ci++) {
+    const colW = answerW * colWidths[ci];
+    const start = colStartsQ[ci], end = colEndsQ[ci];
+    const rows = end - start + 1;
+
+    // 세로 한글 라벨 (좌측)
+    ctx.fillStyle = '#1a1a1a';
+    ctx.font = `700 9px 'Noto Sans KR'`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    const sideChars = colLabels[ci].side.split(' ');
+    const labelX = xAcc + 7;
+    const labelY0 = answerY + 50;
+    sideChars.forEach((ch, i) => {
+      ctx.fillText(ch, labelX, labelY0 + i*14 + rows*3);
+    });
+
+    // 헤더 박스
+    const headX = xAcc + 16;
+    const headW = colW - 18;
+    ctx.fillStyle = '#1a1a1a';
+    ctx.fillRect(headX, answerY, headW, 20);
+    ctx.fillStyle = '#fbfaf6';
+    ctx.font = `700 11px 'Noto Sans KR'`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(colLabels[ci].top, headX + headW/2, answerY + 10);
+
+    // 문번/답란 헤더
+    ctx.fillStyle = '#fbfaf6';
+    ctx.strokeStyle = '#1a1a1a'; ctx.lineWidth = 0.8;
+    ctx.fillRect(headX, answerY+20, headW*0.22, 18);
+    ctx.fillRect(headX + headW*0.22, answerY+20, headW*0.78, 18);
+    ctx.strokeRect(headX, answerY+20, headW*0.22, 18);
+    ctx.strokeRect(headX + headW*0.22, answerY+20, headW*0.78, 18);
+    ctx.fillStyle = '#1a1a1a';
+    ctx.font = `700 10px 'Noto Sans KR'`;
+    ctx.fillText('문번', headX + headW*0.11, answerY+29);
+    ctx.fillText('답    란', headX + headW*0.61, answerY+29);
+
+    // 각 문항 행
+    const gridTop = answerY + 38;
+    const gridH = answerH - 38;
+    const rowH = gridH / rows;
+    const bubbleR = Math.min(rowH*0.32, (headW*0.78)/14);
+
+    for (let r = 0; r < rows; r++) {
+      const num = start + r;
+      const cy = gridTop + (r+0.5)*rowH;
+      // 5 단위 행 강조
+      const strong = num % 5 === 0;
+      // 구분선
+      ctx.strokeStyle = 'rgba(20,20,20,0.18)';
+      ctx.lineWidth = 0.5;
+      ctx.beginPath();
+      ctx.moveTo(headX, gridTop + (r+1)*rowH);
+      ctx.lineTo(headX + headW, gridTop + (r+1)*rowH);
+      ctx.stroke();
+      // 좌우 테두리
+      ctx.strokeStyle = '#1a1a1a'; ctx.lineWidth = 0.8;
+      ctx.beginPath();
+      ctx.moveTo(headX, gridTop); ctx.lineTo(headX, gridTop + rows*rowH);
+      ctx.moveTo(headX + headW*0.22, gridTop); ctx.lineTo(headX + headW*0.22, gridTop + rows*rowH);
+      ctx.moveTo(headX + headW, gridTop); ctx.lineTo(headX + headW, gridTop + rows*rowH);
+      ctx.stroke();
+      // 하단 테두리
+      ctx.beginPath();
+      ctx.moveTo(headX, gridTop + rows*rowH);
+      ctx.lineTo(headX + headW, gridTop + rows*rowH);
+      ctx.stroke();
+
+      // 문번
+      ctx.fillStyle = '#1a1a1a';
+      ctx.font = `${strong?'700':'400'} 11px 'Noto Sans KR'`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(String(num), headX + headW*0.11, cy);
+
+      // 5지선다 버블
+      const bubStart = headX + headW*0.22 + headW*0.06;
+      const bubSpace = headW*0.72 / 5;
+      for (let o = 0; o < 5; o++) {
+        const bx = bubStart + bubSpace*(o+0.5);
+        ctx.beginPath();
+        ctx.arc(bx, cy, bubbleR, 0, Math.PI*2);
+        ctx.strokeStyle = '#1a1a1a'; ctx.lineWidth = 0.9;
+        ctx.stroke();
+        ctx.font = `400 ${Math.max(8, bubbleR*0.95)}px 'Noto Sans KR'`;
+        ctx.fillStyle = '#1a1a1a';
+        ctx.fillText(['①','②','③','④','⑤'][o], bx, cy+0.5);
+        cells.push({ x:bx, y:cy, r:bubbleR, num, opt:o });
+      }
+    }
+
+    xAcc += colW;
+  }
 
   omr = { x:px, y:py, w:pw, h:ph, cells };
 }
@@ -311,6 +510,15 @@ function cellAt(x,y){
 /* ===== 인터랙션 ===== */
 const crosshair = document.getElementById('crosshair');
 
+/* 결함 난이도: 마킹 수에 따라 0→1로 상승.
+   0~2회: 0 (완전 정상), 3~5회: 0.1~0.3, 6~9회: 0.4~0.7, 10회~: 1 */
+function defectLevel(){
+  if (markCount < 3) return 0;
+  if (markCount < 6) return (markCount - 2) * 0.1;     // 0.1, 0.2, 0.3
+  if (markCount < 10) return 0.3 + (markCount - 5) * 0.1; // 0.4, 0.5, 0.6, 0.7
+  return 1;
+}
+
 function onMove(e){
   mouseX = e.clientX; mouseY = e.clientY;
   crosshair.style.transform = `translate(${mouseX}px,${mouseY}px)`;
@@ -320,9 +528,11 @@ function onMove(e){
   lastMoveT = now;
 
   if (!started) return;
+  const L = defectLevel();
+  if (L === 0) return; // 초반엔 펜이 멀쩡함
 
-  // 이동 중 펜촉에서 잉크 뚝뚝 — 확률적
-  if (inPaper(mouseX, mouseY) && Math.random() < 0.08) {
+  // 이동 중 펜촉에서 잉크 뚝뚝 — L에 비례
+  if (inPaper(mouseX, mouseY) && Math.random() < 0.08 * L) {
     droplets.push({
       x: mouseX + (Math.random()-0.5)*6,
       y: mouseY + (Math.random()-0.5)*6,
@@ -334,8 +544,8 @@ function onMove(e){
     });
   }
 
-  // 이동 중 손자국 (낮은 확률, 큰 퍼진 얼룩)
-  if (inPaper(mouseX, mouseY) && Math.random() < 0.015) {
+  // 이동 중 손자국 — 결함이 심해진 뒤에만
+  if (L > 0.5 && inPaper(mouseX, mouseY) && Math.random() < 0.015 * L) {
     smudges.push({
       x: mouseX + (Math.random()-0.5)*40,
       y: mouseY + (Math.random()-0.5)*40,
@@ -357,35 +567,42 @@ function onUp(){ mdown = false; }
 function handleMark(x, y){
   if (!inPaper(x,y)) return;
 
+  markCount++;
+  const L = defectLevel();
+
   // 셀 마킹 여부 판단
   const cell = cellAt(x, y);
 
-  // 1) 정상 마킹 (작고 진한 원)
+  // 1) 정상 마킹 (작고 진한 원) — 항상 발생
   if (cell) {
     addInkDrop(cell.x + (Math.random()-0.5)*1.2, cell.y + (Math.random()-0.5)*1.2, {
       r0: cell.r*0.3, target: cell.r*0.95, growRate: 0.15,
-      bleedTarget: cell.r*1.3, bleedRate: 0.001,
-      spikes: 20, jitter: 0.05, alpha: 0.95,
+      // 결함 레벨에 따라 번짐 범위/속도 증가
+      bleedTarget: cell.r * (1 + L*1.2),
+      bleedRate: 0.0008 + L*0.003,
+      spikes: 20, jitter: 0.05 + L*0.15, alpha: 0.95,
     });
   } else {
-    // 빈 공간 클릭도 잉크가 남음
+    // 빈 공간 클릭
     addInkDrop(x, y, {
       r0: 1.5, target: 4 + Math.random()*2, growRate: 0.1,
-      bleedTarget: 12, bleedRate: 0.003,
+      bleedTarget: 6 + L*10, bleedRate: 0.001 + L*0.002,
     });
   }
 
-  // 2) 잉크 폭발 (Burst) — 15% 확률
-  if (Math.random() < 0.15) {
+  // 2) 잉크 폭발 (Burst) — L에 비례
+  if (Math.random() < L * 0.35) {
     const bx = x + (Math.random()-0.5)*6;
     const by = y + (Math.random()-0.5)*6;
     addInkDrop(bx, by, {
-      r0: 4, target: 18 + Math.random()*14, growRate: 0.25,
-      bleedTarget: 55, bleedRate: 0.004,
+      r0: 4, target: 12 + L * (12 + Math.random()*14),
+      growRate: 0.25,
+      bleedTarget: 30 + L * 30, bleedRate: 0.003,
       spikes: 26, jitter: 0.35, alpha: 0.9, burst:true,
     });
     // 튄 방울들
-    for (let i = 0; i < 6 + Math.random()*8; i++) {
+    const sprayN = Math.floor(3 + L * 10);
+    for (let i = 0; i < sprayN; i++) {
       const a = Math.random()*Math.PI*2;
       const dist = 10 + Math.random()*40;
       addInkDrop(bx + Math.cos(a)*dist, by + Math.sin(a)*dist, {
@@ -396,8 +613,8 @@ function handleMark(x, y){
     }
   }
 
-  // 3) 옆 칸으로 스며듦 (이웃 셀 오염) — 낮은 확률로 예약
-  if (cell && Math.random() < 0.22) {
+  // 3) 옆 칸으로 스며듦 — L에 비례
+  if (cell && Math.random() < L * 0.45) {
     const neighbor = omr.cells.find(c =>
       c !== cell && c.num === cell.num &&
       Math.abs(c.opt - cell.opt) === 1
@@ -412,9 +629,6 @@ function handleMark(x, y){
       }, 3000 + Math.random()*4000);
     }
   }
-
-  markCount++;
-  if (markCount >= 4) showSubmit();
 }
 
 function drawSmudges(){
@@ -522,44 +736,6 @@ addEventListener('mouseup', onUp);
 addEventListener('touchstart', e => { const t = e.touches[0]; onMove(t); onDown(t); }, {passive:true});
 addEventListener('touchmove', e => { onMove(e.touches[0]); }, {passive:true});
 addEventListener('touchend', onUp, {passive:true});
-
-/* ===== 제출 / 아웃트로 ===== */
-const submitBtn = document.getElementById('submit');
-const outro = document.getElementById('outro');
-const scan = document.getElementById('scan');
-const testimonyEl = document.getElementById('testimony');
-
-function showSubmit(){ submitBtn.classList.add('show'); }
-
-const TESTIMONIES = [
-  "펜촉에서 잉크가 뚝뚝 떨어져서 답안지가 새카맣게 번졌습니다.",
-  "옆 칸까지 스며들어서 어느 답을 골랐는지 저도 모르겠어요.",
-  "시험 중에 세 번이나 펜을 교체해 달라고 손을 들었습니다.",
-  "답을 고치려고 지웠더니 잉크가 더 번져서 판독 불가 처리됐어요.",
-  "감독관도 '이건 좀 심하네요'라고 했지만 교체는 시간이 오래 걸린다고 했습니다.",
-  "3년을 준비했는데 펜 하나 때문에 모든 게 무너진 기분입니다.",
-  "이의 신청을 해도 '본인 부주의'로 처리된다고 들었습니다.",
-  "같은 고사장에서 열 명 넘게 동일한 문제가 있었다고 합니다.",
-  "마킹을 마친 답안이 10분 뒤에 옆 번호까지 번지고 있었습니다.",
-  "공식 사인펜이 왜 이 지경인지 아무도 답을 주지 않습니다.",
-];
-
-submitBtn.addEventListener('click', () => {
-  submitBtn.classList.remove('show');
-  running = false;
-  outro.classList.add('show');
-
-  // 테스티모니 삽입
-  testimonyEl.innerHTML = TESTIMONIES.map(t => `<p>${t}</p>`).join('');
-
-  // 스캔 라인 애니메이션
-  let sy = 0;
-  const scanInterval = setInterval(() => {
-    sy = (sy + 6) % (innerHeight + 40);
-    scan.style.top = sy + 'px';
-  }, 16);
-  setTimeout(() => clearInterval(scanInterval), 3200);
-});
 
 /* ===== 지속적 번짐 업데이트 타이머 (여분 안전망) ===== */
 setInterval(() => {
