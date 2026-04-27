@@ -53,6 +53,7 @@ body{background:#0a0a0a;font-family:'Noto Sans KR',sans-serif;color:#fff;min-hei
   <div class="ticker-track">
     <div class="ticker-text">
       [단독] 2025 수능 현장서 '잉크 뚝뚝' 불량 사인펜 무더기…"판독 불가 처리" 속출 &nbsp;│&nbsp;
+      웹캠에 비친 얼굴이 한글이 되는 순간 — '한글 Face' 실험 &nbsp;│&nbsp;
       휴대폰 개통 안면인증, "보이스피싱 예방" vs "내 개인정보 어떡하라고?" &nbsp;│&nbsp;
       "자다 깼더니 바다 한가운데"…대부도 찾은 여성 날벼락 &nbsp;│&nbsp;
       "소주 들고 와 경찰 앞 '원샷'"…보란 듯 술타기하다 결국 &nbsp;│&nbsp;
@@ -66,8 +67,8 @@ body{background:#0a0a0a;font-family:'Noto Sans KR',sans-serif;color:#fff;min-hei
 
 <div class="main">
 
-  <!-- 히어로: 최신 기사 (4/24) The Bleeding Pen -->
-  <a class="hero" href="2026-04-24/20260424_bleeding-pen.html">
+  <!-- 히어로: 최신 기사 (4/27) The Bleeding Pen -->
+  <a class="hero" href="2026-04-27/20260427.html">
     <div class="hero-visual">
       <canvas id="hero-ink"></canvas>
     </div>
@@ -81,6 +82,14 @@ body{background:#0a0a0a;font-family:'Noto Sans KR',sans-serif;color:#fff;min-hei
   <!-- 이전 기사 -->
   <div class="section-label">이전 기사</div>
   <div class="grid">
+    <a class="card" href="2026-04-24/20260424.html">
+      <div class="card-body">
+        <div class="card-tag">실험·비주얼</div>
+        <div class="card-title">한글 Face — 웹캠이 인식한 얼굴을 한글 자모로 그려보다</div>
+        <div class="card-date">2026.04.24</div>
+      </div>
+      <div class="card-thumb"><canvas id="thumb-hangeul" width="100" height="72"></canvas></div>
+    </a>
     <a class="card" href="2026-04-23/20260423.html">
       <div class="card-body">
         <div class="card-tag">IT·사회</div>
@@ -313,6 +322,52 @@ body{background:#0a0a0a;font-family:'Noto Sans KR',sans-serif;color:#fff;min-hei
     requestAnimationFrame(loop);
   }
   requestAnimationFrame(loop);
+})();
+
+// ── 썸네일: 한글 Face (ASCII 웹캠) ──
+(function(){
+  const cv = document.getElementById('thumb-hangeul');
+  if (!cv) return;
+  cv.width = 200; cv.height = 144;
+  const cx = cv.getContext('2d');
+  const W = 200, H = 144;
+  const CHARS = '가나다라마바사아자차카타파하ㄱㄴㄷㄹㅁㅂㅅㅇㅈㅊㅋㅌㅍㅎ'.split('');
+  const COLS = 20, ROWS = 14;
+  const CW = W/COLS, CH = H/ROWS;
+  // 얼굴 마스크(타원)
+  function faceVal(c,r,t){
+    const nx = (c - COLS/2) / (COLS*0.35);
+    const ny = (r - ROWS/2 + 1) / (ROWS*0.42);
+    const d = nx*nx + ny*ny;
+    if (d > 1) return 0;
+    // 이목구비 강조
+    const eyeL = Math.hypot(c-COLS*0.38, r-ROWS*0.42) < 1.4;
+    const eyeR = Math.hypot(c-COLS*0.62, r-ROWS*0.42) < 1.4;
+    const mouth = Math.abs(r-ROWS*0.65) < 0.6 && Math.abs(c-COLS/2) < 3;
+    if (eyeL || eyeR || mouth) return 1;
+    return 1 - d*0.7 + Math.sin(t*0.8 + c*0.3 + r*0.25)*0.1;
+  }
+  function loop(){
+    const t = Date.now()*0.001;
+    cx.fillStyle = '#000'; cx.fillRect(0,0,W,H);
+    cx.textBaseline = 'middle'; cx.textAlign = 'center';
+    cx.font = `700 9px 'Noto Sans Mono CJK KR', monospace`;
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS; c++) {
+        const v = faceVal(c, r, t);
+        if (v <= 0.1) continue;
+        const ch = CHARS[Math.floor((c*7 + r*3 + t*4) % CHARS.length)];
+        cx.fillStyle = `rgba(12,239,211,${Math.min(1, v*0.9)})`;
+        cx.fillText(ch, c*CW + CW/2, r*CH + CH/2);
+      }
+    }
+    // 스캔 라인
+    const sy = (t*25) % H;
+    cx.fillStyle = 'rgba(12,239,211,0.25)';
+    cx.fillRect(0, sy, W, 1);
+    requestAnimationFrame(loop);
+  }
+  loop();
 })();
 
 // ── 썸네일: 안면인식 ──

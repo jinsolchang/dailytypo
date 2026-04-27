@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>한글 Face</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #000; }
+  video, #hidden { display: none; }
+
+  pre#ascii {
+    position: fixed; inset: 0;
+    margin: 0; padding: 0;
+    padding-bottom: 40px;
+    font-family: 'D2Coding', 'Noto Sans Mono CJK KR', monospace;
+    font-size: 10px;
+    line-height: 1.1;
+    color: #0cefd3;
+    overflow: hidden;
+    text-align: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1;
+  }
+
+  #overlay {
+    position: fixed; inset: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    background: #000; z-index: 10; gap: 16px;
+    transition: opacity 0.6s;
+  }
+  #overlay.hidden { opacity: 0; pointer-events: none; }
+  #overlay p { font-family: sans-serif; font-size: 15px; color: rgba(255,255,255,0.75); letter-spacing: 1px; }
+  #overlay button {
+    padding: 13px 34px;
+    background: rgba(255,255,255,0.18);
+    border: 1.5px solid rgba(255,255,255,0.45);
+    border-radius: 40px; color: white;
+    font-size: 15px; cursor: pointer; letter-spacing: 0.5px;
+  }
+  #overlay button:hover { background: rgba(255,255,255,0.3); }
+
+  #progress-wrap {
+    display: none; width: 220px;
+    flex-direction: column; align-items: center; gap: 8px;
+  }
+  #progress-wrap.show { display: flex; }
+  #progress-bar-bg {
+    width: 100%; height: 4px;
+    background: rgba(255,255,255,0.12);
+    border-radius: 2px; overflow: hidden;
+  }
+  #progress-bar {
+    height: 100%; width: 0%;
+    background: #0cefd3; border-radius: 2px;
+    transition: width 0.3s ease;
+  }
+  #progress-text {
+    font-family: sans-serif; font-size: 12px;
+    color: rgba(255,255,255,0.5); letter-spacing: 0.5px;
+  }
+
+  #stats {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    padding: 12px 0;
+    text-align: center;
+    font-family: sans-serif;
+    font-size: 13px;
+    color: #0cefd3;
+    letter-spacing: 0.5px;
+    z-index: 5;
+    pointer-events: none;
+    background: linear-gradient(transparent, rgba(0,0,0,0.85) 30%);
+  }
+</style>
+</head>
+<body>
+
+<div id="overlay">
+  <p>카메라로 얼굴을 한글 아트로 변환합니다</p>
+  <button id="startBtn" onclick="startCamera()">카메라 켜기</button>
+  <div id="progress-wrap">
+    <div id="progress-bar-bg"><div id="progress-bar"></div></div>
+    <span id="progress-text"></span>
+  </div>
+</div>
+
+<pre id="ascii"></pre>
+<div id="stats"></div>
+
+<video id="video" autoplay playsinline muted></video>
+<canvas id="hidden"></canvas>
+
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+<script>
+const video   = document.getElementById('video');
+const hidden  = document.getElementById('hidden');
+const hctx    = hidden.getContext('2d', { willReadFrequently: true });
+const asciiEl = document.getElementById('ascii');
+
+// 한글 문자 (획수 적은→많은 순, 밝기 어두운→밝은)
+const CHARS = ' ㅡㅣㄱㄴㅏㅓㅗㅜㄹㅎ오나다라마바사아자하';
+
+let COLS, ROWS;
+let charW, charH;
+
+function measureChar() {
+  const m = document.createElement('pre');
+  m.style.cssText = asciiEl.style.cssText;
+  m.style.cssText = 'font-family:"D2Coding","Noto Sans Mono CJK KR",monospace;font-size:10px;line-height:1.1;position:absolute;visibility:hidden;white-space:pre;display:inline';
+  m.textContent = '가'.repeat(50);
+  document.body.appendChild(m);
+  charW = m.offsetWidth / 50;
+  charH = m.offsetHeight || 11;
+  document.body.removeChild(m);
+}
+
+function calcGrid() {
+  measureChar();
+  const screenCols = Math.floor(window.innerWidth / charW);
+  const screenRows = Math.floor(window.innerHeight / charH);
+
+  if (video.videoWidth && video.videoHeight) {
+    const vidRatio = video.videoWidth / video.videoHeight;
+    // 문자 비율 보정: 한글은 대략 정사각형에 가까움
+    const cellRatio = charW / charH;
+
+    // 화면에 맞추되 비디오 비율 유지
+    let c = screenCols;
+    let r = Math.round(c * cellRatio / vidRatio);
+    if (r > screenRows) {
+      r = screenRows;
+      c = Math.round(r * vidRatio / cellRatio);
+    }
+    COLS = c;
+    ROWS = r;
+  } else {
+    COLS = screenCols;
+    ROWS = screenRows;
+  }
+}
+
+// ── MEDIAPIPE HANDS ──
+let handLandmarks = null;
+let prevHandPos = null;
+const handSpeed = { x: 0, y: 0 };
+
+const hands = new Hands({
+  locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+});
+hands.setOptions({
+  maxNumHands: 2, modelComplexity: 0,
+  minDetectionConfidence: 0.5, minTrackingConfidence: 0.5
+});
+hands.onResults((results) => {
+  if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+    handLandmarks = results.multiHandLandmarks;
+    const wrist = results.multiHandLandmarks[0][0];
+    const cur = { x: wrist.x, y: wrist.y };
+    if (prevHandPos) {
+      handSpeed.x = cur.x - prevHandPos.x;
+      handSpeed.y = cur.y - prevHandPos.y;
+    }
+    prevHandPos = cur;
+  } else {
+    handLandmarks = null; prevHandPos = null;
+    handSpeed.x = 0; handSpeed.y = 0;
+  }
+});
+
+// ── 파티클 ──
+const MAX_P = 200;
+const particles = Array.from({ length: MAX_P }, () => ({
+  alive: false, life: 0, maxLife: 0,
+  x: 0, y: 0, vx: 0, vy: 0, char: '✦'
+}));
+const sparkChars = '✦✧·˚°∘';
+
+function emitParticles(nx, ny, count) {
+  let e = 0;
+  for (let i = 0; i < MAX_P && e < count; i++) {
+    if (!particles[i].alive) {
+      const p = particles[i];
+      p.alive = true; p.life = 0;
+      p.maxLife = 15 + Math.random() * 25;
+      p.x = nx * COLS + (Math.random() - 0.5) * 4;
+      p.y = ny * ROWS + (Math.random() - 0.5) * 3;
+      p.vx = (Math.random() - 0.5) * 1.5 + handSpeed.x * -30;
+      p.vy = (Math.random() - 0.5) * 1 + handSpeed.y * -20;
+      p.char = sparkChars[Math.floor(Math.random() * sparkChars.length)];
+      e++;
+    }
+  }
+}
+
+function updateParticles() {
+  for (const p of particles) {
+    if (!p.alive) continue;
+    p.life++;
+    if (p.life > p.maxLife) { p.alive = false; continue; }
+    p.x += p.vx; p.y += p.vy;
+    p.vx *= 0.92; p.vy *= 0.92;
+  }
+}
+
+function isFingerOpen(lms, tip, pip) { return lms[tip].y < lms[pip].y; }
+function isOpenHand(lms) {
+  return isFingerOpen(lms,8,6) && isFingerOpen(lms,12,10)
+      && isFingerOpen(lms,16,14) && isFingerOpen(lms,20,18);
+}
+
+// ── 프로그레스 ──
+const progressBar  = document.getElementById('progress-bar');
+const progressText = document.getElementById('progress-text');
+const progressWrap = document.getElementById('progress-wrap');
+const startBtn     = document.getElementById('startBtn');
+function setProgress(pct, text) {
+  progressBar.style.width = pct + '%';
+  progressText.textContent = text;
+}
+
+// ── 카메라 시작 ──
+async function startCamera() {
+  startBtn.style.display = 'none';
+  progressWrap.classList.add('show');
+  setProgress(0, '카메라 연결 중...');
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } }
+    });
+    video.srcObject = stream;
+    await video.play();
+    setProgress(30, '카메라 준비 완료');
+    await new Promise(r => {
+      const c = () => (video.videoWidth && video.videoHeight) ? r() : requestAnimationFrame(c);
+      c();
+    });
+    calcGrid();
+    setProgress(50, '손 인식 모델 로딩...');
+    await hands.send({ image: video });
+    setProgress(90, '거의 다 됐어요...');
+
+    async function sendFrames() {
+      if (video.readyState >= 2) await hands.send({ image: video });
+      requestAnimationFrame(sendFrames);
+    }
+    sendFrames();
+
+    setProgress(100, '완료!');
+    await new Promise(r => setTimeout(r, 300));
+    document.getElementById('overlay').classList.add('hidden');
+    animate();
+  } catch(e) {
+    alert('카메라 권한을 허용해주세요.');
+    startBtn.style.display = '';
+    progressWrap.classList.remove('show');
+  }
+}
+
+window.addEventListener('resize', () => { if (video.videoWidth) calcGrid(); });
+
+// ── 메인 렌더링 ──
+function animate() {
+  requestAnimationFrame(animate);
+  if (!video.videoWidth || !COLS || !ROWS) return;
+
+  hidden.width  = COLS;
+  hidden.height = ROWS;
+  hctx.save();
+  hctx.translate(COLS, 0);
+  hctx.scale(-1, 1);
+  hctx.drawImage(video, 0, 0, COLS, ROWS);
+  hctx.restore();
+
+  const pixels = hctx.getImageData(0, 0, COLS, ROWS).data;
+
+  // 손 파티클
+  if (handLandmarks) {
+    for (const lms of handLandmarks) {
+      const speed = Math.sqrt(handSpeed.x ** 2 + handSpeed.y ** 2);
+      if (isOpenHand(lms) && speed > 0.008) {
+        for (const tip of [8, 12, 16, 20]) emitParticles(1 - lms[tip].x, lms[tip].y, 1);
+      } else if (speed > 0.02) {
+        emitParticles(1 - lms[0].x, lms[0].y, 2);
+      }
+    }
+  }
+  updateParticles();
+
+  // 파티클 맵
+  const pMap = new Map();
+  for (const p of particles) {
+    if (!p.alive) continue;
+    const c = Math.round(p.x), r = Math.round(p.y);
+    if (c >= 0 && c < COLS && r >= 0 && r < ROWS) {
+      pMap.set(r * COLS + c, { char: p.char, fade: 1 - p.life / p.maxLife });
+    }
+  }
+
+  // 한글 ASCII 변환
+  const lines = [];
+  const counts = {};
+  for (let row = 0; row < ROWS; row++) {
+    let line = '';
+    for (let col = 0; col < COLS; col++) {
+      const i = row * COLS + col;
+      const particle = pMap.get(i);
+      if (particle) {
+        line += particle.char;
+      } else {
+        const idx = i * 4;
+        const lum = (pixels[idx] * 0.299 + pixels[idx+1] * 0.587 + pixels[idx+2] * 0.114) / 255;
+        const charIdx = Math.floor(lum * (CHARS.length - 1));
+        const ch = CHARS[charIdx];
+        line += ch;
+        // 공백과 가장 어두운 2개 문자(배경) 제외하고 카운팅
+        if (charIdx > 2) {
+          counts[ch] = (counts[ch] || 0) + 1;
+        }
+      }
+    }
+    lines.push(line);
+  }
+
+  asciiEl.textContent = lines.join('\n');
+
+  // 문자 분포 (매 15프레임마다 업데이트)
+  if (!animate.fc) animate.fc = 0;
+  animate.fc++;
+  if (animate.fc % 15 === 0) {
+    const total = Object.values(counts).reduce((a, b) => a + b, 0);
+    if (total > 0) {
+      const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 5);
+      const colors = ['#8dfff0', '#0cefd3', '#09c4ad', '#069e8b', '#047a6c'];
+      let html = '<span style="color:rgba(255,255,255,0.5)">이 얼굴은 </span>';
+      html += sorted.map(([ch, n], idx) => {
+        const pct = Math.round(n / total * 100);
+        const c = colors[idx];
+        return `<span style="color:${c};font-size:18px;font-weight:bold">${ch}</span> <span style="color:${c}">${pct}%</span>`;
+      }).join('<span style="color:rgba(255,255,255,0.2)">  </span>');
+      html += ' <span style="color:rgba(255,255,255,0.5)">으로 이루어져 있습니다</span>';
+      document.getElementById('stats').innerHTML = html;
+    }
+  }
+}
+</script>
+</body>
+</html>
