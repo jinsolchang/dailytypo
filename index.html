@@ -50,34 +50,43 @@ body{background:#0a0a0a;font-family:'Noto Sans KR',sans-serif;color:#fff;min-hei
   <div class="ticker-label">속보</div>
   <div class="ticker-track">
     <div class="ticker-text">
+      사라진 간판 "청룡, 예술을 창조하는 기업" — 1990년대 디자인 아카이브의 귀환 &nbsp;│&nbsp;
       휴대폰 개통 안면인증, "보이스피싱 예방" vs "내 개인정보 어떡하라고?" &nbsp;│&nbsp;
       "자다 깼더니 바다 한가운데"…대부도 찾은 여성 날벼락 &nbsp;│&nbsp;
       "소주 들고 와 경찰 앞 '원샷'"…보란 듯 술타기하다 결국 &nbsp;│&nbsp;
       美, 휴전 시한 앞두고 이란 선박 전격 나포…이란 압박 극대화 &nbsp;│&nbsp;
       "6월 역대급 장마 온다" 퍼지자…기상청이 내놓은 답 &nbsp;│&nbsp;
       KOSPI 6,150 — 미국-이란 협상 기대감에 급등 &nbsp;│&nbsp;
-      휴대폰 개통 안면인증, "보이스피싱 예방" vs "내 개인정보 어떡하라고?"
+      사라진 간판 "청룡, 예술을 창조하는 기업" — 1990년대 디자인 아카이브의 귀환
     </div>
   </div>
 </div>
 
 <div class="main">
 
-  <!-- 히어로: 최신 기사 (4/23) -->
-  <a class="hero" href="2026-04-23/20260423.html">
+  <!-- 히어로: 최신 기사 (4/24) -->
+  <a class="hero" href="2026-04-24/20260424.html">
     <div class="hero-visual">
       <canvas id="hero-canvas"></canvas>
     </div>
     <div class="hero-body">
-      <div class="hero-tag">IT·사회</div>
-      <div class="hero-title">휴대폰 개통 안면인증, "보이스피싱 예방" vs "내 개인정보 어떡하라고?"</div>
-      <div class="hero-meta">2026.04.23</div>
+      <div class="hero-tag">문화·디자인</div>
+      <div class="hero-title">사라진 간판 "청룡, 예술을 창조하는 기업" — 1990년대 디자인 아카이브의 귀환</div>
+      <div class="hero-meta">2026.04.24</div>
     </div>
   </a>
 
   <!-- 이전 기사 -->
   <div class="section-label">이전 기사</div>
   <div class="grid">
+    <a class="card" href="2026-04-23/20260423.html">
+      <div class="card-body">
+        <div class="card-tag">IT·사회</div>
+        <div class="card-title">휴대폰 개통 안면인증, "보이스피싱 예방" vs "내 개인정보 어떡하라고?"</div>
+        <div class="card-date">2026.04.23</div>
+      </div>
+      <div class="card-thumb"><canvas id="thumb-face" width="100" height="72"></canvas></div>
+    </a>
     <a class="card" href="2026-04-22/20260422.html">
       <div class="card-body">
         <div class="card-tag">사회</div>
@@ -125,7 +134,7 @@ body{background:#0a0a0a;font-family:'Noto Sans KR',sans-serif;color:#fff;min-hei
 <div class="footer">NEWSROOM — This is fiction. 실제 뉴스가 아닙니다.</div>
 
 <script>
-// ── 히어로: Voxel Face 느낌 ──
+// ── 히어로: 청룡 간판 타이포 ──
 (function(){
   const cv = document.getElementById('hero-canvas');
   const rect = cv.parentElement.getBoundingClientRect();
@@ -135,81 +144,119 @@ body{background:#0a0a0a;font-family:'Noto Sans KR',sans-serif;color:#fff;min-hei
   cx.scale(devicePixelRatio, devicePixelRatio);
   const W = rect.width, H = rect.height;
 
-  // 얼굴을 복셀 그리드로 근사 (정면 반원형)
-  const CX = W * 0.5, CY = H * 0.55;
-  const FW = Math.min(W, H) * 0.35;
-  const CELL = 10;
+  // 균열 네트워크
+  const cracks = [];
+  function makeCrack(x,y,angle,len,depth){
+    const pts = [{x,y}]; let cx2=x,cy2=y,a=angle;
+    for (let i = 0; i < 10; i++) {
+      a += (Math.random()-0.5)*0.5;
+      cx2 += Math.cos(a)*(len/10);
+      cy2 += Math.sin(a)*(len/10);
+      pts.push({x:cx2,y:cy2});
+    }
+    const b = {pts, children:[]};
+    if (depth > 0 && Math.random() < 0.65) {
+      const p = pts[Math.floor(pts.length*0.4)];
+      b.children.push(makeCrack(p.x,p.y,a+(Math.random()<0.5?1:-1)*Math.PI/2,len*0.5,depth-1));
+    }
+    return b;
+  }
+  for (let i = 0; i < 10; i++) {
+    cracks.push(makeCrack(Math.random()*W, Math.random()*H, Math.random()*Math.PI*2, 60+Math.random()*100, 2));
+  }
+  function drawCrack(b,a){
+    cx.beginPath();
+    cx.moveTo(b.pts[0].x,b.pts[0].y);
+    for (let i = 1; i < b.pts.length; i++) cx.lineTo(b.pts[i].x,b.pts[i].y);
+    cx.strokeStyle = `rgba(20,20,20,${a})`; cx.lineWidth = 0.7; cx.stroke();
+    for (const c of b.children) drawCrack(c,a*0.6);
+  }
 
-  // 얼굴 마스크: 타원 안쪽 셀만
+  // 떠다니는 단어 파티클
+  const WORDS = ['AD','광고','디자인','기획','청룡','TOTAL','DESIGNER','예술','창조','간판','한글'];
+  const ps = [];
+  for (let i = 0; i < 30; i++) {
+    ps.push({x:Math.random()*W,y:Math.random()*H,vx:(Math.random()-0.5)*0.2,vy:(Math.random()-0.5)*0.12,
+      w:WORDS[Math.floor(Math.random()*WORDS.length)],s:7+Math.random()*12,o:0.08+Math.random()*0.12});
+  }
+
+  function loop(){
+    // 베이지 시트지 배경
+    const g = cx.createLinearGradient(0,0,W,H);
+    g.addColorStop(0,'#c4c0b5'); g.addColorStop(1,'#a8a497');
+    cx.fillStyle = g; cx.fillRect(0,0,W,H);
+
+    // 얼룩
+    for (let i = 0; i < 5; i++) {
+      const x = (i*127)%W, y = (i*89)%H;
+      const r = 60+i*20;
+      const rg = cx.createRadialGradient(x,y,0,x,y,r);
+      rg.addColorStop(0,'rgba(60,50,40,0.1)'); rg.addColorStop(1,'rgba(60,50,40,0)');
+      cx.fillStyle = rg; cx.beginPath(); cx.arc(x,y,r,0,Math.PI*2); cx.fill();
+    }
+
+    // 균열
+    for (const c of cracks) drawCrack(c, 0.28);
+
+    // 파티클
+    for (const p of ps) {
+      p.x += p.vx; p.y += p.vy;
+      if (p.x < -30) p.x = W+30; if (p.x > W+30) p.x = -30;
+      if (p.y < -30) p.y = H+30; if (p.y > H+30) p.y = -30;
+      cx.font = `900 ${p.s}px 'Noto Sans KR'`;
+      cx.fillStyle = `rgba(30,30,30,${p.o})`;
+      cx.fillText(p.w, p.x, p.y);
+    }
+
+    // 중앙 타이포
+    cx.save();
+    cx.translate(W*0.5, H*0.5);
+    cx.textAlign='center'; cx.textBaseline='middle';
+    cx.fillStyle = 'rgba(20,20,20,0.85)';
+    cx.font = `900 ${Math.min(W,H)*0.32}px 'Black Han Sans','Noto Sans KR'`;
+    cx.fillText('청룡', 0, -10);
+    cx.font = `400 ${Math.min(W,H)*0.06}px 'Bebas Neue',sans-serif`;
+    cx.fillStyle = 'rgba(30,30,30,0.7)';
+    const subY = Math.min(W,H)*0.22;
+    cx.fillText('TOTAL · DESIGNER', 0, subY);
+    cx.restore();
+
+    requestAnimationFrame(loop);
+  }
+  loop();
+})();
+
+// ── 썸네일: 안면인식 ──
+(function(){
+  const cv = document.getElementById('thumb-face');
+  if (!cv) return;
+  cv.width = 200; cv.height = 144;
+  const cx = cv.getContext('2d');
+  const W = 200, H = 144;
+  const FW = 45, CELL = 6;
   const voxels = [];
   for (let gy = -FW; gy <= FW; gy += CELL) {
     for (let gx = -FW; gx <= FW; gx += CELL) {
-      const nx = gx / FW, ny = gy / (FW * 1.2);
+      const nx = gx/FW, ny = gy/(FW*1.2);
       if (nx*nx + ny*ny < 1) {
-        // 이목구비 영역: 눈(2개), 코, 입
-        const leftEye = Math.hypot(gx + FW*0.3, gy + FW*0.2) < FW*0.12;
-        const rightEye = Math.hypot(gx - FW*0.3, gy + FW*0.2) < FW*0.12;
-        const nose = Math.abs(gx) < FW*0.08 && gy > -FW*0.1 && gy < FW*0.2;
-        const mouth = Math.abs(gx) < FW*0.25 && gy > FW*0.35 && gy < FW*0.5;
-        const feature = leftEye || rightEye || nose || mouth;
-        // 얼굴 깊이: 중심일수록 앞으로 (z값)
-        const z = Math.sqrt(1 - nx*nx - ny*ny) * FW * 0.5;
-        voxels.push({
-          gx, gy, z, feature,
-          phase: Math.random() * Math.PI * 2,
-        });
+        const feat = Math.hypot(gx+FW*0.3, gy+FW*0.2)<FW*0.12 ||
+                     Math.hypot(gx-FW*0.3, gy+FW*0.2)<FW*0.12 ||
+                     (Math.abs(gx)<FW*0.25 && gy>FW*0.35 && gy<FW*0.5);
+        voxels.push({gx,gy,feat});
       }
     }
   }
-
-  let rot = 0;
-  function loop() {
-    const t = Date.now() * 0.001;
-    rot = Math.sin(t * 0.3) * 0.4;
-
+  function loop(){
+    const t = Date.now()*0.001;
     cx.clearRect(0,0,W,H);
-    // 배경
-    const bg = cx.createLinearGradient(0,0,0,H);
-    bg.addColorStop(0,'#001a1c'); bg.addColorStop(1,'#000405');
-    cx.fillStyle = bg; cx.fillRect(0,0,W,H);
-
-    // 그리드 바닥
-    cx.strokeStyle = 'rgba(12,239,211,0.04)';
-    cx.lineWidth = 0.5;
-    for (let y = 0; y < H; y += 20) { cx.beginPath(); cx.moveTo(0,y); cx.lineTo(W,y); cx.stroke(); }
-    for (let x = 0; x < W; x += 20) { cx.beginPath(); cx.moveTo(x,0); cx.lineTo(x,H); cx.stroke(); }
-
-    // 복셀 그리기 (깊이순 정렬)
-    const sorted = [...voxels].sort((a,b)=>a.z-b.z);
-    for (const v of sorted) {
-      const cosR = Math.cos(rot), sinR = Math.sin(rot);
-      const rx = v.gx * cosR - v.z * sinR;
-      const rz = v.gx * sinR + v.z * cosR;
-      const x = CX + rx;
-      const y = CY + v.gy;
-      const size = CELL - 2 + (rz/FW)*2;
-      const bright = 0.2 + (rz/FW + 1) * 0.4;
-
-      if (v.feature) {
-        // 이목구비는 밝게
-        cx.fillStyle = `rgba(12,239,211,${bright * 0.95})`;
-      } else {
-        cx.fillStyle = `rgba(12,200,180,${bright * 0.35})`;
-      }
-      cx.fillRect(x - size/2, y - size/2, size, size);
-      // 와이어프레임
-      cx.strokeStyle = `rgba(12,239,211,${bright * 0.3})`;
-      cx.lineWidth = 0.5;
-      cx.strokeRect(x - size/2, y - size/2, size, size);
+    cx.fillStyle = '#001a1c'; cx.fillRect(0,0,W,H);
+    for (const v of voxels) {
+      const x = W*0.5 + v.gx, y = H*0.55 + v.gy;
+      cx.fillStyle = v.feat ? 'rgba(12,239,211,0.9)' : 'rgba(12,200,180,0.35)';
+      cx.fillRect(x-CELL/2+1, y-CELL/2+1, CELL-2, CELL-2);
     }
-
-    // 스캔 라인
-    const sy = ((t * 60) % (H + 40)) - 20;
-    cx.fillStyle = 'rgba(12,239,211,0.06)';
-    cx.fillRect(0, sy - 15, W, 30);
-    cx.fillStyle = 'rgba(12,239,211,0.4)';
-    cx.fillRect(0, sy, W, 1);
-
+    const sy = ((t*40) % (H+20)) - 10;
+    cx.fillStyle = 'rgba(12,239,211,0.4)'; cx.fillRect(0,sy,W,1);
     requestAnimationFrame(loop);
   }
   loop();
