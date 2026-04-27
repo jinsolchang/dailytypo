@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>The Bleeding Pen — 2025 수능 불량 사인펜</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;700;900&family=Noto+Serif+KR:wght@400;700&display=swap');
+*{margin:0;padding:0;box-sizing:border-box;-webkit-user-select:none;user-select:none}
+html,body{width:100%;height:100%;overflow:hidden;background:#ededea;font-family:'Noto Sans KR',sans-serif;color:#1a1a1a}
+body.started{cursor:none}
+#stage{position:fixed;inset:0}
+canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+#paper{z-index:1}
+#ink{z-index:2}
+#smudge{z-index:3}
+#overlay{position:fixed;inset:0;z-index:10;pointer-events:none;display:flex;flex-direction:column;justify-content:space-between}
+.ui-top{padding:22px 32px;display:flex;justify-content:space-between;align-items:flex-start;font-size:10px;letter-spacing:0.18em;color:#666;font-weight:700;text-transform:uppercase}
+.ui-top .date{text-align:right;font-family:'Noto Serif KR',serif;font-weight:400;letter-spacing:0.12em;color:#1a1a1a}
+.ui-top .date .y{display:block;font-size:12px}
+.ui-top .date .d{display:block;font-size:10px;color:#888;margin-top:2px}
+.ui-bottom{padding:20px 32px 22px;display:flex;justify-content:space-between;align-items:flex-end;font-size:10px;color:#888;letter-spacing:0.1em;font-weight:400}
+.ui-bottom .l{max-width:48%;line-height:1.6}
+.ui-bottom .r{text-align:right;font-family:'Noto Serif KR',serif}
+.crosshair{position:absolute;width:1px;height:1px;pointer-events:none;z-index:20;mix-blend-mode:multiply}
+.crosshair::before,.crosshair::after{content:'';position:absolute;background:rgba(20,20,20,0.35)}
+.crosshair::before{left:-8px;top:0;width:16px;height:1px}
+.crosshair::after{left:0;top:-8px;width:1px;height:16px}
+
+/* 인트로 */
+#intro{position:fixed;inset:0;z-index:30;background:#ededea;display:flex;flex-direction:column;justify-content:center;align-items:center;transition:opacity 1.4s ease;cursor:pointer}
+#intro.hide{opacity:0;pointer-events:none}
+.crosshair{display:none}
+.started .crosshair{display:block}
+.intro-date{font-family:'Noto Serif KR',serif;font-size:11px;letter-spacing:0.3em;color:#888;margin-bottom:26px}
+.intro-title{font-family:'Noto Serif KR',serif;font-weight:700;font-size:clamp(1.6rem,3.6vw,2.6rem);line-height:1.5;text-align:center;max-width:720px;color:#1a1a1a}
+.intro-sub{margin-top:40px;font-size:11px;letter-spacing:0.2em;color:#aaa;animation:blink 1.8s infinite}
+@keyframes blink{0%,100%{opacity:0.2}50%{opacity:0.8}}
+
+/* 제출 버튼 */
+#submit{position:fixed;bottom:64px;left:50%;transform:translateX(-50%);z-index:11;padding:11px 38px;background:transparent;border:1px solid #1a1a1a;color:#1a1a1a;font-family:'Noto Sans KR',sans-serif;font-size:11px;letter-spacing:0.3em;font-weight:700;cursor:pointer;transition:all 0.25s;opacity:0;pointer-events:none}
+#submit.show{opacity:1;pointer-events:auto}
+#submit:hover{background:#1a1a1a;color:#ededea}
+
+/* 아웃트로 */
+#outro{position:fixed;inset:0;z-index:40;background:rgba(237,237,234,0.96);display:none;flex-direction:column;justify-content:center;align-items:center;padding:60px 40px;overflow:hidden}
+#outro.show{display:flex}
+.scan{position:absolute;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,#c00000 40%,#ff2020 50%,#c00000 60%,transparent);box-shadow:0 0 12px rgba(204,0,0,0.6);z-index:2}
+.error-label{font-family:'Noto Sans KR',sans-serif;font-size:11px;letter-spacing:0.35em;color:#c00000;font-weight:900;margin-bottom:14px;opacity:0}
+.error-title{font-family:'Noto Serif KR',serif;font-size:clamp(2rem,5.6vw,4rem);font-weight:700;color:#1a1a1a;letter-spacing:-0.01em;opacity:0;margin-bottom:40px}
+.error-title .x{color:#c00000}
+.testimony{max-width:880px;width:100%;opacity:0;font-family:'Noto Serif KR',serif;font-size:13px;line-height:1.9;color:#333;columns:2;column-gap:40px;max-height:38vh;overflow:hidden}
+.testimony p{margin-bottom:12px;break-inside:avoid}
+.testimony p::before{content:'"';color:#c00000;font-weight:700;margin-right:3px}
+.testimony p::after{content:'"';color:#c00000;font-weight:700;margin-left:3px}
+.verdict{margin-top:40px;opacity:0;text-align:center;font-family:'Noto Serif KR',serif;font-size:clamp(0.95rem,1.6vw,1.2rem);line-height:1.75;color:#1a1a1a;letter-spacing:0.02em;max-width:640px}
+.verdict .strong{display:block;margin-top:10px;font-weight:700;color:#c00000}
+.reveal{animation:reveal 1.2s ease forwards}
+@keyframes reveal{to{opacity:1}}
+.delay-1{animation-delay:1.2s}
+.delay-2{animation-delay:1.8s}
+.delay-3{animation-delay:2.8s}
+.delay-4{animation-delay:3.8s}
+
+/* 홈 */
+.home{position:fixed;top:22px;left:32px;z-index:50;font-size:10px;letter-spacing:0.2em;color:#888;text-decoration:none;font-weight:700}
+.home:hover{color:#1a1a1a}
+</style>
+</head>
+<body>
+
+<a class="home" href="../index.html">← NEWSROOM</a>
+
+<div id="intro">
+  <div class="intro-date">2025. 11. 13. 대학수학능력시험</div>
+  <div class="intro-title">당신의 3년이<br>이 종이 위에 기록됩니다.</div>
+  <div class="intro-sub">CLICK TO BEGIN</div>
+</div>
+
+<div id="stage">
+  <canvas id="paper"></canvas>
+  <canvas id="ink"></canvas>
+  <canvas id="smudge"></canvas>
+</div>
+
+<div id="overlay">
+  <div class="ui-top">
+    <div>
+      <div>OMR RESPONSE SHEET</div>
+      <div style="margin-top:4px;font-weight:400;letter-spacing:0.12em;color:#aaa">第 17 回 大學修學能力試驗</div>
+    </div>
+    <div class="date">
+      <span class="y">2025. 11. 13.</span>
+      <span class="d">08:40 — 제 1 교시</span>
+    </div>
+  </div>
+  <div class="ui-bottom">
+    <div class="l">답안은 반드시 컴퓨터용 사인펜(흑색)으로 표기하며, 수정테이프·수정액 사용을 금한다.<br>펜의 결함은 수험자의 책임이 아니나, 결과는 수험자의 책임이다.</div>
+    <div class="r">—<br>SHEET · 001 / 001</div>
+  </div>
+</div>
+
+<div class="crosshair" id="crosshair"></div>
+
+<button id="submit">제출 · SUBMIT</button>
+
+<div id="outro">
+  <div class="scan" id="scan"></div>
+  <div class="error-label reveal delay-1">READ ERROR · 판독 불가</div>
+  <div class="error-title reveal delay-2">판독<span class="x">불가</span></div>
+  <div class="testimony reveal delay-3" id="testimony"></div>
+  <div class="verdict reveal delay-4">
+    결함은 당신의 실수가 아닙니다.
+    <span class="strong">그러나 책임은 당신이 집니다.</span>
+  </div>
+</div>
+
+<script>
+/* ===== 레이아웃 · OMR 카드 그리기 ===== */
+const paper = document.getElementById('paper');
+const inkCv = document.getElementById('ink');
+const smudgeCv = document.getElementById('smudge');
+const pctx = paper.getContext('2d');
+const ictx = inkCv.getContext('2d', { willReadFrequently: true });
+const sctx = smudgeCv.getContext('2d');
+
+let W = 0, H = 0, DPR = Math.min(window.devicePixelRatio || 1, 2);
+let omr = null; // {x,y,w,h, cells:[{x,y,r,num,opt}]}
+
+function resize(){
+  W = innerWidth; H = innerHeight;
+  for (const cv of [paper, inkCv, smudgeCv]) {
+    cv.width = W * DPR; cv.height = H * DPR;
+    cv.style.width = W + 'px'; cv.style.height = H + 'px';
+  }
+  pctx.setTransform(DPR,0,0,DPR,0,0);
+  ictx.setTransform(DPR,0,0,DPR,0,0);
+  sctx.setTransform(DPR,0,0,DPR,0,0);
+  drawPaper();
+}
+
+function drawPaper(){
+  const ctx = pctx;
+  // 시트지 색
+  ctx.fillStyle = '#ededea';
+  ctx.fillRect(0,0,W,H);
+
+  // 종이 영역 (가운데 큰 흰색)
+  const pad = Math.min(W,H) * 0.05;
+  const pw = Math.min(W - pad*2, 1080);
+  const ph = Math.min(H - pad*2, 720);
+  const px = (W - pw)/2, py = (H - ph)/2;
+
+  // 종이 그림자
+  ctx.save();
+  ctx.shadowColor = 'rgba(0,0,0,0.12)';
+  ctx.shadowBlur = 28;
+  ctx.shadowOffsetY = 4;
+  ctx.fillStyle = '#fbfaf6';
+  ctx.fillRect(px, py, pw, ph);
+  ctx.restore();
+
+  // 종이 질감 (미세 점)
+  const img = ctx.getImageData(px, py, pw, ph);
+  const d = img.data;
+  for (let i = 0; i < d.length; i += 4) {
+    const n = (Math.random()-0.5)*10;
+    d[i] = Math.max(0, Math.min(255, d[i]+n));
+    d[i+1] = Math.max(0, Math.min(255, d[i+1]+n));
+    d[i+2] = Math.max(0, Math.min(255, d[i+2]+n));
+  }
+  ctx.putImageData(img, px, py);
+
+  // 헤더
+  ctx.fillStyle = '#1a1a1a';
+  ctx.font = `700 13px 'Noto Serif KR',serif`;
+  ctx.textBaseline = 'top';
+  ctx.fillText('2025학년도 대학수학능력시험 답안지', px+24, py+22);
+  ctx.font = `400 10px 'Noto Sans KR',sans-serif`;
+  ctx.fillStyle = '#666';
+  ctx.fillText('제 1 교시 · 국어영역', px+24, py+44);
+  ctx.textAlign = 'right';
+  ctx.fillStyle = '#1a1a1a';
+  ctx.font = `400 10px 'Noto Sans KR',sans-serif`;
+  ctx.fillText('수험번호 □□□□□□□□    성명 □□□', px+pw-24, py+26);
+  ctx.textAlign = 'left';
+
+  // OMR 그리드: 2열 × 각 열 15문항, 5지선다
+  const colX = [px + pw*0.08, px + pw*0.54];
+  const colW = pw * 0.38;
+  const gridTop = py + 88;
+  const rowH = (ph - 110) / 15;
+  const cells = [];
+  ctx.font = `400 11px 'Noto Sans KR',sans-serif`;
+  ctx.fillStyle = '#1a1a1a';
+  for (let c = 0; c < 2; c++) {
+    for (let r = 0; r < 15; r++) {
+      const num = c*15 + r + 1;
+      const cy = gridTop + r*rowH + rowH/2;
+      // 번호
+      ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#1a1a1a';
+      ctx.fillText(String(num).padStart(2,'0'), colX[c]+18, cy);
+      // 5개 원
+      const bubbleStart = colX[c] + 34;
+      const bubbleW = colW - 40;
+      const radius = Math.min(rowH*0.32, bubbleW/12);
+      for (let o = 0; o < 5; o++) {
+        const bx = bubbleStart + (bubbleW/5)*o + bubbleW/10;
+        ctx.beginPath();
+        ctx.arc(bx, cy, radius, 0, Math.PI*2);
+        ctx.strokeStyle = '#1a1a1a';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        // 원 안 숫자
+        ctx.font = `400 ${Math.max(8,radius*0.9)}px 'Noto Sans KR'`;
+        ctx.fillStyle = '#999';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(['①','②','③','④','⑤'][o], bx, cy);
+        cells.push({ x:bx, y:cy, r:radius, num, opt:o });
+      }
+      ctx.font = `400 11px 'Noto Sans KR',sans-serif`;
+    }
+  }
+
+  // 가이드 라인
+  ctx.strokeStyle = 'rgba(0,0,0,0.06)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(px+pw/2, py+80); ctx.lineTo(px+pw/2, py+ph-24);
+  ctx.stroke();
+
+  omr = { x:px, y:py, w:pw, h:ph, cells };
+}
+
+resize();
+addEventListener('resize', resize);
+
+/* ===== 잉크 시뮬레이션 ===== */
+/* 잉크 방울: 성장/번짐/드립 */
+const drops = [];      // 퍼지는 잉크 방울 (마킹, 오염)
+const droplets = [];   // 공중 드립(펜촉에서 떨어지는 방울)
+const smudges = [];    // 손 얼룩
+let mouseX = W/2, mouseY = H/2, mdown = false;
+let lastMoveT = 0;
+
+function addInkDrop(x, y, opts={}){
+  const base = {
+    x, y,
+    r: opts.r0 || (2 + Math.random()*2),
+    target: opts.target || (8 + Math.random()*6),
+    growRate: opts.growRate || (0.08 + Math.random()*0.12),
+    bleedRate: opts.bleedRate || (0.002 + Math.random()*0.004),
+    bleedTarget: opts.bleedTarget || (opts.target ? opts.target*1.6 : 0),
+    life: 0,
+    maxLife: opts.maxLife || 9999,
+    // 번짐 불규칙성을 위한 로컬 perlin 시드
+    seed: Math.random()*1000,
+    spikes: opts.spikes !== undefined ? opts.spikes : 16,
+    alpha: opts.alpha || 0.92,
+    jitter: opts.jitter || 0.15,
+    burst: opts.burst || false,
+  };
+  drops.push(base);
+  return base;
+}
+
+/* 섬유를 따라 불규칙하게 퍼지는 얼룩을 그림 */
+function drawBlob(d){
+  const ctx = ictx;
+  const pts = d.spikes;
+  ctx.beginPath();
+  for (let i = 0; i <= pts; i++) {
+    const a = (i/pts) * Math.PI*2;
+    // 방향별 불규칙 반경 (의사 펄린)
+    const n = Math.sin(a*3 + d.seed) * 0.5
+            + Math.sin(a*7 + d.seed*1.3) * 0.3
+            + Math.sin(a*13 + d.seed*2.1) * 0.2;
+    const rr = d.r * (1 + n * d.jitter);
+    const x = d.x + Math.cos(a)*rr;
+    const y = d.y + Math.sin(a)*rr;
+    if (i === 0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+  }
+  ctx.closePath();
+  // 잉크 그라디언트: 안쪽 진한 검정, 가장자리 푸른 번짐
+  const g = ctx.createRadialGradient(d.x, d.y, 0, d.x, d.y, d.r*1.15);
+  g.addColorStop(0, `rgba(8,12,20,${Math.min(0.98, d.alpha)})`);
+  g.addColorStop(0.6, `rgba(18,28,55,${d.alpha*0.92})`);
+  g.addColorStop(0.92, `rgba(30,55,95,${d.alpha*0.45})`);
+  g.addColorStop(1, 'rgba(60,90,140,0)');
+  ctx.fillStyle = g;
+  ctx.fill();
+}
+
+/* OMR 바운딩 박스 체크 */
+function inPaper(x,y){
+  if (!omr) return false;
+  return x > omr.x && x < omr.x + omr.w && y > omr.y && y < omr.y + omr.h;
+}
+
+/* 셀 감지 */
+function cellAt(x,y){
+  if (!omr) return null;
+  for (const c of omr.cells) {
+    const dx = x-c.x, dy = y-c.y;
+    if (dx*dx + dy*dy < c.r*c.r*2.2) return c;
+  }
+  return null;
+}
+
+/* ===== 인터랙션 ===== */
+const crosshair = document.getElementById('crosshair');
+
+function onMove(e){
+  mouseX = e.clientX; mouseY = e.clientY;
+  crosshair.style.transform = `translate(${mouseX}px,${mouseY}px)`;
+
+  const now = performance.now();
+  const dt = now - lastMoveT;
+  lastMoveT = now;
+
+  if (!started) return;
+
+  // 이동 중 펜촉에서 잉크 뚝뚝 — 확률적
+  if (inPaper(mouseX, mouseY) && Math.random() < 0.08) {
+    droplets.push({
+      x: mouseX + (Math.random()-0.5)*6,
+      y: mouseY + (Math.random()-0.5)*6,
+      vy: 0.3 + Math.random()*0.9,
+      vx: (Math.random()-0.5)*0.3,
+      life: 0,
+      maxLife: 35 + Math.random()*30,
+      r: 1.2 + Math.random()*1.6,
+    });
+  }
+
+  // 이동 중 손자국 (낮은 확률, 큰 퍼진 얼룩)
+  if (inPaper(mouseX, mouseY) && Math.random() < 0.015) {
+    smudges.push({
+      x: mouseX + (Math.random()-0.5)*40,
+      y: mouseY + (Math.random()-0.5)*40,
+      r: 18 + Math.random()*26,
+      alpha: 0.03 + Math.random()*0.05,
+      angle: Math.random()*Math.PI,
+    });
+    drawSmudges();
+  }
+}
+
+function onDown(e){
+  if (!started) return;
+  mdown = true;
+  handleMark(e.clientX, e.clientY);
+}
+function onUp(){ mdown = false; }
+
+function handleMark(x, y){
+  if (!inPaper(x,y)) return;
+
+  // 셀 마킹 여부 판단
+  const cell = cellAt(x, y);
+
+  // 1) 정상 마킹 (작고 진한 원)
+  if (cell) {
+    addInkDrop(cell.x + (Math.random()-0.5)*1.2, cell.y + (Math.random()-0.5)*1.2, {
+      r0: cell.r*0.3, target: cell.r*0.95, growRate: 0.15,
+      bleedTarget: cell.r*1.3, bleedRate: 0.001,
+      spikes: 20, jitter: 0.05, alpha: 0.95,
+    });
+  } else {
+    // 빈 공간 클릭도 잉크가 남음
+    addInkDrop(x, y, {
+      r0: 1.5, target: 4 + Math.random()*2, growRate: 0.1,
+      bleedTarget: 12, bleedRate: 0.003,
+    });
+  }
+
+  // 2) 잉크 폭발 (Burst) — 15% 확률
+  if (Math.random() < 0.15) {
+    const bx = x + (Math.random()-0.5)*6;
+    const by = y + (Math.random()-0.5)*6;
+    addInkDrop(bx, by, {
+      r0: 4, target: 18 + Math.random()*14, growRate: 0.25,
+      bleedTarget: 55, bleedRate: 0.004,
+      spikes: 26, jitter: 0.35, alpha: 0.9, burst:true,
+    });
+    // 튄 방울들
+    for (let i = 0; i < 6 + Math.random()*8; i++) {
+      const a = Math.random()*Math.PI*2;
+      const dist = 10 + Math.random()*40;
+      addInkDrop(bx + Math.cos(a)*dist, by + Math.sin(a)*dist, {
+        r0: 0.8, target: 1.5 + Math.random()*2.5, growRate: 0.3,
+        bleedTarget: 4, bleedRate: 0.003,
+        spikes: 10, jitter: 0.4, alpha: 0.8,
+      });
+    }
+  }
+
+  // 3) 옆 칸으로 스며듦 (이웃 셀 오염) — 낮은 확률로 예약
+  if (cell && Math.random() < 0.22) {
+    const neighbor = omr.cells.find(c =>
+      c !== cell && c.num === cell.num &&
+      Math.abs(c.opt - cell.opt) === 1
+    );
+    if (neighbor) {
+      setTimeout(() => {
+        addInkDrop(neighbor.x + (Math.random()-0.5)*3, neighbor.y + (Math.random()-0.5)*3, {
+          r0: 0.5, target: neighbor.r*0.6, growRate: 0.04,
+          bleedTarget: neighbor.r*1.1, bleedRate: 0.0015,
+          spikes: 14, jitter: 0.3, alpha: 0.6,
+        });
+      }, 3000 + Math.random()*4000);
+    }
+  }
+
+  markCount++;
+  if (markCount >= 4) showSubmit();
+}
+
+function drawSmudges(){
+  for (const s of smudges.slice(-1)) {
+    sctx.save();
+    sctx.translate(s.x, s.y);
+    sctx.rotate(s.angle);
+    // 긴 타원형 손자국
+    for (let i = 0; i < 18; i++) {
+      const r = s.r * (0.2 + Math.random()*0.8);
+      const dx = (Math.random()-0.5) * s.r * 1.4;
+      const dy = (Math.random()-0.5) * s.r * 0.7;
+      sctx.beginPath();
+      sctx.arc(dx, dy, r, 0, Math.PI*2);
+      const g = sctx.createRadialGradient(dx, dy, 0, dx, dy, r);
+      g.addColorStop(0, `rgba(60,50,45,${s.alpha})`);
+      g.addColorStop(1, 'rgba(60,50,45,0)');
+      sctx.fillStyle = g;
+      sctx.fill();
+    }
+    // 지문 라인
+    sctx.strokeStyle = `rgba(40,30,25,${s.alpha*2})`;
+    sctx.lineWidth = 0.6;
+    for (let i = -4; i <= 4; i++) {
+      sctx.beginPath();
+      for (let t = -1; t <= 1; t += 0.08) {
+        const x = t * s.r * 0.9;
+        const y = i * 1.8 + Math.sin(t*3 + i) * 1.4;
+        if (t === -1) sctx.moveTo(x,y); else sctx.lineTo(x,y);
+      }
+      sctx.stroke();
+    }
+    sctx.restore();
+  }
+}
+
+/* ===== 메인 루프 ===== */
+let running = false, started = false, markCount = 0;
+
+function tick(){
+  if (!running) return;
+
+  // 잉크 드롭 성장 & 번짐
+  // 부드러운 번짐을 위해 매 프레임 다시 그림 (drop 수는 제한)
+  ictx.clearRect(0,0,W,H);
+
+  for (let i = drops.length - 1; i >= 0; i--) {
+    const d = drops[i];
+    // 빠른 성장 (마킹 순간)
+    if (d.r < d.target) {
+      d.r += (d.target - d.r) * d.growRate;
+    } else if (d.bleedTarget && d.r < d.bleedTarget) {
+      // 느린 번짐
+      d.r += d.bleedRate * (d.bleedTarget - d.r);
+      d.jitter = Math.min(d.jitter + 0.0004, 0.45);
+      d.alpha = Math.max(0.38, d.alpha - 0.0005);
+    }
+    d.life++;
+    drawBlob(d);
+    if (drops.length > 450) drops.shift(); // 성능 가드
+  }
+
+  // 공중 드립
+  for (let i = droplets.length - 1; i >= 0; i--) {
+    const dp = droplets[i];
+    dp.x += dp.vx;
+    dp.y += dp.vy;
+    dp.vy += 0.05;
+    dp.life++;
+    if (dp.life > dp.maxLife || dp.y > H + 20) {
+      // 떨어진 자리에 잉크 방울로 고정
+      if (inPaper(dp.x, dp.y)) {
+        addInkDrop(dp.x, dp.y, {
+          r0: dp.r, target: dp.r*2.2, growRate: 0.15,
+          bleedTarget: dp.r*3, bleedRate: 0.002,
+          jitter: 0.25, alpha: 0.85,
+        });
+      }
+      droplets.splice(i,1);
+      continue;
+    }
+    // 공중 방울 그리기
+    ictx.beginPath();
+    ictx.ellipse(dp.x, dp.y, dp.r*0.6, dp.r, 0, 0, Math.PI*2);
+    ictx.fillStyle = `rgba(10,15,30,0.85)`;
+    ictx.fill();
+  }
+
+  requestAnimationFrame(tick);
+}
+
+/* ===== 인트로 / 시작 ===== */
+const intro = document.getElementById('intro');
+intro.addEventListener('click', () => {
+  intro.classList.add('hide');
+  document.body.classList.add('started');
+  started = true; running = true;
+  tick();
+  setTimeout(() => intro.style.display = 'none', 1400);
+});
+
+addEventListener('mousemove', onMove);
+addEventListener('mousedown', onDown);
+addEventListener('mouseup', onUp);
+addEventListener('touchstart', e => { const t = e.touches[0]; onMove(t); onDown(t); }, {passive:true});
+addEventListener('touchmove', e => { onMove(e.touches[0]); }, {passive:true});
+addEventListener('touchend', onUp, {passive:true});
+
+/* ===== 제출 / 아웃트로 ===== */
+const submitBtn = document.getElementById('submit');
+const outro = document.getElementById('outro');
+const scan = document.getElementById('scan');
+const testimonyEl = document.getElementById('testimony');
+
+function showSubmit(){ submitBtn.classList.add('show'); }
+
+const TESTIMONIES = [
+  "펜촉에서 잉크가 뚝뚝 떨어져서 답안지가 새카맣게 번졌습니다.",
+  "옆 칸까지 스며들어서 어느 답을 골랐는지 저도 모르겠어요.",
+  "시험 중에 세 번이나 펜을 교체해 달라고 손을 들었습니다.",
+  "답을 고치려고 지웠더니 잉크가 더 번져서 판독 불가 처리됐어요.",
+  "감독관도 '이건 좀 심하네요'라고 했지만 교체는 시간이 오래 걸린다고 했습니다.",
+  "3년을 준비했는데 펜 하나 때문에 모든 게 무너진 기분입니다.",
+  "이의 신청을 해도 '본인 부주의'로 처리된다고 들었습니다.",
+  "같은 고사장에서 열 명 넘게 동일한 문제가 있었다고 합니다.",
+  "마킹을 마친 답안이 10분 뒤에 옆 번호까지 번지고 있었습니다.",
+  "공식 사인펜이 왜 이 지경인지 아무도 답을 주지 않습니다.",
+];
+
+submitBtn.addEventListener('click', () => {
+  submitBtn.classList.remove('show');
+  running = false;
+  outro.classList.add('show');
+
+  // 테스티모니 삽입
+  testimonyEl.innerHTML = TESTIMONIES.map(t => `<p>${t}</p>`).join('');
+
+  // 스캔 라인 애니메이션
+  let sy = 0;
+  const scanInterval = setInterval(() => {
+    sy = (sy + 6) % (innerHeight + 40);
+    scan.style.top = sy + 'px';
+  }, 16);
+  setTimeout(() => clearInterval(scanInterval), 3200);
+});
+
+/* ===== 지속적 번짐 업데이트 타이머 (여분 안전망) ===== */
+setInterval(() => {
+  // 일부 드롭의 bleedTarget을 조금씩 늘려 '계속 번지는' 느낌 유지
+  for (const d of drops) {
+    if (d.life > 200 && d.bleedTarget && d.r < d.bleedTarget * 1.05) {
+      d.bleedTarget *= 1.002;
+    }
+  }
+}, 500);
+</script>
+
+</body>
+</html>

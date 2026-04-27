@@ -51,6 +51,7 @@ body{background:#0a0a0a;font-family:'Noto Sans KR',sans-serif;color:#fff;min-hei
   <div class="ticker-label">속보</div>
   <div class="ticker-track">
     <div class="ticker-text">
+      [단독] 2025 수능 현장서 '잉크 뚝뚝' 불량 사인펜 무더기…"판독 불가 처리" 속출 &nbsp;│&nbsp;
       청룡기획사 "예술을 창조하는 기업" — 영업중 · TEL 010-6614-6449 &nbsp;│&nbsp;
       휴대폰 개통 안면인증, "보이스피싱 예방" vs "내 개인정보 어떡하라고?" &nbsp;│&nbsp;
       "자다 깼더니 바다 한가운데"…대부도 찾은 여성 날벼락 &nbsp;│&nbsp;
@@ -65,21 +66,29 @@ body{background:#0a0a0a;font-family:'Noto Sans KR',sans-serif;color:#fff;min-hei
 
 <div class="main">
 
-  <!-- 히어로: 최신 기사 (4/24) -->
-  <a class="hero" href="2026-04-24/20260424.html">
+  <!-- 히어로: 최신 기사 (4/24) The Bleeding Pen -->
+  <a class="hero" href="2026-04-24/20260424_bleeding-pen.html">
     <div class="hero-visual">
-      <img class="hero-img" src="2026-04-24/L1030722.jpg" alt="청룡기획사 간판">
+      <canvas id="hero-ink"></canvas>
     </div>
     <div class="hero-body">
-      <div class="hero-tag">문화·디자인</div>
-      <div class="hero-title">청룡기획사 "예술을 창조하는 기업" — 영업중</div>
-      <div class="hero-meta">2026.04.24 · 전주 · TOTAL DESIGNER</div>
+      <div class="hero-tag">단독·사회</div>
+      <div class="hero-title">[단독] 2025 수능 현장서 '잉크 뚝뚝' 불량 사인펜 무더기…"판독 불가" 처리 속출</div>
+      <div class="hero-meta">2025.11.13 · 탐사보도 · THE BLEEDING PEN</div>
     </div>
   </a>
 
   <!-- 이전 기사 -->
   <div class="section-label">이전 기사</div>
   <div class="grid">
+    <a class="card" href="2026-04-24/20260424.html">
+      <div class="card-body">
+        <div class="card-tag">문화·디자인</div>
+        <div class="card-title">청룡기획사 "예술을 창조하는 기업" — 영업중</div>
+        <div class="card-date">2026.04.24</div>
+      </div>
+      <div class="card-thumb"><canvas id="thumb-cheong" width="100" height="72"></canvas></div>
+    </a>
     <a class="card" href="2026-04-23/20260423.html">
       <div class="card-body">
         <div class="card-tag">IT·사회</div>
@@ -135,94 +144,101 @@ body{background:#0a0a0a;font-family:'Noto Sans KR',sans-serif;color:#fff;min-hei
 <div class="footer">NEWSROOM — This is fiction. 실제 뉴스가 아닙니다.</div>
 
 <script>
-// ── 히어로: 청룡 간판 타이포 ──
+// ── 히어로: 잉크 번짐 (The Bleeding Pen) ──
 (function(){
-  const cv = document.getElementById('hero-canvas');
+  const cv = document.getElementById('hero-ink');
   if (!cv) return;
   const rect = cv.parentElement.getBoundingClientRect();
-  cv.width = rect.width * devicePixelRatio;
-  cv.height = rect.height * devicePixelRatio;
+  const DPR = Math.min(devicePixelRatio||1, 2);
+  cv.width = rect.width * DPR; cv.height = rect.height * DPR;
   const cx = cv.getContext('2d');
-  cx.scale(devicePixelRatio, devicePixelRatio);
+  cx.scale(DPR, DPR);
   const W = rect.width, H = rect.height;
 
-  // 균열 네트워크
-  const cracks = [];
-  function makeCrack(x,y,angle,len,depth){
-    const pts = [{x,y}]; let cx2=x,cy2=y,a=angle;
-    for (let i = 0; i < 10; i++) {
-      a += (Math.random()-0.5)*0.5;
-      cx2 += Math.cos(a)*(len/10);
-      cy2 += Math.sin(a)*(len/10);
-      pts.push({x:cx2,y:cy2});
+  // OMR 카드 배경
+  function drawCard(){
+    cx.fillStyle = '#f0ede5'; cx.fillRect(0,0,W,H);
+    cx.fillStyle = '#fbfaf6';
+    cx.fillRect(W*0.08, H*0.1, W*0.84, H*0.8);
+    // OMR 셀 그리드
+    cx.strokeStyle = 'rgba(20,20,20,0.55)';
+    cx.lineWidth = 0.8;
+    const cols = 18, rows = 7;
+    const gx = W*0.12, gy = H*0.2;
+    const gw = W*0.76, gh = H*0.6;
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const x = gx + (c+0.5)*(gw/cols);
+        const y = gy + (r+0.5)*(gh/rows);
+        cx.beginPath(); cx.arc(x, y, Math.min(gw/cols,gh/rows)*0.3, 0, Math.PI*2); cx.stroke();
+      }
     }
-    const b = {pts, children:[]};
-    if (depth > 0 && Math.random() < 0.65) {
-      const p = pts[Math.floor(pts.length*0.4)];
-      b.children.push(makeCrack(p.x,p.y,a+(Math.random()<0.5?1:-1)*Math.PI/2,len*0.5,depth-1));
-    }
-    return b;
-  }
-  for (let i = 0; i < 10; i++) {
-    cracks.push(makeCrack(Math.random()*W, Math.random()*H, Math.random()*Math.PI*2, 60+Math.random()*100, 2));
-  }
-  function drawCrack(b,a){
-    cx.beginPath();
-    cx.moveTo(b.pts[0].x,b.pts[0].y);
-    for (let i = 1; i < b.pts.length; i++) cx.lineTo(b.pts[i].x,b.pts[i].y);
-    cx.strokeStyle = `rgba(20,20,20,${a})`; cx.lineWidth = 0.7; cx.stroke();
-    for (const c of b.children) drawCrack(c,a*0.6);
   }
 
-  // 떠다니는 단어 파티클
-  const WORDS = ['AD','광고','디자인','기획','청룡','TOTAL','DESIGNER','예술','창조','간판','한글'];
-  const ps = [];
-  for (let i = 0; i < 30; i++) {
-    ps.push({x:Math.random()*W,y:Math.random()*H,vx:(Math.random()-0.5)*0.2,vy:(Math.random()-0.5)*0.12,
-      w:WORDS[Math.floor(Math.random()*WORDS.length)],s:7+Math.random()*12,o:0.08+Math.random()*0.12});
+  const drops = [];
+  function addDrop(x,y,target,delay=0){
+    drops.push({x,y,r:0,target,jitter:0.1+Math.random()*0.3,seed:Math.random()*100,alpha:0.9,grow:0.06+Math.random()*0.05,startAt:performance.now()+delay});
+  }
+  // 초기 마킹들
+  for (let c = 0; c < 18; c++) {
+    for (let r = 0; r < 7; r++) {
+      if (Math.random() < 0.18) {
+        const cellSize = Math.min(W*0.76/18, H*0.6/7);
+        addDrop(W*0.12 + (c+0.5)*(W*0.76/18), H*0.2 + (r+0.5)*(H*0.6/7), cellSize*0.4 + Math.random()*cellSize*0.6, Math.random()*3000);
+      }
+    }
+  }
+  // 몇 개는 거대 blot
+  for (let i = 0; i < 3; i++) {
+    addDrop(W*(0.2+Math.random()*0.6), H*(0.15+Math.random()*0.7), 20 + Math.random()*30, i*1500);
   }
 
   function loop(){
-    // 베이지 시트지 배경
+    drawCard();
+    const now = performance.now();
+    for (const d of drops) {
+      if (now < d.startAt) continue;
+      if (d.r < d.target) d.r += (d.target - d.r) * d.grow;
+      const pts = 20;
+      cx.beginPath();
+      for (let i = 0; i <= pts; i++) {
+        const a = (i/pts)*Math.PI*2;
+        const n = Math.sin(a*3+d.seed) + Math.sin(a*7+d.seed*1.3)*0.5 + Math.sin(a*13+d.seed*2.1)*0.3;
+        const rr = d.r * (1 + n*d.jitter*0.3);
+        const x = d.x + Math.cos(a)*rr;
+        const y = d.y + Math.sin(a)*rr;
+        i === 0 ? cx.moveTo(x,y) : cx.lineTo(x,y);
+      }
+      cx.closePath();
+      const g = cx.createRadialGradient(d.x,d.y,0,d.x,d.y,d.r*1.1);
+      g.addColorStop(0,'rgba(8,12,20,0.95)');
+      g.addColorStop(0.7,'rgba(18,28,55,0.7)');
+      g.addColorStop(1,'rgba(60,90,140,0)');
+      cx.fillStyle = g; cx.fill();
+    }
+    requestAnimationFrame(loop);
+  }
+  loop();
+})();
+
+// ── 썸네일: 청룡 간판 ──
+(function(){
+  const cv = document.getElementById('thumb-cheong');
+  if (!cv) return;
+  cv.width = 200; cv.height = 144;
+  const cx = cv.getContext('2d');
+  const W = 200, H = 144;
+  function loop(){
     const g = cx.createLinearGradient(0,0,W,H);
     g.addColorStop(0,'#c4c0b5'); g.addColorStop(1,'#a8a497');
     cx.fillStyle = g; cx.fillRect(0,0,W,H);
-
-    // 얼룩
-    for (let i = 0; i < 5; i++) {
-      const x = (i*127)%W, y = (i*89)%H;
-      const r = 60+i*20;
-      const rg = cx.createRadialGradient(x,y,0,x,y,r);
-      rg.addColorStop(0,'rgba(60,50,40,0.1)'); rg.addColorStop(1,'rgba(60,50,40,0)');
-      cx.fillStyle = rg; cx.beginPath(); cx.arc(x,y,r,0,Math.PI*2); cx.fill();
-    }
-
-    // 균열
-    for (const c of cracks) drawCrack(c, 0.28);
-
-    // 파티클
-    for (const p of ps) {
-      p.x += p.vx; p.y += p.vy;
-      if (p.x < -30) p.x = W+30; if (p.x > W+30) p.x = -30;
-      if (p.y < -30) p.y = H+30; if (p.y > H+30) p.y = -30;
-      cx.font = `900 ${p.s}px 'Noto Sans KR'`;
-      cx.fillStyle = `rgba(30,30,30,${p.o})`;
-      cx.fillText(p.w, p.x, p.y);
-    }
-
-    // 중앙 타이포
-    cx.save();
-    cx.translate(W*0.5, H*0.5);
-    cx.textAlign='center'; cx.textBaseline='middle';
     cx.fillStyle = 'rgba(20,20,20,0.85)';
-    cx.font = `900 ${Math.min(W,H)*0.32}px 'Black Han Sans','Noto Sans KR'`;
-    cx.fillText('청룡', 0, -10);
-    cx.font = `400 ${Math.min(W,H)*0.06}px 'Bebas Neue',sans-serif`;
-    cx.fillStyle = 'rgba(30,30,30,0.7)';
-    const subY = Math.min(W,H)*0.22;
-    cx.fillText('TOTAL · DESIGNER', 0, subY);
-    cx.restore();
-
+    cx.font = `900 58px 'Black Han Sans','Noto Sans KR'`;
+    cx.textAlign='center'; cx.textBaseline='middle';
+    cx.fillText('청룡', W/2, H/2-4);
+    cx.font = `400 9px 'Noto Sans KR'`;
+    cx.fillStyle='rgba(30,30,30,0.65)';
+    cx.fillText('TOTAL · DESIGNER', W/2, H-18);
     requestAnimationFrame(loop);
   }
   loop();
