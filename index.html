@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>NEWSROOM</title>
-<script src="https://cdn.jsdelivr.net/npm/matter-js@0.19.0/build/matter.min.js"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap');
 *{margin:0;padding:0;box-sizing:border-box}
@@ -52,6 +51,7 @@ body{background:#0a0a0a;font-family:'Noto Sans KR',sans-serif;color:#fff;min-hei
   <div class="ticker-label">속보</div>
   <div class="ticker-track">
     <div class="ticker-text">
+      Cable Lab 오픈 — 네 개의 하이파이 케이블을 직접 꽂아 소리의 차이를 듣다 &nbsp;│&nbsp;
       [단독] 2025 수능 현장서 '잉크 뚝뚝' 불량 사인펜 무더기…"판독 불가 처리" 속출 &nbsp;│&nbsp;
       웹캠에 비친 얼굴이 한글이 되는 순간 — '한글 Face' 실험 &nbsp;│&nbsp;
       휴대폰 개통 안면인증, "보이스피싱 예방" vs "내 개인정보 어떡하라고?" &nbsp;│&nbsp;
@@ -67,21 +67,29 @@ body{background:#0a0a0a;font-family:'Noto Sans KR',sans-serif;color:#fff;min-hei
 
 <div class="main">
 
-  <!-- 히어로: 최신 기사 (4/27) The Bleeding Pen -->
-  <a class="hero" href="2026-04-27/20260427.html">
+  <!-- 히어로: 최신 기사 (4/28) Cable Lab -->
+  <a class="hero" href="2026-04-28/20260428.html">
     <div class="hero-visual">
-      <canvas id="hero-ink"></canvas>
+      <canvas id="hero-cable"></canvas>
     </div>
     <div class="hero-body">
-      <div class="hero-tag">단독·사회</div>
-      <div class="hero-title">[단독] 2025 수능 현장서 '잉크 뚝뚝' 불량 사인펜 무더기…"판독 불가" 처리 속출</div>
-      <div class="hero-meta">2025.11.13 · 탐사보도 · THE BLEEDING PEN</div>
+      <div class="hero-tag">실험·오디오</div>
+      <div class="hero-title">Cable Lab — 네 개의 케이블, 네 개의 소리. 직접 꽂아 듣는 하이파이 청음실</div>
+      <div class="hero-meta">2026.04.28 · 인터랙티브 · CABLE LAB</div>
     </div>
   </a>
 
   <!-- 이전 기사 -->
   <div class="section-label">이전 기사</div>
   <div class="grid">
+    <a class="card" href="2026-04-27/20260427.html">
+      <div class="card-body">
+        <div class="card-tag">단독·사회</div>
+        <div class="card-title">[단독] 2025 수능 현장서 '잉크 뚝뚝' 불량 사인펜 무더기…"판독 불가" 처리 속출</div>
+        <div class="card-date">2026.04.27</div>
+      </div>
+      <div class="card-thumb"><canvas id="thumb-ink" width="100" height="72"></canvas></div>
+    </a>
     <a class="card" href="2026-04-24/20260424.html">
       <div class="card-body">
         <div class="card-tag">실험·비주얼</div>
@@ -145,10 +153,10 @@ body{background:#0a0a0a;font-family:'Noto Sans KR',sans-serif;color:#fff;min-hei
 <div class="footer">NEWSROOM — This is fiction. 실제 뉴스가 아닙니다.</div>
 
 <script>
-// ── 히어로: Matter.js 잉크 방울 낙하 (The Bleeding Pen) ──
+// ── 히어로: Cable Lab (빈티지 스피커 + 꿈틀대는 케이블) ──
 (function(){
-  const cv = document.getElementById('hero-ink');
-  if (!cv || !window.Matter) return;
+  const cv = document.getElementById('hero-cable');
+  if (!cv) return;
   const rect = cv.parentElement.getBoundingClientRect();
   const DPR = Math.min(devicePixelRatio||1, 2);
   cv.width = rect.width * DPR; cv.height = rect.height * DPR;
@@ -156,169 +164,224 @@ body{background:#0a0a0a;font-family:'Noto Sans KR',sans-serif;color:#fff;min-hei
   cx.scale(DPR, DPR);
   const W = rect.width, H = rect.height;
 
-  // Matter.js 물리 엔진 (잉크 방울 낙하용)
-  const { Engine, World, Bodies, Body, Events } = Matter;
-  const engine = Engine.create({ gravity: { y: 1.2 } });
-  const world = engine.world;
-  // 바닥 (화면 아래쪽)
-  const ground = Bodies.rectangle(W/2, H+20, W*2, 40, { isStatic: true });
-  World.add(world, ground);
+  // Paper / warm tone background (same palette as Cable Lab)
+  const PAPER = '#f1ead8', PAPER2 = '#e6dec5', INK = '#1c1a16', RUST = '#b04a2a', GOLD = '#c8a04a';
 
-  // 영구 얼룩 누적용 오프스크린 캔버스
-  const stainCv = document.createElement('canvas');
-  stainCv.width = cv.width; stainCv.height = cv.height;
-  const sx = stainCv.getContext('2d');
-  sx.scale(DPR, DPR);
+  // Speaker anchor: left side, 3/4 view
+  const spk = { x: W*0.32, y: H*0.55, w: W*0.22, h: H*0.62 };
+  // Terminal (target point where cables want to go)
+  const term = { x: spk.x + spk.w*0.42, y: spk.y - spk.h*0.05 };
 
-  function drawCardTo(ctx){
-    ctx.fillStyle = '#e8e5dc'; ctx.fillRect(0,0,W,H);
-    ctx.fillStyle = '#fbfaf6';
-    ctx.fillRect(W*0.06, H*0.08, W*0.88, H*0.84);
-    // OMR 셀 그리드 (빽빽하게)
-    ctx.strokeStyle = 'rgba(20,20,20,0.6)';
-    ctx.lineWidth = 0.9;
-    const cols = 22, rows = 9;
-    const gx = W*0.1, gy = H*0.15;
-    const gw = W*0.8, gh = H*0.7;
-    const cw = gw/cols, ch = gh/rows;
-    const radius = Math.min(cw, ch) * 0.32;
-    for (let r = 0; r < rows; r++) {
-      for (let c = 0; c < cols; c++) {
-        const x = gx + (c+0.5)*cw;
-        const y = gy + (r+0.5)*ch;
-        ctx.beginPath(); ctx.arc(x, y, radius, 0, Math.PI*2); ctx.stroke();
-      }
-    }
-    // 상단 메타
-    ctx.fillStyle = '#1a1a1a';
-    ctx.font = `700 10px 'Noto Serif KR', serif`;
-    ctx.fillText('OMR · 2025.11.13', W*0.07, H*0.06);
+  // Four cables with distinct colors
+  const cables = [
+    { color: '#8a7a60', jacket: '#3a3020', ampY: 18, speed: 0.9, phase: 0.0, offY: 0,   tension: 0.55 },
+    { color: '#d4a850', jacket: '#4a3820', ampY: 14, speed: 1.1, phase: 1.3, offY: 24,  tension: 0.62 },
+    { color: '#e0e0d8', jacket: '#1a1a18', ampY: 10, speed: 1.4, phase: 2.6, offY: 48,  tension: 0.72 },
+    { color: '#f0c860', jacket: '#3a2a14', ampY:  7, speed: 1.8, phase: 3.9, offY: 72,  tension: 0.85 },
+  ];
+
+  // right edge (cables come from off-screen right)
+  const tailX = W + 30;
+
+  function drawPaperBg(){
+    cx.fillStyle = PAPER;
+    cx.fillRect(0,0,W,H);
+    // warm vignette
+    const g = cx.createRadialGradient(W*0.35, H*0.45, 0, W*0.35, H*0.45, W*0.8);
+    g.addColorStop(0, 'rgba(176,74,42,0.06)');
+    g.addColorStop(1, 'rgba(0,0,0,0.18)');
+    cx.fillStyle = g; cx.fillRect(0,0,W,H);
+    // horizon line
+    cx.strokeStyle = 'rgba(28,26,22,0.22)'; cx.lineWidth = 1;
+    cx.beginPath(); cx.moveTo(0, H*0.78); cx.lineTo(W, H*0.78); cx.stroke();
   }
 
-  // 초기 세팅 그림 (정적)
-  drawCardTo(sx);
+  function drawSpeaker(){
+    const {x, y, w, h} = spk;
+    // contact shadow
+    cx.fillStyle = 'rgba(0,0,0,0.3)';
+    cx.beginPath(); cx.ellipse(x, y + h*0.5 + 6, w*0.7, 8, 0, 0, Math.PI*2); cx.fill();
 
-  // 잉크 방울 (Matter body 목록)
+    // rear side panel (3/4 view)
+    cx.fillStyle = '#7a715a';
+    cx.beginPath();
+    cx.moveTo(x + w*0.5, y - h*0.5);
+    cx.lineTo(x + w*0.95, y - h*0.48);
+    cx.lineTo(x + w*0.95, y + h*0.48);
+    cx.lineTo(x + w*0.5, y + h*0.5);
+    cx.closePath(); cx.fill();
+
+    // front baffle
+    const bafGrad = cx.createLinearGradient(x - w*0.5, 0, x + w*0.5, 0);
+    bafGrad.addColorStop(0, '#d8d0b8');
+    bafGrad.addColorStop(1, '#fbf8ee');
+    cx.fillStyle = bafGrad;
+    cx.fillRect(x - w*0.5, y - h*0.5, w, h);
+    cx.strokeStyle = INK; cx.lineWidth = 1.2;
+    cx.strokeRect(x - w*0.5, y - h*0.5, w, h);
+
+    // woofer
+    const woofY = y + h*0.15;
+    const woofR = w*0.36;
+    const woofG = cx.createRadialGradient(x - w*0.05, woofY - woofR*0.15, 0, x, woofY, woofR);
+    woofG.addColorStop(0, '#3a352c');
+    woofG.addColorStop(0.7, '#1c1a16');
+    woofG.addColorStop(1, '#0a0908');
+    cx.fillStyle = woofG;
+    cx.beginPath(); cx.arc(x, woofY, woofR, 0, Math.PI*2); cx.fill();
+    // dust cap
+    cx.fillStyle = '#5a5240';
+    cx.beginPath(); cx.arc(x - woofR*0.08, woofY - woofR*0.1, woofR*0.28, 0, Math.PI*2); cx.fill();
+
+    // tweeter
+    cx.fillStyle = '#1c1a16';
+    cx.beginPath(); cx.arc(x, y - h*0.25, w*0.16, 0, Math.PI*2); cx.fill();
+
+    // terminal (the jack) — brass ring + socket
+    cx.fillStyle = GOLD;
+    cx.beginPath(); cx.arc(term.x, term.y, 9, 0, Math.PI*2); cx.fill();
+    cx.fillStyle = '#0a0908';
+    cx.beginPath(); cx.arc(term.x, term.y, 5.5, 0, Math.PI*2); cx.fill();
+  }
+
+  function drawCable(c, t){
+    // gentle breathing wave from right (off-screen) to the terminal area
+    const steps = 34;
+    cx.strokeStyle = c.jacket;
+    cx.lineWidth = 6;
+    cx.lineCap = 'round';
+    cx.beginPath();
+    for (let i = 0; i <= steps; i++) {
+      const u = i / steps;
+      const baseX = tailX - (tailX - (term.x + 80)) * u;
+      const baseY = (term.y + c.offY + 30) + (1 - u) * -8;
+      // wave disturbance strongest in middle, pinned at both ends
+      const fall = Math.sin(u * Math.PI);
+      const wy = Math.sin(t * c.speed + c.phase + u * 7) * c.ampY * fall;
+      const wx = Math.cos(t * c.speed * 0.7 + c.phase + u * 5) * c.ampY * 0.3 * fall;
+      const px = baseX + wx;
+      const py = baseY + wy;
+      i === 0 ? cx.moveTo(px, py) : cx.lineTo(px, py);
+    }
+    cx.stroke();
+    // metallic highlight
+    cx.strokeStyle = c.color;
+    cx.lineWidth = 2;
+    cx.stroke();
+  }
+
+  function loop(){
+    const t = performance.now() * 0.001;
+    drawPaperBg();
+
+    // draw cables from bottom layer (first) to top
+    for (let i = cables.length - 1; i >= 0; i--) {
+      drawCable(cables[i], t);
+    }
+
+    drawSpeaker();
+
+    // subtle grain overlay
+    cx.globalAlpha = 0.04;
+    for (let i = 0; i < 60; i++) {
+      cx.fillStyle = INK;
+      cx.fillRect(Math.random()*W, Math.random()*H, 1, 1);
+    }
+    cx.globalAlpha = 1;
+
+    requestAnimationFrame(loop);
+  }
+  loop();
+})();
+
+// ── 썸네일: The Bleeding Pen (OMR 카드 + 잉크 방울) ──
+(function(){
+  const cv = document.getElementById('thumb-ink');
+  if (!cv) return;
+  cv.width = 200; cv.height = 144;
+  const cx = cv.getContext('2d');
+  const W = 200, H = 144;
+  // 얼룩 누적 오프스크린
+  const sCv = document.createElement('canvas');
+  sCv.width = W; sCv.height = H;
+  const sx = sCv.getContext('2d');
+
+  // 초기 카드 배경 + OMR 셀
+  sx.fillStyle = '#e8e5dc'; sx.fillRect(0,0,W,H);
+  sx.fillStyle = '#fbfaf6'; sx.fillRect(W*0.06, H*0.08, W*0.88, H*0.84);
+  sx.strokeStyle = 'rgba(20,20,20,0.55)'; sx.lineWidth = 0.7;
+  const cols = 12, rows = 6;
+  const gx = W*0.1, gy = H*0.18, gw = W*0.8, gh = H*0.66;
+  const cw = gw/cols, ch = gh/rows;
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      sx.beginPath();
+      sx.arc(gx + (c+0.5)*cw, gy + (r+0.5)*ch, Math.min(cw,ch)*0.3, 0, Math.PI*2);
+      sx.stroke();
+    }
+  }
+
   const drops = [];
-  function spawnDrop(){
-    const x = W*0.15 + Math.random() * W*0.7;
-    const r = 3.5 + Math.random()*3;
-    const body = Bodies.circle(x, -20, r, {
-      restitution: 0.15,
-      friction: 0.3,
-      density: 0.002,
-      frictionAir: 0.02,
+  function spawn(){
+    drops.push({
+      x: 20 + Math.random()*(W-40),
+      y: -10,
+      vy: 1 + Math.random()*1.8,
+      r: 2 + Math.random()*2,
+      splatted: false
     });
-    Body.setVelocity(body, { x: (Math.random()-0.5)*0.5, y: 1 + Math.random()*2 });
-    drops.push({ body, r, splatted: false, life: 0 });
-    World.add(world, body);
   }
-
-  // 주기적으로 방울 투하
-  let lastSpawn = 0;
-  function maybeSpawn(t){
-    if (t - lastSpawn > 320 && drops.filter(d => !d.splatted).length < 8) {
-      spawnDrop();
-      lastSpawn = t;
-    }
-  }
-
-  // 충돌 시 얼룩 찍기
-  Events.on(engine, 'collisionStart', (ev) => {
-    for (const pair of ev.pairs) {
-      for (const d of drops) {
-        if (d.splatted) continue;
-        if (pair.bodyA === d.body || pair.bodyB === d.body) {
-          splat(d);
-          d.splatted = true;
-          World.remove(world, d.body);
-        }
-      }
-    }
-  });
-
   function splat(d){
-    const {x, y} = d.body.position;
-    const baseR = d.r * 3;
-    // 메인 얼룩 (울퉁불퉁 블롭)
+    const baseR = d.r * 2.5;
     sx.beginPath();
-    const pts = 22;
+    const pts = 16;
     for (let i = 0; i <= pts; i++) {
-      const a = (i/pts) * Math.PI*2;
-      const n = Math.sin(a*3 + d.r) * 0.4 + Math.sin(a*7) * 0.25 + Math.sin(a*13) * 0.15;
-      const rr = baseR * (1 + n * 0.35);
-      const px = x + Math.cos(a)*rr, py = y + Math.sin(a)*rr;
-      i === 0 ? sx.moveTo(px, py) : sx.lineTo(px, py);
+      const a = (i/pts)*Math.PI*2;
+      const n = Math.sin(a*3 + d.r)*0.35 + Math.sin(a*7)*0.2;
+      const rr = baseR * (1 + n*0.35);
+      const px = d.x + Math.cos(a)*rr, py = d.y + Math.sin(a)*rr;
+      i === 0 ? sx.moveTo(px,py) : sx.lineTo(px,py);
     }
     sx.closePath();
-    const g = sx.createRadialGradient(x,y,0,x,y,baseR*1.3);
+    const g = sx.createRadialGradient(d.x,d.y,0,d.x,d.y,baseR*1.3);
     g.addColorStop(0, 'rgba(8,12,22,0.95)');
-    g.addColorStop(0.6, 'rgba(20,32,60,0.75)');
+    g.addColorStop(0.6, 'rgba(20,32,60,0.7)');
     g.addColorStop(1, 'rgba(60,90,140,0)');
     sx.fillStyle = g; sx.fill();
-    // 튄 방울
-    const n = 4 + Math.floor(Math.random()*6);
-    for (let i = 0; i < n; i++) {
+    // 작은 튄 방울 몇 개
+    for (let i = 0; i < 3; i++) {
       const a = Math.random()*Math.PI*2;
-      const dist = baseR + Math.random()*baseR*2;
-      const rr = 1 + Math.random()*2;
+      const dist = baseR + Math.random()*baseR*1.5;
       sx.beginPath();
-      sx.arc(x + Math.cos(a)*dist, y + Math.sin(a)*dist, rr, 0, Math.PI*2);
-      sx.fillStyle = 'rgba(12,18,35,0.8)';
-      sx.fill();
+      sx.arc(d.x + Math.cos(a)*dist, d.y + Math.sin(a)*dist, 0.8 + Math.random()*1, 0, Math.PI*2);
+      sx.fillStyle = 'rgba(12,18,35,0.75)'; sx.fill();
     }
   }
 
-  // 얼룩 번짐 (오래될수록 경계가 퍼짐)
-  setInterval(() => {
-    // 누적 얼룩에 미세한 blur/번짐 효과 (drawImage 재조합으로 에지 확장)
-    sx.save();
-    sx.filter = 'blur(0.35px)';
-    sx.globalAlpha = 0.06;
-    sx.drawImage(stainCv, 0, 0, W, H);
-    sx.restore();
-  }, 800);
-
+  let lastSpawn = 0;
   function loop(t){
-    Engine.update(engine, 16);
-    maybeSpawn(t);
-
-    // 배경 + 누적 얼룩
-    cx.drawImage(stainCv, 0, 0, W, H);
-
-    // 낙하 중인 방울 그리기
+    if (t - lastSpawn > 420 && drops.filter(d=>!d.splatted).length < 4) {
+      spawn(); lastSpawn = t;
+    }
+    cx.drawImage(sCv, 0, 0);
     for (const d of drops) {
       if (d.splatted) continue;
-      const p = d.body.position;
-      // 방울 모양 (수직 길쭉)
+      d.y += d.vy;
+      if (d.y > H - 8) {
+        splat(d); d.splatted = true;
+        continue;
+      }
       cx.save();
-      cx.translate(p.x, p.y);
+      cx.translate(d.x, d.y);
       cx.scale(0.75, 1.25);
-      cx.beginPath();
-      cx.arc(0, 0, d.r, 0, Math.PI*2);
-      const gg = cx.createRadialGradient(0, -d.r*0.2, 0, 0, 0, d.r);
-      gg.addColorStop(0, 'rgba(30,40,70,0.95)');
-      gg.addColorStop(1, 'rgba(8,12,22,0.95)');
-      cx.fillStyle = gg;
-      cx.fill();
+      cx.beginPath(); cx.arc(0, 0, d.r, 0, Math.PI*2);
+      cx.fillStyle = 'rgba(12,18,35,0.9)'; cx.fill();
       cx.restore();
-      // 잉크 꼬리
-      cx.beginPath();
-      cx.moveTo(p.x - d.r*0.3, p.y - d.r);
-      cx.lineTo(p.x + d.r*0.3, p.y - d.r);
-      cx.lineTo(p.x, p.y - d.r*3);
-      cx.closePath();
-      cx.fillStyle = 'rgba(12,18,35,0.6)';
-      cx.fill();
     }
-
-    // 낡은 body 정리 (화면 밖)
+    // 화면 밖 정리
     for (let i = drops.length-1; i >= 0; i--) {
-      if (drops[i].splatted) continue;
-      const p = drops[i].body.position;
-      if (p.y > H + 40) { World.remove(world, drops[i].body); drops.splice(i,1); }
+      if (drops[i].splatted && drops[i].y < -50) drops.splice(i,1);
     }
-
     requestAnimationFrame(loop);
   }
   requestAnimationFrame(loop);

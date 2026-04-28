@@ -1,0 +1,1984 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Cable Lab — A Hi-Fi Listening Room</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #f1ead8;
+    --paper-2: #e6dec5;
+    --ink: #1c1a16;
+    --ink-soft: #3a352c;
+    --rust: #b04a2a;
+    --olive: #6a6638;
+    --gold: #c8a04a;
+    --shadow: rgba(28, 26, 22, 0.18);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; overflow: hidden; }
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: 'Cormorant Garamond', serif;
+    user-select: none;
+    -webkit-user-select: none;
+    position: relative;
+  }
+  /* paper grain */
+  body::before {
+    content: "";
+    position: fixed; inset: 0;
+    background-image:
+      radial-gradient(circle at 20% 30%, rgba(176,74,42,0.06) 0%, transparent 40%),
+      radial-gradient(circle at 80% 70%, rgba(106,102,56,0.05) 0%, transparent 45%);
+    pointer-events: none;
+    z-index: 1;
+  }
+  body::after {
+    content: "";
+    position: fixed; inset: 0;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' seed='3'/><feColorMatrix values='0 0 0 0 0.11 0 0 0 0 0.10 0 0 0 0 0.08 0 0 0 0.18 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+    opacity: 0.35;
+    mix-blend-mode: multiply;
+    pointer-events: none;
+    z-index: 2;
+  }
+
+  #stage {
+    position: fixed;
+    inset: 0;
+    z-index: 3;
+  }
+  svg.scene {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+
+  /* Footer info — everything lives here */
+  .info-bar {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    padding: 16px 28px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: 24px;
+    z-index: 10;
+    pointer-events: none;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    background: linear-gradient(to top, rgba(241,234,216,0.85), rgba(241,234,216,0));
+  }
+  .info-bar > * { pointer-events: auto; }
+  .legend {
+    display: flex;
+    gap: 26px;
+    align-items: flex-end;
+    flex: 0 0 auto;
+  }
+  .legend-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .legend-item span:first-child {
+    color: var(--rust);
+    font-size: 9px;
+    letter-spacing: 0.3em;
+  }
+  .legend-item span:last-child {
+    font-family: 'Cormorant Garamond', serif;
+    font-style: italic;
+    font-weight: 500;
+    font-size: 17px;
+    letter-spacing: 0.01em;
+    text-transform: none;
+    color: var(--ink);
+  }
+  .legend-item.track-legend span:last-child {
+    max-width: 180px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .transport {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 0 0 auto;
+  }
+  .track-picker { position: relative; }
+  .track-picker-btn {
+    cursor: pointer;
+    border: 1px solid var(--ink);
+    background: var(--paper);
+    color: var(--ink-soft);
+    padding: 9px 16px 8px;
+    font: inherit;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    transition: all 0.2s;
+  }
+  .track-picker-btn:hover,
+  .track-picker-btn.open {
+    background: var(--ink);
+    color: var(--paper);
+  }
+  .track-menu {
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 0;
+    min-width: 240px;
+    background: var(--paper);
+    border: 1px solid var(--ink);
+    box-shadow: 0 -14px 34px var(--shadow);
+    display: none;
+    flex-direction: column;
+    padding: 6px;
+    z-index: 30;
+  }
+  .track-menu.open { display: flex; }
+  .track-item {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    cursor: pointer;
+    background: transparent;
+    border: none;
+    padding: 10px 12px;
+    text-align: left;
+    font-family: inherit;
+    color: var(--ink);
+    transition: background 0.15s, color 0.15s;
+  }
+  .track-item:hover { background: var(--ink); color: var(--paper); }
+  .track-item .track-num {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.3em;
+    color: var(--rust);
+    min-width: 22px;
+  }
+  .track-item:hover .track-num { color: var(--gold); }
+  .track-item .track-title {
+    font-family: 'Cormorant Garamond', serif;
+    font-style: italic;
+    font-size: 16px;
+    letter-spacing: 0.02em;
+    text-transform: none;
+  }
+  .track-item.active { background: var(--paper-2); }
+
+  .play-btn {
+    cursor: pointer;
+    width: 38px; height: 38px;
+    border: 1px solid var(--ink);
+    background: var(--paper);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+  }
+  .play-btn:hover { background: var(--ink); }
+  .play-btn:hover svg path,
+  .play-btn:hover svg rect { fill: var(--paper); }
+  .play-btn[disabled] { opacity: 0.3; cursor: not-allowed; }
+
+  /* Volume fader — vintage console style, horizontal */
+  .volume {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 1 1 auto;
+    min-width: 220px;
+    max-width: 420px;
+  }
+  .volume-label {
+    color: var(--rust);
+    font-size: 9px;
+    letter-spacing: 0.3em;
+    flex: 0 0 auto;
+  }
+  .volume-val {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    color: var(--ink-soft);
+    min-width: 26px;
+    text-align: right;
+  }
+  .fader {
+    position: relative;
+    flex: 1 1 auto;
+    height: 34px;
+    cursor: grab;
+    touch-action: none;
+    user-select: none;
+  }
+  .fader:active, .fader.grabbing { cursor: grabbing; }
+  .fader-track {
+    position: absolute;
+    left: 0; right: 0;
+    top: 50%;
+    height: 4px;
+    transform: translateY(-50%);
+    background: var(--paper-2);
+    border: 1px solid var(--ink);
+    box-shadow: inset 0 1px 2px rgba(28,26,22,0.25);
+  }
+  .fader-tick {
+    position: absolute;
+    top: -7px;
+    width: 1px;
+    height: 16px;
+    background: var(--ink-soft);
+    opacity: 0.5;
+    pointer-events: none;
+  }
+  .fader-tick[data-at="0"]   { left: 0%; }
+  .fader-tick[data-at="25"]  { left: 25%; }
+  .fader-tick[data-at="50"]  { left: 50%; opacity: 0.85; background: var(--rust); }
+  .fader-tick[data-at="75"]  { left: 75%; }
+  .fader-tick[data-at="100"] { left: 100%; }
+  .fader-knob {
+    position: absolute;
+    top: 50%;
+    left: 72%;
+    width: 18px;
+    height: 30px;
+    transform: translate(-50%, -50%);
+    background: linear-gradient(to bottom,
+      #f5eedc 0%,
+      #ded3b4 40%,
+      #1c1a16 40%,
+      #1c1a16 60%,
+      #ded3b4 60%,
+      #a89e84 100%);
+    border: 1px solid var(--ink);
+    box-shadow: 0 3px 8px var(--shadow), inset 0 1px 0 rgba(255,255,255,0.4);
+    transition: box-shadow 0.12s;
+  }
+  .fader.grabbing .fader-knob,
+  .fader-knob:hover {
+    box-shadow: 0 5px 12px rgba(28,26,22,0.35), inset 0 1px 0 rgba(255,255,255,0.5);
+  }
+  .fader:focus { outline: none; }
+  .fader:focus .fader-knob {
+    border-color: var(--rust);
+  }
+
+  .signal-meter {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 6px;
+    flex: 0 0 auto;
+  }
+  .meter-bars {
+    display: flex;
+    gap: 2px;
+    height: 18px;
+  }
+  .meter-bars span {
+    width: 3px;
+    background: var(--ink);
+    opacity: 0.15;
+    transition: opacity 0.08s, background 0.2s;
+  }
+  .meter-bars span.on { opacity: 0.85; }
+  .meter-bars span.peak { background: var(--rust); opacity: 1; }
+
+  /* Tooltip when hovering plug */
+  .tooltip {
+    position: fixed;
+    background: var(--ink);
+    color: var(--paper);
+    padding: 8px 12px 7px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    pointer-events: none;
+    z-index: 20;
+    opacity: 0;
+    transition: opacity 0.15s;
+    transform: translate(-50%, -130%);
+    white-space: nowrap;
+  }
+  .tooltip.show { opacity: 1; }
+  .tooltip::after {
+    content: "";
+    position: absolute;
+    bottom: -5px;
+    left: 50%;
+    transform: translateX(-50%);
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-top: 5px solid var(--ink);
+  }
+
+  @media (max-width: 860px) {
+    .info-bar {
+      flex-wrap: wrap;
+      gap: 14px;
+      padding: 14px 18px 16px;
+    }
+    .legend { gap: 14px; }
+    .legend-item span:last-child { font-size: 14px; }
+    .volume { min-width: 160px; }
+  }
+</style>
+</head>
+<body>
+
+<div id="stage">
+  <svg class="scene" id="scene" viewBox="0 0 1600 1000" preserveAspectRatio="xMidYMid meet">
+    <defs>
+      <!-- speaker body gradient -->
+      <linearGradient id="speakerBody" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#fbf8ee"/>
+        <stop offset="1" stop-color="#d8d0b8"/>
+      </linearGradient>
+      <linearGradient id="speakerSide" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0" stop-color="#a89e84"/>
+        <stop offset="1" stop-color="#7a715a"/>
+      </linearGradient>
+      <linearGradient id="speakerTop" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#f0e8d2"/>
+        <stop offset="1" stop-color="#c4baa0"/>
+      </linearGradient>
+      <radialGradient id="cone" cx="0.42" cy="0.45" r="0.55">
+        <stop offset="0" stop-color="#3a352c"/>
+        <stop offset="0.7" stop-color="#1c1a16"/>
+        <stop offset="1" stop-color="#0a0908"/>
+      </radialGradient>
+      <radialGradient id="dustcap" cx="0.4" cy="0.4" r="0.6">
+        <stop offset="0" stop-color="#5a5240"/>
+        <stop offset="1" stop-color="#1c1a16"/>
+      </radialGradient>
+      <radialGradient id="tweeter" cx="0.4" cy="0.4" r="0.6">
+        <stop offset="0" stop-color="#3a352c"/>
+        <stop offset="1" stop-color="#0e0d0a"/>
+      </radialGradient>
+      <radialGradient id="terminalRing" cx="0.5" cy="0.5" r="0.5">
+        <stop offset="0" stop-color="#d4a850"/>
+        <stop offset="0.55" stop-color="#9a7a30"/>
+        <stop offset="1" stop-color="#3a2a10"/>
+      </radialGradient>
+      <radialGradient id="terminalSocket" cx="0.5" cy="0.5" r="0.5">
+        <stop offset="0" stop-color="#000"/>
+        <stop offset="0.7" stop-color="#0a0908"/>
+        <stop offset="1" stop-color="#2a2418"/>
+      </radialGradient>
+      <radialGradient id="terminalGlow" cx="0.5" cy="0.5" r="0.5">
+        <stop offset="0" stop-color="#ffeaa0" stop-opacity="0.95"/>
+        <stop offset="0.4" stop-color="#ffce5e" stop-opacity="0.5"/>
+        <stop offset="1" stop-color="#ffeaa0" stop-opacity="0"/>
+      </radialGradient>
+      <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
+        <feGaussianBlur in="SourceAlpha" stdDeviation="6"/>
+        <feOffset dx="2" dy="6"/>
+        <feComponentTransfer><feFuncA type="linear" slope="0.35"/></feComponentTransfer>
+        <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+    </defs>
+
+    <!--
+      Ground / floor: a faint horizontal band that establishes the surface.
+      Without this the speaker reads as floating in mid-air.
+    -->
+    <defs>
+      <linearGradient id="floorGrad" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#1c1a16" stop-opacity="0"/>
+        <stop offset="0.4" stop-color="#1c1a16" stop-opacity="0.05"/>
+        <stop offset="1" stop-color="#1c1a16" stop-opacity="0.14"/>
+      </linearGradient>
+    </defs>
+    <!-- floor band, sits behind everything -->
+    <rect x="0" y="742" width="1600" height="258" fill="url(#floorGrad)"/>
+    <!-- horizon line -->
+    <line x1="0" y1="742" x2="1600" y2="742" stroke="#1c1a16" stroke-width="0.8" opacity="0.16"/>
+
+    <!-- contact shadow directly under the speaker (matches its new base) -->
+    <ellipse cx="540" cy="750" rx="280" ry="13" fill="#000" opacity="0.34"/>
+    <ellipse cx="540" cy="752" rx="320" ry="22" fill="#000" opacity="0.12"/>
+
+    <!--
+      SPEAKER at 3/4 angle, facing LEFT, viewed slightly from above.
+      Vanishing points: one far left, one far right.
+      The NEAR vertical edge (where front baffle meets right rear panel) is
+      the LONGEST. The two FAR edges (left of baffle, right of rear panel)
+      are shorter. The bottom of the speaker tilts gently DOWN toward the
+      near edge — not up — so the speaker reads as resting on the floor.
+
+      Coordinates (within local frame, translated to (500, 380)):
+        Far-left vertical (front baffle, far edge):  y = 30 to 460
+        Near vertical (front baffle right / rear panel left): y = 8 to 482
+        Far-right vertical (rear panel, far edge):    y = 38 to 462
+    -->
+    <g id="speaker" transform="translate(500, 260)">
+
+      <!-- TOP face: traces the upper edge across all three verticals -->
+      <path d="M -200 30 L 80 8 L 220 38 L -60 60 Z"
+            fill="url(#speakerTop)" stroke="#1c1a16" stroke-width="1.2" stroke-linejoin="round"/>
+
+      <!-- RIGHT REAR panel (where terminal lives). The near edge is taller, the
+           far edge (off to the right, closer to vanishing point) is shorter -->
+      <path d="M 80 8 L 220 38 L 220 462 L 80 482 Z"
+            fill="url(#speakerSide)" stroke="#1c1a16" stroke-width="1.2" stroke-linejoin="round"/>
+
+      <!-- FRONT BAFFLE (left face). Far-left edge shorter, near (right) edge taller.
+           Bottom slopes DOWN from y=460 (far) to y=482 (near). -->
+      <path d="M -200 30 L 80 8 L 80 482 L -200 460 Z"
+            fill="url(#speakerBody)" stroke="#1c1a16" stroke-width="1.2" stroke-linejoin="round"/>
+
+      <!-- inner panel inset on baffle -->
+      <path d="M -185 46 L 65 24 L 65 466 L -185 444 Z"
+            fill="none" stroke="#1c1a16" stroke-width="0.5" opacity="0.4"/>
+
+      <!-- tweeter (centered on baffle, around mid-upper) -->
+      <ellipse cx="-65" cy="135" rx="34" ry="36" fill="url(#tweeter)" stroke="#1c1a16" stroke-width="1"/>
+      <ellipse cx="-65" cy="135" rx="22" ry="23" fill="#0e0d0a"/>
+      <ellipse cx="-71" cy="129" rx="6" ry="6" fill="#3a352c" opacity="0.6"/>
+
+      <!-- woofer (lower-mid of baffle) -->
+      <ellipse cx="-65" cy="315" rx="105" ry="112" fill="url(#cone)" stroke="#1c1a16" stroke-width="1.5"/>
+      <ellipse cx="-65" cy="315" rx="92" ry="98" fill="none" stroke="#0e0d0a" stroke-width="0.5" opacity="0.6"/>
+      <ellipse cx="-65" cy="315" rx="38" ry="40" fill="url(#dustcap)" stroke="#1c1a16" stroke-width="0.8"/>
+      <ellipse cx="-77" cy="303" rx="9" ry="9" fill="#7a6e54" opacity="0.4"/>
+
+      <!-- screws on baffle corners (tracking the baffle's actual corners) -->
+      <g fill="#1c1a16">
+        <circle cx="-185" cy="48" r="2.5"/>
+        <circle cx="65" cy="26" r="2.5"/>
+        <circle cx="-185" cy="442" r="2.5"/>
+        <circle cx="65" cy="464" r="2.5"/>
+      </g>
+
+      <!-- brand plate on baffle -->
+
+      <!--
+        TERMINAL on the right rear panel.
+        Drawn as a recessed cup (the socket) with a brass ring around it.
+        When the plug "snaps in", it slides toward this center and disappears
+        behind a cap that we layer on top. The plug's SVG is rendered ABOVE
+        the terminal cup and BELOW the cap layer.
+      -->
+      <g id="terminalGroup">
+        <!-- soft hum/glow halo, opacity controlled by JS based on plug proximity -->
+        <ellipse id="termGlow" cx="150" cy="240" rx="62" ry="56" fill="url(#terminalGlow)" opacity="0"/>
+
+        <!-- terminal mounting plate on the rear panel -->
+        <ellipse cx="150" cy="240" rx="32" ry="34" fill="#1c1a16"/>
+        <ellipse cx="150" cy="240" rx="28" ry="30" fill="url(#terminalRing)" stroke="#1c1a16" stroke-width="0.6"/>
+
+        <!-- recessed socket (the hole where the plug goes) -->
+        <ellipse cx="150" cy="240" rx="14" ry="15" fill="url(#terminalSocket)"/>
+        <ellipse cx="150" cy="240" rx="14" ry="15" fill="none" stroke="#000" stroke-width="0.8" opacity="0.7"/>
+        <!-- tiny inner highlight -->
+        <ellipse cx="146" cy="236" rx="3" ry="3" fill="#3a2a14" opacity="0.5"/>
+
+        <!-- + / - markings on the rear panel -->
+        <text x="150" y="206" text-anchor="middle" font-family="JetBrains Mono" font-size="11"
+              font-weight="500" fill="#f0e0a0" letter-spacing="1">+</text>
+        <text x="150" y="290" text-anchor="middle" font-family="JetBrains Mono" font-size="13"
+              font-weight="500" fill="#f0e0a0" letter-spacing="1">−</text>
+      </g>
+    </g>
+
+    <!-- cable layer is BELOW the cap so the inserted plug head gets occluded -->
+    <g id="cableLayer"></g>
+
+    <!--
+      Terminal CAP overlay: drawn AFTER the cables, so when a plug is fully
+      inserted at the terminal position, the head goes behind this cap and
+      visually disappears. The cap is just a small ring matching the socket lip.
+    -->
+    <g id="terminalCap" transform="translate(500, 260)">
+      <ellipse cx="150" cy="240" rx="14" ry="15" fill="none" stroke="#1c1a16" stroke-width="1.2" opacity="0.85"/>
+      <!-- subtle inner shadow ring on the very lip -->
+      <ellipse cx="150" cy="240" rx="13" ry="14" fill="none" stroke="#000" stroke-width="0.6" opacity="0.5"/>
+    </g>
+
+    <!-- labels above plugs -->
+    <g id="labelLayer"></g>
+  </svg>
+</div>
+
+<div class="info-bar">
+  <div class="legend">
+    <div class="legend-item">
+      <span>Now Connected</span>
+      <span id="currentCable">— none —</span>
+    </div>
+    <div class="legend-item">
+      <span>Character</span>
+      <span id="currentChar">silence</span>
+    </div>
+    <div class="legend-item track-legend">
+      <span>Track</span>
+      <span id="trackName">— none —</span>
+    </div>
+  </div>
+
+  <div class="transport">
+    <div class="track-picker">
+      <button type="button" class="track-picker-btn" id="loadTrackBtn" aria-haspopup="true" aria-expanded="false">Load Track</button>
+      <div class="track-menu" id="trackMenu" role="menu">
+        <button class="track-item" role="menuitem" data-src="1_늑구빵.mp3" data-name="늑구빵">
+          <span class="track-num">01</span><span class="track-title">늑구빵</span>
+        </button>
+        <button class="track-item" role="menuitem" data-src="2_러브버그.mp3" data-name="러브버그">
+          <span class="track-num">02</span><span class="track-title">러브버그</span>
+        </button>
+        <button class="track-item" role="menuitem" data-src="3_자랑스런날개.mp3" data-name="자랑스런 날개">
+          <span class="track-num">03</span><span class="track-title">자랑스런 날개</span>
+        </button>
+        <button class="track-item" role="menuitem" data-src="4_피고는스마트폰.mp3" data-name="피고는 스마트폰">
+          <span class="track-num">04</span><span class="track-title">피고는 스마트폰</span>
+        </button>
+      </div>
+    </div>
+    <button class="play-btn" id="playBtn" disabled aria-label="play">
+      <svg width="12" height="12" viewBox="0 0 12 12"><path d="M2 1 L10 6 L2 11 Z" fill="#1c1a16"/></svg>
+    </button>
+  </div>
+
+  <div class="volume">
+    <span class="volume-label">Volume</span>
+    <div class="fader" id="fader" role="slider" aria-label="master volume"
+         aria-valuemin="0" aria-valuemax="100" aria-valuenow="72" tabindex="0">
+      <div class="fader-track">
+        <span class="fader-tick" data-at="0"></span>
+        <span class="fader-tick" data-at="25"></span>
+        <span class="fader-tick" data-at="50"></span>
+        <span class="fader-tick" data-at="75"></span>
+        <span class="fader-tick" data-at="100"></span>
+      </div>
+      <div class="fader-knob" id="faderKnob"></div>
+    </div>
+    <span class="volume-val" id="volumeVal">72</span>
+  </div>
+
+  <div class="signal-meter">
+    <div class="meter-bars" id="meter">
+      <span></span><span></span><span></span><span></span><span></span><span></span>
+      <span></span><span></span><span></span><span></span><span></span><span></span>
+      <span></span><span></span><span></span><span></span>
+    </div>
+    <span style="font-size: 9px; opacity: 0.6;">SIGNAL · DB</span>
+  </div>
+</div>
+
+<div class="tooltip" id="tooltip"></div>
+
+<script>
+/* =========================================================
+   CABLE LAB — interactive audio cable simulator
+   ========================================================= */
+
+const SVG_NS = "http://www.w3.org/2000/svg";
+const scene = document.getElementById("scene");
+const cableLayer = document.getElementById("cableLayer");
+const labelLayer = document.getElementById("labelLayer");
+const tooltip = document.getElementById("tooltip");
+
+/* ------------ Cable definitions ------------ */
+/*
+  Each cable has:
+   - audio character (filter chain values)
+   - physical character (segmentLength, stiffness, gravity, segments) for verlet sim
+   - color, jacket-color
+   - a label
+   - an anchor (off-screen tail) and a starting plug position
+*/
+const CABLES = [
+  {
+    id: "copper",
+    name: "Pure Copper OFC",
+    short: "Copper",
+    char: "warm · loose",
+    plugColor: "#c8855a",
+    jacket: "#2b2a26",
+    accent: "#7a3e22",
+    // physics: heavy & droopy
+    segments: 75,
+    segmentLength: 16,
+    stiffness: 0.42,
+    gravity: 0.85,
+    damping: 0.86,
+    // audio: rolled off highs, bumped mids, slightly compressed
+    audio: {
+      lowShelf:  { freq: 180, gain: +1.5 },
+      mid:       { freq: 900, q: 0.9, gain: +1.5 },
+      highShelf: { freq: 5500, gain: -4.5 },
+      drive: 0.12,
+      noiseFloor: 0.012
+    },
+    startPlug: { x: 960, y: 800 },
+    // tail anchor (off-screen, to the right)
+    tail: { x: 1720, y: 815 }
+  },
+  {
+    id: "brass",
+    name: "Vintage Brass",
+    short: "Brass",
+    char: "bright · brassy",
+    plugColor: "#d4a850",
+    jacket: "#4a3820",
+    accent: "#8a6822",
+    segments: 76,
+    segmentLength: 16,
+    stiffness: 0.55,
+    gravity: 0.7,
+    damping: 0.88,
+    audio: {
+      lowShelf:  { freq: 200, gain: -1.5 },
+      mid:       { freq: 2200, q: 1.6, gain: +3.5 },
+      highShelf: { freq: 7000, gain: +1.5 },
+      drive: 0.18,
+      noiseFloor: 0.02
+    },
+    startPlug: { x: 960, y: 740 },
+    tail: { x: 1720, y: 755 }
+  },
+  {
+    id: "silver",
+    name: "Silver Plated",
+    short: "Silver",
+    char: "clear · airy",
+    plugColor: "#e0e0d8",
+    jacket: "#1a1a18",
+    accent: "#888884",
+    segments: 75,
+    segmentLength: 16,
+    stiffness: 0.7,
+    gravity: 0.55,
+    damping: 0.9,
+    audio: {
+      lowShelf:  { freq: 120, gain: -0.5 },
+      mid:       { freq: 1500, q: 0.7, gain: -0.8 },
+      highShelf: { freq: 8000, gain: +3.5 },
+      drive: 0.04,
+      noiseFloor: 0.006
+    },
+    startPlug: { x: 960, y: 680 },
+    tail: { x: 1720, y: 695 }
+  },
+  {
+    id: "gold24k",
+    name: "24K Gold Reference",
+    short: "24K Gold",
+    char: "transparent · alive",
+    plugColor: "#f0c860",
+    jacket: "#3a2a14",
+    accent: "#c89030",
+    segments: 72,
+    segmentLength: 16,
+    stiffness: 0.85,
+    gravity: 0.4,
+    damping: 0.92,
+    audio: {
+      lowShelf:  { freq: 90,   gain: +0.8 },
+      mid:       { freq: 1800, q: 0.6,  gain: +0.5 },
+      highShelf: { freq: 9500, gain: +2.0 },
+      drive: 0.0,
+      noiseFloor: 0.002
+    },
+    startPlug: { x: 960, y: 620 },
+    tail: { x: 1720, y: 635 }
+  }
+];
+
+/* ------------ Speaker terminal target (in SVG coords) ------------ */
+const SPEAKER_TERMINAL = { x: 500 + 150, y: 260 + 240 }; // matches speaker translate + terminal pos
+const SNAP_RADIUS = 70;     // distance at which the cable starts to engage with terminal (hum + glow)
+const HOLD_RADIUS = 30;     // distance at which holding the plug locks it in for insertion
+const HOLD_TIME_MS = 450;   // how long to hold to "push" the plug in
+
+/* =========================================================
+   VERLET PHYSICS for each cable
+   ========================================================= */
+class Cable {
+  constructor(def) {
+    this.def = def;
+    this.points = [];
+    this.dragId = null;
+
+    // INITIAL LAYOUT: layered/stacked. Each cable sits in its own horizontal lane
+    // defined by the line between its tail (off-screen right) and its startPlug.
+    // The cable consists of a short straight run from the tail, a SMALL TIDY COIL
+    // right beside the plug, and the plug itself at the left end. This produces
+    // four parallel cables stacked from top to bottom, like a catalogue spread.
+    const tail = def.tail;
+    const head = def.startPlug;
+    const totalLen = (def.segments - 1) * def.segmentLength;
+    const directLen = Math.hypot(head.x - tail.x, head.y - tail.y);
+    const slack = Math.max(0, totalLen - directLen);
+
+    // small tidy coil dimensions per cable character
+    const coilRadius = 18 + (1 - def.stiffness) * 8;     // floppier = slightly bigger
+    // segment-by-segment angular spacing so adjacent points are ~segmentLength apart
+    // (this avoids the distance constraints stretching the coil flat in frame 1)
+    // because of the y-squash (0.5 ratio), the effective radius is ~r * 0.75 on avg
+    const effR = coilRadius * 0.75;
+    const dTheta = def.segmentLength / effR; // radians per segment in coil
+
+    // how many segments do we want in the coil?
+    // we want enough to absorb most of the slack; leave at least 2 segments to
+    // bridge from coil edge to the plug head
+    const segsForSlack = Math.round(slack / def.segmentLength);
+    const coilSegs = Math.max(8, Math.min(def.segments - 6, segsForSlack));
+    const tailSegs = def.segments - coilSegs - 1; // -1 for the bridge to plug head
+
+    // coil center: right next to plug
+    const coilCx = head.x + coilRadius + 6;
+    const coilCy = head.y;
+
+    for (let i = 0; i < def.segments; i++) {
+      let x, y;
+      if (i === 0) {
+        // tail anchor
+        x = tail.x; y = tail.y;
+      } else if (i <= tailSegs) {
+        // straight run from tail toward the coil entry (right side of coil)
+        const u = i / tailSegs;
+        const coilEntryX = coilCx + coilRadius;
+        const coilEntryY = coilCy;
+        x = tail.x + (coilEntryX - tail.x) * u;
+        const ease = u * u * (3 - 2 * u);
+        y = tail.y + (coilEntryY - tail.y) * ease;
+      } else if (i < tailSegs + coilSegs) {
+        // tidy coil winding clockwise. start at angle 0 (right side) so it
+        // continues smoothly from the tail run
+        const k = i - tailSegs;
+        const angle = -k * dTheta;
+        x = coilCx + Math.cos(angle) * coilRadius;
+        y = coilCy + Math.sin(angle) * coilRadius * 0.5;
+      } else {
+        // bridge from end of coil to plug head
+        const u = (i - (tailSegs + coilSegs - 1)) / (def.segments - 1 - (tailSegs + coilSegs - 1));
+        const lastCoilK = coilSegs - 1;
+        const lastCoilAngle = -lastCoilK * dTheta;
+        const lastCoilX = coilCx + Math.cos(lastCoilAngle) * coilRadius;
+        const lastCoilY = coilCy + Math.sin(lastCoilAngle) * coilRadius * 0.5;
+        x = lastCoilX + (head.x - lastCoilX) * u;
+        y = lastCoilY + (head.y - lastCoilY) * u;
+      }
+      this.points.push({
+        x, y,
+        ox: x, oy: y,
+        pinned: i === 0
+      });
+    }
+    // ensure plug head ends exactly at startPlug
+    const lastP = this.points[this.points.length - 1];
+    lastP.x = head.x;
+    lastP.y = head.y;
+    lastP.ox = head.x;
+    lastP.oy = head.y;
+
+    // pin tail
+    this.points[0].x = tail.x;
+    this.points[0].y = tail.y;
+    this.points[0].ox = tail.x;
+    this.points[0].oy = tail.y;
+
+    // remember rest positions so the cable can tidy back to its lane
+    // when the plug is released
+    this.restPositions = this.points.map(p => ({ x: p.x, y: p.y }));
+
+    // physics flags
+    this.connected = false;
+    this.dragging = false;
+    this.inserting = false;
+    this.insertStart = 0;
+    this.insertFrom = { x: 0, y: 0 };
+    // Lifecycle phases:
+    //   "idle"      — held in tidy stacked layout (initial state)
+    //   "falling"   — just released; free physics, lands on floor
+    //   "returning" — slowly interpolating from current resting place back to
+    //                 the tidy layout
+    // dragging/connecting/inserting are orthogonal flags above.
+    this.phase = "idle";
+    this.fallStart = 0;
+    this.returnStart = 0;
+    this.returnFrom = null; // snapshot of point positions at the start of returning
+
+    // build SVG
+    this.group = document.createElementNS(SVG_NS, "g");
+    this.group.dataset.cableId = def.id;
+
+    // jacket path (thicker)
+    this.jacketPath = document.createElementNS(SVG_NS, "path");
+    this.jacketPath.setAttribute("fill", "none");
+    this.jacketPath.setAttribute("stroke", def.jacket);
+    this.jacketPath.setAttribute("stroke-width", "8");
+    this.jacketPath.setAttribute("stroke-linecap", "round");
+    this.jacketPath.setAttribute("stroke-linejoin", "round");
+    this.group.appendChild(this.jacketPath);
+
+    // accent stripe (slightly thinner, lighter)
+    this.stripePath = document.createElementNS(SVG_NS, "path");
+    this.stripePath.setAttribute("fill", "none");
+    this.stripePath.setAttribute("stroke", def.accent);
+    this.stripePath.setAttribute("stroke-width", "1.5");
+    this.stripePath.setAttribute("stroke-linecap", "round");
+    this.stripePath.setAttribute("stroke-linejoin", "round");
+    this.stripePath.setAttribute("opacity", "0.55");
+    this.stripePath.setAttribute("stroke-dasharray", "6 4");
+    this.group.appendChild(this.stripePath);
+
+    // plug (head)
+    this.plugGroup = document.createElementNS(SVG_NS, "g");
+    this.plugGroup.style.cursor = "grab";
+    this.plugGroup.dataset.cableId = def.id;
+
+    // plug shape: a banana-style plug
+    const plugBody = document.createElementNS(SVG_NS, "rect");
+    plugBody.setAttribute("x", "-9");
+    plugBody.setAttribute("y", "-22");
+    plugBody.setAttribute("width", "18");
+    plugBody.setAttribute("height", "22");
+    plugBody.setAttribute("rx", "3");
+    plugBody.setAttribute("fill", def.jacket);
+    plugBody.setAttribute("stroke", "#0e0d0a");
+    plugBody.setAttribute("stroke-width", "0.8");
+    this.plugGroup.appendChild(plugBody);
+
+    const plugTip = document.createElementNS(SVG_NS, "path");
+    plugTip.setAttribute("d", "M -7 0 L 7 0 L 5 16 Q 0 22 -5 16 Z");
+    plugTip.setAttribute("fill", def.plugColor);
+    plugTip.setAttribute("stroke", "#0e0d0a");
+    plugTip.setAttribute("stroke-width", "0.8");
+    this.plugGroup.appendChild(plugTip);
+
+    // tiny ring detail
+    const ring = document.createElementNS(SVG_NS, "rect");
+    ring.setAttribute("x", "-9");
+    ring.setAttribute("y", "-3");
+    ring.setAttribute("width", "18");
+    ring.setAttribute("height", "3");
+    ring.setAttribute("fill", def.accent);
+    ring.setAttribute("opacity", "0.7");
+    this.plugGroup.appendChild(ring);
+
+    this.group.appendChild(this.plugGroup);
+
+    cableLayer.appendChild(this.group);
+
+    // label — small "tag" card with colored dot + name, clearly visible
+    this.label = document.createElementNS(SVG_NS, "g");
+    this.label.dataset.cableId = def.id;
+
+    // measure-ish text width (approx based on character count, fits short labels)
+    const labelText = def.short.toUpperCase();
+    const approxWidth = labelText.length * 7.5 + 40; // rough estimate for monospaced caps
+
+    // tag card background
+    const labelBg = document.createElementNS(SVG_NS, "rect");
+    labelBg.setAttribute("rx", "3");
+    labelBg.setAttribute("ry", "3");
+    labelBg.setAttribute("fill", "#f1ead8");
+    labelBg.setAttribute("stroke", "#1c1a16");
+    labelBg.setAttribute("stroke-width", "0.8");
+    this.label.appendChild(labelBg);
+    this.labelBg = labelBg;
+
+    // colored dot showing the cable's plug color (mini-swatch)
+    const labelDot = document.createElementNS(SVG_NS, "circle");
+    labelDot.setAttribute("r", "5");
+    labelDot.setAttribute("fill", def.plugColor);
+    labelDot.setAttribute("stroke", "#1c1a16");
+    labelDot.setAttribute("stroke-width", "0.6");
+    this.label.appendChild(labelDot);
+    this.labelDot = labelDot;
+
+    // label text in monospace caps for instant readability
+    const labelTextEl = document.createElementNS(SVG_NS, "text");
+    labelTextEl.setAttribute("font-family", "JetBrains Mono, monospace");
+    labelTextEl.setAttribute("font-size", "11");
+    labelTextEl.setAttribute("font-weight", "500");
+    labelTextEl.setAttribute("fill", "#1c1a16");
+    labelTextEl.setAttribute("letter-spacing", "1.5");
+    labelTextEl.setAttribute("text-anchor", "start");
+    labelTextEl.textContent = labelText;
+    this.label.appendChild(labelTextEl);
+    this.labelText = labelTextEl;
+
+    // tiny tick line connecting tag to plug (subtle)
+    const labelLine = document.createElementNS(SVG_NS, "line");
+    labelLine.setAttribute("stroke", "#1c1a16");
+    labelLine.setAttribute("stroke-width", "0.6");
+    labelLine.setAttribute("opacity", "0.5");
+    this.label.appendChild(labelLine);
+    this.labelLine = labelLine;
+
+    this.labelWidth = approxWidth;
+    this.labelHeight = 22;
+
+    labelLayer.appendChild(this.label);
+
+    // attach drag listeners
+    this.attachListeners();
+  }
+
+  get head() { return this.points[this.points.length - 1]; }
+
+  attachListeners() {
+    const onDown = (e) => {
+      e.preventDefault();
+      const id = (e.pointerId !== undefined) ? e.pointerId : 0;
+      this.dragging = true;
+      this.dragId = id;
+      // cancel any in-progress falling/returning phase
+      this.phase = "idle";
+      this.returnFrom = null;
+      this.plugGroup.setPointerCapture && this.plugGroup.setPointerCapture(id);
+      this.plugGroup.style.cursor = "grabbing";
+      hideTooltip();
+      // ensure audio context is created on first user gesture
+      AudioEngine.ensureCtx();
+      // If currently connected, this counts as starting to UNPLUG.
+      // The hum buzz is already going (we're at the terminal). Trigger the
+      // unplug event: brief crackle + music cuts off + buzz lingers briefly.
+      if (this.connected) {
+        this.connected = false;
+        AudioEngine.unplug(this);
+        if (app.connectedCable === this) {
+          app.connectedCable = null;
+          document.getElementById("currentCable").textContent = "— none —";
+          document.getElementById("currentChar").textContent = "silence";
+        }
+      }
+      // NOTE: no crackle on bare grab. Silence until you bring the plug to
+      // the terminal — that's where the hum and the click live.
+      app.draggingCable = this;
+    };
+    this.plugGroup.addEventListener("pointerdown", onDown);
+
+    // hover tooltip (still shows the cable's name on hover, but no audio)
+    this.plugGroup.addEventListener("pointerenter", () => {
+      if (!this.dragging) {
+        showTooltip(this.def.name, this.head.x, this.head.y);
+      }
+    });
+    this.plugGroup.addEventListener("pointerleave", () => hideTooltip());
+  }
+
+  // Verlet integration step
+  step() {
+    const def = this.def;
+    const segLen = def.segmentLength;
+    const head = this.points[this.points.length - 1];
+    const lastIdx = this.points.length - 1;
+    const isHeadFixed = this.dragging || this.connected || this.inserting;
+
+    // -------- HEAD CONTROL (when externally fixed) --------
+    if (this.connected) {
+      head.x = SPEAKER_TERMINAL.x;
+      head.y = SPEAKER_TERMINAL.y;
+      head.ox = head.x;
+      head.oy = head.y;
+    } else if (this.inserting) {
+      const t = Math.min(1, (performance.now() - this.insertStart) / HOLD_TIME_MS);
+      const e = t * t * (3 - 2 * t);
+      head.x = this.insertFrom.x + (SPEAKER_TERMINAL.x - this.insertFrom.x) * e;
+      head.y = this.insertFrom.y + (SPEAKER_TERMINAL.y - this.insertFrom.y) * e;
+      head.ox = head.x;
+      head.oy = head.y;
+      if (t >= 1) {
+        this.inserting = false;
+        this.connected = true;
+        AudioEngine.connectFinalize(this);
+      }
+    }
+    // when dragging, the pointer handler sets head position directly
+
+    // -------- IDLE: locked to tidy layout --------
+    if (this.phase === "idle" && !isHeadFixed) {
+      for (let i = 1; i < this.points.length; i++) {
+        const p = this.points[i];
+        const r = this.restPositions[i];
+        p.x = r.x; p.y = r.y;
+        p.ox = r.x; p.oy = r.y;
+      }
+      return;
+    }
+
+    // -------- RETURNING: being pulled back home by an invisible string.
+    // Physics stays live, but each segment gets a spring force toward its
+    // rest position, plus strong damping. Feels like someone tugging the
+    // cable back into its cradle rather than a free-floating tween.
+    if (this.phase === "returning" && !isHeadFixed) {
+      const lastIdx2 = this.points.length - 1;
+      // Spring tuning
+      const STIFF = 0.006;       // pull strength toward rest position
+      const HEAD_STIFF = 0.009;  // plug (head) is pulled harder — leads the motion
+      const RETURN_DAMP = 0.92;  // velocity retention (lower = snappier)
+      const LIFT = -0.08;        // slight upward bias so it lifts off floor, not slides
+      const SNAP_MS = 16000;
+      const SNAP_DIST = 2.0;
+
+      let maxDist = 0;
+      for (let i = 1; i < this.points.length; i++) {
+        const p = this.points[i];
+        const r = this.restPositions[i];
+        // verlet velocity
+        let vx = (p.x - p.ox) * RETURN_DAMP;
+        let vy = (p.y - p.oy) * RETURN_DAMP;
+        p.ox = p.x;
+        p.oy = p.y;
+        // spring force toward rest (head pulled more firmly)
+        const k = (i === lastIdx2) ? HEAD_STIFF : STIFF;
+        vx += (r.x - p.x) * k;
+        vy += (r.y - p.y) * k + LIFT;
+        p.x += vx;
+        p.y += vy;
+        const dx = r.x - p.x, dy = r.y - p.y;
+        const d = Math.sqrt(dx*dx + dy*dy);
+        if (d > maxDist) maxDist = d;
+      }
+
+      // Keep distance constraints so the cable stays coherent while
+      // being reeled in (prevents stretch artifacts).
+      const iters2 = Math.max(2, Math.round(def.stiffness * 6));
+      for (let k = 0; k < iters2; k++) {
+        for (let i = 0; i < this.points.length - 1; i++) {
+          const a = this.points[i];
+          const b = this.points[i + 1];
+          const dx = b.x - a.x;
+          const dy = b.y - a.y;
+          const dist = Math.sqrt(dx*dx + dy*dy) || 0.0001;
+          const diff = (segLen - dist) / dist;
+          const factor = def.stiffness * 0.5;
+          const offX = dx * diff * factor;
+          const offY = dy * diff * factor;
+          if (!a.pinned) { a.x -= offX; a.y -= offY; }
+          if (!b.pinned) { b.x += offX; b.y += offY; }
+        }
+      }
+
+      const elapsed = performance.now() - this.returnStart;
+      if (maxDist < SNAP_DIST || elapsed > SNAP_MS) {
+        // snap to rest to avoid jitter
+        for (let i = 1; i < this.points.length; i++) {
+          const p = this.points[i];
+          const r = this.restPositions[i];
+          p.x = r.x; p.y = r.y;
+          p.ox = r.x; p.oy = r.y;
+        }
+        this.phase = "idle";
+        this.returnFrom = null;
+      }
+      return;
+    }
+
+    // -------- FALLING (or actively dragging/connecting): free physics --------
+
+    // Body integration with gravity. Heavier cables (lower stiffness) feel
+    // droopier under gravity.
+    const grav = def.gravity * 0.7;
+    for (let i = 1; i < this.points.length; i++) {
+      // skip head when externally controlled or being dragged
+      if (i === lastIdx && (isHeadFixed || this.dragging)) continue;
+      const p = this.points[i];
+      const vx = (p.x - p.ox) * def.damping;
+      const vy = (p.y - p.oy) * def.damping;
+      p.ox = p.x;
+      p.oy = p.y;
+      p.x += vx;
+      p.y += vy + grav;
+    }
+
+    // Floor constraint: cables settle on the ground rather than fall forever.
+    const FLOOR_Y = 815;
+    for (let i = 1; i < this.points.length; i++) {
+      if (i === lastIdx && isHeadFixed) continue;
+      const p = this.points[i];
+      if (p.y > FLOOR_Y) {
+        p.y = FLOOR_Y;
+        p.ox = p.x - (p.x - p.ox) * 0.4;
+      }
+    }
+
+    // Distance constraints — keep adjacent points at segmentLength apart.
+    const iters = Math.max(2, Math.round(def.stiffness * 8));
+    for (let k = 0; k < iters; k++) {
+      for (let i = 0; i < this.points.length - 1; i++) {
+        const a = this.points[i];
+        const b = this.points[i + 1];
+        const dx = b.x - a.x;
+        const dy = b.y - a.y;
+        const dist = Math.sqrt(dx*dx + dy*dy) || 0.0001;
+        const diff = (segLen - dist) / dist;
+        const factor = def.stiffness * 0.5;
+        const offX = dx * diff * factor;
+        const offY = dy * diff * factor;
+        if (!a.pinned) {
+          a.x -= offX;
+          a.y -= offY;
+        }
+        const headLocked = (isHeadFixed || this.dragging) && (i + 1 === lastIdx);
+        if (!b.pinned && !headLocked) {
+          b.x += offX;
+          b.y += offY;
+        }
+      }
+    }
+
+    // Phase transition: falling -> returning, after the cable has had time
+    // to land and visually settle. Short dwell so the "pulled back" feeling
+    // kicks in while there's still some kinetic energy.
+    if (this.phase === "falling") {
+      const FALL_MS = 850;
+      if (performance.now() - this.fallStart >= FALL_MS) {
+        // snapshot current positions, then start the spring-reeled return
+        this.returnFrom = this.points.map(p => ({ x: p.x, y: p.y }));
+        this.returnStart = performance.now();
+        this.phase = "returning";
+      }
+    }
+  }
+
+  draw() {
+    // smooth catmull-rom-ish path
+    const pts = this.points;
+    let d = `M ${pts[0].x.toFixed(1)} ${pts[0].y.toFixed(1)}`;
+    for (let i = 0; i < pts.length - 1; i++) {
+      const p0 = pts[i === 0 ? i : i - 1];
+      const p1 = pts[i];
+      const p2 = pts[i + 1];
+      const p3 = pts[i + 2 < pts.length ? i + 2 : i + 1];
+      // catmull-rom -> bezier
+      const c1x = p1.x + (p2.x - p0.x) / 6;
+      const c1y = p1.y + (p2.y - p0.y) / 6;
+      const c2x = p2.x - (p3.x - p1.x) / 6;
+      const c2y = p2.y - (p3.y - p1.y) / 6;
+      d += ` C ${c1x.toFixed(1)} ${c1y.toFixed(1)}, ${c2x.toFixed(1)} ${c2y.toFixed(1)}, ${p2.x.toFixed(1)} ${p2.y.toFixed(1)}`;
+    }
+    this.jacketPath.setAttribute("d", d);
+    this.stripePath.setAttribute("d", d);
+
+    // plug position + insertion fade
+    const tail = pts[pts.length - 2];
+    const head = pts[pts.length - 1];
+    const angle = Math.atan2(head.y - tail.y, head.x - tail.x) * 180 / Math.PI - 90;
+    this.plugGroup.setAttribute("transform", `translate(${head.x.toFixed(1)} ${head.y.toFixed(1)}) rotate(${angle.toFixed(1)})`);
+
+    // when plug enters the socket, fade the head out so it looks "inserted"
+    let plugOpacity = 1;
+    if (this.connected) {
+      plugOpacity = 0;
+    } else if (this.inserting) {
+      // fade quickly during the second half of the insertion animation
+      const t = Math.min(1, (performance.now() - this.insertStart) / HOLD_TIME_MS);
+      plugOpacity = t < 0.5 ? 1 : 1 - (t - 0.5) * 2;
+    }
+    this.plugGroup.style.opacity = plugOpacity.toFixed(3);
+    // also fade the last bit of the cable that would be inside the socket so
+    // the wire visually "enters" the hole rather than stopping at its surface
+    // (we approximate this with a stroke-dasharray that hides the last few px
+    // when fully connected)
+    if (this.connected) {
+      // dim and shorten the last few segments by setting opacity of jacket near end
+      this.jacketPath.setAttribute("stroke-dasharray", "");
+      // we instead nudge the path's apparent end via reduced final-segment opacity
+      // — but path opacity is uniform, so we just trim by drawing a short cap circle.
+    }
+
+    // label as a tag card: positioned ABOVE the cable body, between the
+    // plug head and the coil. This keeps it clear of the path between plug
+    // and the speaker terminal (which is to the LEFT of the plug).
+    const tagW = this.labelWidth;
+    const tagH = this.labelHeight;
+    const tagX = head.x + 10;            // start just to the right of the plug
+    const tagY = head.y - tagH - 18;     // above the cable
+    this.labelBg.setAttribute("x", tagX);
+    this.labelBg.setAttribute("y", tagY);
+    this.labelBg.setAttribute("width", tagW);
+    this.labelBg.setAttribute("height", tagH);
+    // dot on left side of tag
+    const dotX = tagX + 12;
+    const dotY = tagY + tagH / 2;
+    this.labelDot.setAttribute("cx", dotX);
+    this.labelDot.setAttribute("cy", dotY);
+    // text after dot
+    this.labelText.setAttribute("x", dotX + 11);
+    this.labelText.setAttribute("y", dotY + 4);
+    // tick line from tag bottom-left down to plug
+    this.labelLine.setAttribute("x1", tagX + 10);
+    this.labelLine.setAttribute("y1", tagY + tagH);
+    this.labelLine.setAttribute("x2", head.x + 4);
+    this.labelLine.setAttribute("y2", head.y - 8);
+    // label follows the plug at all times (even while dragging), but fades
+    // when the plug is connected/inserting since it's no longer informative.
+    const hideLabel = this.connected || this.inserting;
+    this.label.style.opacity = hideLabel ? "0" : "1";
+    this.label.style.transition = "opacity 0.2s";
+  }
+}
+
+/* =========================================================
+   AUDIO ENGINE
+   ========================================================= */
+const AudioEngine = (() => {
+  let ctx = null;
+  let buffer = null;
+  let source = null;
+  let isPlaying = false;
+  let startedAt = 0;
+  let pausedAt = 0;
+
+  // music chain
+  let inputGain, lowShelf, midPeak, highShelf, drive, postGain, analyser;
+  // hiss / cable noise floor
+  let noiseSource, noiseGain;
+  // master
+  let masterGain;
+  // analog output stage (saturation that intensifies with fader position)
+  let masterSat, masterSatMake, masterTrim;
+
+  // === HUM SYSTEM ===
+  // The "buzz" you hear when a bare wire approaches a live terminal.
+  // Built from a 60Hz fundamental + 120Hz/180Hz harmonics + a touch of
+  // bandpassed white noise. Output level is driven externally by proximity.
+  let humTargetGain = 0;        // what JS wants the hum at (0..1)
+  let humOsc60, humOsc120, humOsc180;
+  let humOscGain60, humOscGain120, humOscGain180;
+  let humNoiseGain;
+  let humMaster;
+
+  function ensureCtx() {
+    if (!ctx) {
+      ctx = new (window.AudioContext || window.webkitAudioContext)();
+
+      // ---- music path ----
+      inputGain = ctx.createGain();
+      inputGain.gain.value = 0;
+
+      lowShelf = ctx.createBiquadFilter(); lowShelf.type = "lowshelf";
+      midPeak = ctx.createBiquadFilter(); midPeak.type = "peaking";
+      highShelf = ctx.createBiquadFilter(); highShelf.type = "highshelf";
+
+      drive = ctx.createWaveShaper();
+      drive.curve = makeDriveCurve(0);
+      drive.oversample = "2x";
+
+      postGain = ctx.createGain();
+      postGain.gain.value = 1.0;
+
+      noiseGain = ctx.createGain();
+      noiseGain.gain.value = 0;
+      noiseSource = createNoiseSource(ctx);
+      noiseSource.connect(noiseGain);
+
+      analyser = ctx.createAnalyser();
+      analyser.fftSize = 256;
+
+      masterGain = ctx.createGain();
+      masterGain.gain.value = 0.72;
+
+      // analog output stage: tube-ish saturation + trim. The drive amount
+      // is modulated by the master fader so pushing it up past unity adds
+      // warmth/harmonics, not just loudness.
+      masterSatMake = ctx.createGain();
+      masterSatMake.gain.value = 1.0;
+      masterSat = ctx.createWaveShaper();
+      masterSat.curve = makeDriveCurve(0.12);
+      masterSat.oversample = "2x";
+      masterTrim = ctx.createGain();
+      masterTrim.gain.value = 0.95;
+
+      inputGain.connect(lowShelf);
+      lowShelf.connect(midPeak);
+      midPeak.connect(highShelf);
+      highShelf.connect(drive);
+      drive.connect(postGain);
+
+      postGain.connect(analyser);
+      noiseGain.connect(analyser);
+      analyser.connect(masterGain);
+      masterGain.connect(masterSatMake);
+      masterSatMake.connect(masterSat);
+      masterSat.connect(masterTrim);
+      masterTrim.connect(ctx.destination);
+
+      // ---- hum path (independent from music chain) ----
+      humMaster = ctx.createGain();
+      humMaster.gain.value = 0;
+
+      // 60Hz fundamental — the backbone of mains hum
+      humOsc60 = ctx.createOscillator();
+      humOsc60.type = "sine";
+      humOsc60.frequency.value = 60;
+      humOscGain60 = ctx.createGain();
+      humOscGain60.gain.value = 0.45;
+      humOsc60.connect(humOscGain60);
+      humOscGain60.connect(humMaster);
+
+      // 120Hz second harmonic — gives the "fat" feel of speaker hum
+      humOsc120 = ctx.createOscillator();
+      humOsc120.type = "sine";
+      humOsc120.frequency.value = 120;
+      humOscGain120 = ctx.createGain();
+      humOscGain120.gain.value = 0.35;
+      humOsc120.connect(humOscGain120);
+      humOscGain120.connect(humMaster);
+
+      // 180Hz third harmonic — adds the "buzzy" edge
+      humOsc180 = ctx.createOscillator();
+      humOsc180.type = "sawtooth";
+      humOsc180.frequency.value = 180;
+      const humLP = ctx.createBiquadFilter();
+      humLP.type = "lowpass";
+      humLP.frequency.value = 800;
+      humLP.Q.value = 0.6;
+      humOscGain180 = ctx.createGain();
+      humOscGain180.gain.value = 0.08;
+      humOsc180.connect(humLP);
+      humLP.connect(humOscGain180);
+      humOscGain180.connect(humMaster);
+
+      // a bit of bandpassed noise — the "live wire" sizzle
+      const humNoise = createNoiseSource(ctx);
+      const humBP = ctx.createBiquadFilter();
+      humBP.type = "bandpass";
+      humBP.frequency.value = 220;
+      humBP.Q.value = 1.4;
+      humNoiseGain = ctx.createGain();
+      humNoiseGain.gain.value = 0.06;
+      humNoise.connect(humBP);
+      humBP.connect(humNoiseGain);
+      humNoiseGain.connect(humMaster);
+
+      humOsc60.start();
+      humOsc120.start();
+      humOsc180.start();
+
+      humMaster.connect(analyser);
+
+      // start ramping the hum from JS-side proximity values
+      requestAnimationFrame(humTick);
+    }
+    return ctx;
+  }
+
+  // smoothly chase the target gain
+  function humTick() {
+    if (!ctx) return;
+    const cur = humMaster.gain.value;
+    const target = humTargetGain;
+    // attack faster than release for "live wire" feel
+    const rate = target > cur ? 0.12 : 0.06;
+    const next = cur + (target - cur) * rate;
+    humMaster.gain.setValueAtTime(next, ctx.currentTime);
+    requestAnimationFrame(humTick);
+  }
+
+  // 0..1 — caller decides based on plug distance to terminal
+  function setHumLevel(level) {
+    humTargetGain = Math.max(0, Math.min(1, level)) * 0.35;
+  }
+
+  function makeDriveCurve(amount) {
+    const n = 1024;
+    const curve = new Float32Array(n);
+    const k = amount * 50;
+    for (let i = 0; i < n; i++) {
+      const x = (i * 2) / n - 1;
+      curve[i] = (1 + k) * x / (1 + k * Math.abs(x));
+    }
+    return curve;
+  }
+
+  function createNoiseSource(ctx) {
+    const bufferSize = 2 * ctx.sampleRate;
+    const buf = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+      data[i] = (Math.random() * 2 - 1) * 0.6;
+    }
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    src.loop = true;
+    src.start();
+    return src;
+  }
+
+  async function loadFile(file) {
+    ensureCtx();
+    const arrayBuf = await file.arrayBuffer();
+    buffer = await ctx.decodeAudioData(arrayBuf);
+    pausedAt = 0;
+  }
+
+  async function loadUrl(url) {
+    ensureCtx();
+    const res = await fetch(url);
+    if (!res.ok) throw new Error("fetch failed: " + res.status);
+    const arrayBuf = await res.arrayBuffer();
+    buffer = await ctx.decodeAudioData(arrayBuf);
+    pausedAt = 0;
+  }
+
+  function play() {
+    if (!buffer) return;
+    ensureCtx();
+    if (ctx.state === "suspended") ctx.resume();
+    if (source) {
+      try { source.stop(); } catch(e){}
+    }
+    source = ctx.createBufferSource();
+    source.buffer = buffer;
+    source.loop = true;
+    source.connect(inputGain);
+    source.start(0, pausedAt % buffer.duration);
+    startedAt = ctx.currentTime - pausedAt;
+    isPlaying = true;
+  }
+
+  function pause() {
+    if (!source) return;
+    pausedAt = ctx.currentTime - startedAt;
+    try { source.stop(); } catch(e){}
+    source = null;
+    isPlaying = false;
+  }
+
+  // Called the moment the cable is fully inserted. Music begins flowing
+  // through the cable's filter chain.
+  function connectFinalize(cable) {
+    ensureCtx();
+    if (ctx.state === "suspended") ctx.resume();
+    const a = cable.def.audio;
+    const t = ctx.currentTime;
+    const tConst = 0.04;
+    lowShelf.frequency.setTargetAtTime(a.lowShelf.freq, t, tConst);
+    lowShelf.gain.setTargetAtTime(a.lowShelf.gain, t, tConst);
+    midPeak.frequency.setTargetAtTime(a.mid.freq, t, tConst);
+    midPeak.Q.setTargetAtTime(a.mid.q, t, tConst);
+    midPeak.gain.setTargetAtTime(a.mid.gain, t, tConst);
+    highShelf.frequency.setTargetAtTime(a.highShelf.freq, t, tConst);
+    highShelf.gain.setTargetAtTime(a.highShelf.gain, t, tConst);
+    drive.curve = makeDriveCurve(a.drive);
+    inputGain.gain.setTargetAtTime(1.0, t, 0.05);
+    noiseGain.gain.setTargetAtTime(a.noiseFloor, t, 0.1);
+    // a satisfying "thud + click" when contact is made
+    contactClick();
+  }
+
+  // Called when the cable is yanked out of the terminal.
+  function unplug(cable) {
+    if (!ctx) return;
+    const t = ctx.currentTime;
+    // music cuts off fast (with a tiny scratch)
+    inputGain.gain.setTargetAtTime(0.0, t, 0.02);
+    noiseGain.gain.setTargetAtTime(0.0, t, 0.08);
+    contactClick(0.7);
+  }
+
+  // Short attacking click + tail of noise — the sound of a connector being
+  // pushed in or yanked out of a live terminal.
+  function contactClick(intensity = 1.0) {
+    if (!ctx) return;
+    const t = ctx.currentTime;
+
+    // 1) sharp click (short impulse with low resonance)
+    const clickDur = 0.04;
+    const clickBuf = ctx.createBuffer(1, Math.floor(ctx.sampleRate * clickDur), ctx.sampleRate);
+    const clickData = clickBuf.getChannelData(0);
+    for (let i = 0; i < clickData.length; i++) {
+      const env = Math.pow(1 - i / clickData.length, 4);
+      clickData[i] = (Math.random() * 2 - 1) * env;
+    }
+    const clickSrc = ctx.createBufferSource();
+    clickSrc.buffer = clickBuf;
+    const clickLP = ctx.createBiquadFilter();
+    clickLP.type = "lowpass";
+    clickLP.frequency.value = 1200;
+    clickLP.Q.value = 4;
+    const clickG = ctx.createGain();
+    clickG.gain.value = 0.55 * intensity;
+    clickSrc.connect(clickLP); clickLP.connect(clickG); clickG.connect(masterGain);
+    clickSrc.start(t);
+    clickSrc.stop(t + clickDur + 0.02);
+
+    // 2) raspy noise tail (the contact scratch)
+    const tailDur = 0.18 + Math.random() * 0.1;
+    const tailBuf = ctx.createBuffer(1, Math.floor(ctx.sampleRate * tailDur), ctx.sampleRate);
+    const tailData = tailBuf.getChannelData(0);
+    for (let i = 0; i < tailData.length; i++) {
+      const env = Math.pow(1 - i / tailData.length, 2.5);
+      const occClick = (Math.random() < 0.05) ? (Math.random() * 2 - 1) * 1.4 : 0;
+      tailData[i] = ((Math.random() * 2 - 1) * 0.6 + occClick) * env;
+    }
+    const tailSrc = ctx.createBufferSource();
+    tailSrc.buffer = tailBuf;
+    const tailBP = ctx.createBiquadFilter();
+    tailBP.type = "bandpass";
+    tailBP.frequency.value = 1600 + Math.random() * 1200;
+    tailBP.Q.value = 0.7;
+    const tailG = ctx.createGain();
+    tailG.gain.value = 0.4 * intensity;
+    tailSrc.connect(tailBP); tailBP.connect(tailG); tailG.connect(masterGain);
+    tailSrc.start(t + 0.005);
+    tailSrc.stop(t + tailDur + 0.05);
+
+    // 3) brief hum spike on contact — like a transient ground loop
+    if (humMaster) {
+      humMaster.gain.cancelScheduledValues(t);
+      const cur = humMaster.gain.value;
+      humMaster.gain.setValueAtTime(cur, t);
+      humMaster.gain.linearRampToValueAtTime(Math.min(0.55, cur + 0.45 * intensity), t + 0.01);
+      humMaster.gain.linearRampToValueAtTime(humTargetGain, t + 0.25);
+    }
+  }
+
+  function getLevel() {
+    if (!analyser) return 0;
+    const arr = new Uint8Array(analyser.fftSize);
+    analyser.getByteTimeDomainData(arr);
+    let sum = 0;
+    for (let i = 0; i < arr.length; i++) {
+      const v = (arr[i] - 128) / 128;
+      sum += v * v;
+    }
+    return Math.sqrt(sum / arr.length);
+  }
+
+  function isReady() { return !!buffer; }
+  function playing() { return isPlaying; }
+
+  // Master volume with analog character baked in.
+  // v ∈ [0, 1.15]. Above 1.0, the makeup gain kicks in while the waveshaper
+  // saturates harder — loud passages get warm harmonics, not brittle digital clip.
+  function setMasterLevel(v) {
+    ensureCtx();
+    const vol = Math.max(0, Math.min(1.15, v));
+    const t = ctx.currentTime;
+    const tc = 0.05;
+    // perceptual curve — quiet end is gentler, useful range spread
+    const gain = Math.pow(vol / 1.15, 1.6) * 1.2;
+    masterGain.gain.setTargetAtTime(gain, t, tc);
+    // saturation increases as you push the fader up
+    const driveAmt = Math.max(0, (vol - 0.55)) * 0.9; // 0..~0.55
+    masterSat.curve = makeDriveCurve(driveAmt);
+    // subtle makeup + trim so loud region feels "hotter" but stays controlled
+    masterSatMake.gain.setTargetAtTime(1.0 + Math.max(0, vol - 0.85) * 1.4, t, tc);
+    masterTrim.gain.setTargetAtTime(0.95 - Math.max(0, vol - 0.9) * 0.25, t, tc);
+  }
+
+  // Tiny mechanical scrape triggered while the user is dragging the fader.
+  // Speed ≈ normalized drag velocity (0..1+).
+  function faderMove(speed) {
+    ensureCtx();
+    const t = ctx.currentTime;
+    const dur = 0.09 + Math.min(0.18, speed * 0.25);
+    const bufLen = Math.max(32, Math.floor(ctx.sampleRate * dur));
+    const buf = ctx.createBuffer(1, bufLen, ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < bufLen; i++) {
+      const env = Math.pow(1 - i / bufLen, 2.2);
+      // grainy friction — burst of noise with occasional crackle
+      const crackle = (Math.random() < 0.04) ? (Math.random() * 2 - 1) * 1.1 : 0;
+      data[i] = ((Math.random() * 2 - 1) * 0.5 + crackle) * env;
+    }
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    const bp = ctx.createBiquadFilter();
+    bp.type = "bandpass";
+    bp.frequency.value = 2200 + Math.random() * 1400;
+    bp.Q.value = 0.9;
+    const g = ctx.createGain();
+    g.gain.value = Math.min(0.12, 0.03 + speed * 0.12);
+    src.connect(bp); bp.connect(g); g.connect(masterTrim);
+    src.start(t);
+    src.stop(t + dur + 0.05);
+  }
+
+  // Soft click when the fader is first grabbed / released.
+  function faderClick(kind) {
+    ensureCtx();
+    const t = ctx.currentTime;
+    const dur = 0.045;
+    const bufLen = Math.floor(ctx.sampleRate * dur);
+    const buf = ctx.createBuffer(1, bufLen, ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < bufLen; i++) {
+      const env = Math.pow(1 - i / bufLen, 3);
+      data[i] = (Math.random() * 2 - 1) * env;
+    }
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    const lp = ctx.createBiquadFilter();
+    lp.type = "lowpass";
+    lp.frequency.value = (kind === "grab") ? 900 : 1400;
+    const g = ctx.createGain();
+    g.gain.value = 0.18;
+    src.connect(lp); lp.connect(g); g.connect(masterTrim);
+    src.start(t);
+    src.stop(t + dur + 0.03);
+  }
+
+  return {
+    ensureCtx, loadFile, loadUrl, play, pause,
+    connectFinalize, unplug,
+    setHumLevel,
+    setMasterLevel, faderMove, faderClick,
+    getLevel, isReady, playing
+  };
+})();
+
+/* =========================================================
+   APP STATE & MAIN LOOP
+   ========================================================= */
+const app = {
+  cables: [],
+  draggingCable: null,
+  pointerSVG: { x: 0, y: 0 },
+  connectedCable: null,
+  holdStart: 0,    // timestamp when plug entered HOLD_RADIUS, 0 if not in zone
+};
+
+// instantiate cables
+CABLES.forEach((def) => app.cables.push(new Cable(def)));
+
+// Cables hold their tidy initial layout until first grabbed (see Cable.step),
+// so no pre-stabilization is needed.
+
+/* convert client coords -> SVG viewBox coords */
+function clientToSVG(clientX, clientY) {
+  const pt = scene.createSVGPoint();
+  pt.x = clientX; pt.y = clientY;
+  const ctm = scene.getScreenCTM();
+  if (!ctm) return { x: clientX, y: clientY };
+  const inv = ctm.inverse();
+  const mapped = pt.matrixTransform(inv);
+  return { x: mapped.x, y: mapped.y };
+}
+
+/* pointermove on whole window so dragging works even if cursor leaves the plug */
+window.addEventListener("pointermove", (e) => {
+  const p = clientToSVG(e.clientX, e.clientY);
+  app.pointerSVG = p;
+
+  const cable = app.draggingCable;
+  if (!cable || cable.inserting) return;
+
+  // move plug head with pointer
+  const head = cable.head;
+  head.x = p.x;
+  head.y = p.y;
+  head.ox = p.x;
+  head.oy = p.y;
+
+  // distance to terminal
+  const dx = p.x - SPEAKER_TERMINAL.x;
+  const dy = p.y - SPEAKER_TERMINAL.y;
+  const dist = Math.sqrt(dx * dx + dy * dy);
+
+  // proximity-based hum (only while a plug is being held near terminal)
+  // smooth ramp: 0 at SNAP_RADIUS*1.4, 1 at HOLD_RADIUS
+  const humOuter = SNAP_RADIUS * 1.4;
+  const humInner = HOLD_RADIUS;
+  let humLevel;
+  if (dist >= humOuter) humLevel = 0;
+  else if (dist <= humInner) humLevel = 1;
+  else humLevel = 1 - (dist - humInner) / (humOuter - humInner);
+  AudioEngine.setHumLevel(humLevel);
+
+  // glow intensifies with proximity
+  const glow = document.getElementById("termGlow");
+  glow.setAttribute("opacity", humLevel.toFixed(3));
+
+  // hold-to-insert timing
+  if (dist < HOLD_RADIUS) {
+    if (!app.holdStart) {
+      app.holdStart = performance.now();
+    } else if (performance.now() - app.holdStart >= HOLD_TIME_MS * 0.5) {
+      // half of HOLD_TIME_MS spent dwelling near the terminal -> commit to insert
+      // (the rest of HOLD_TIME_MS is the visual insertion animation)
+      beginInsert(cable);
+    }
+  } else {
+    app.holdStart = 0;
+  }
+});
+
+function beginInsert(cable) {
+  if (cable.inserting || cable.connected) return;
+  // disconnect any currently-connected cable first; it falls away from the
+  // terminal and slowly returns to its tidy lane.
+  app.cables.forEach(c => {
+    if (c !== cable && c.connected) {
+      c.connected = false;
+      AudioEngine.unplug(c);
+      c.phase = "falling";
+      c.fallStart = performance.now();
+    }
+  });
+  // start the insert animation; head pulls toward terminal
+  cable.inserting = true;
+  cable.insertStart = performance.now();
+  cable.insertFrom = { x: cable.head.x, y: cable.head.y };
+  // detach pointer ownership: user no longer needs to hold the button
+  cable.dragging = false;
+  app.draggingCable = null;
+  app.holdStart = 0;
+  cable.plugGroup.style.cursor = "grab";
+  // briefly bump the hum so the contact-impending feeling is strong
+  AudioEngine.setHumLevel(1);
+  // update legend immediately so the user sees what's connecting
+  document.getElementById("currentCable").textContent = cable.def.name;
+  document.getElementById("currentChar").textContent = cable.def.char;
+  app.connectedCable = cable;
+}
+
+window.addEventListener("pointerup", () => {
+  if (!app.draggingCable) return;
+  const cable = app.draggingCable;
+  cable.dragging = false;
+  app.draggingCable = null;
+  app.holdStart = 0;
+  cable.plugGroup.style.cursor = "grab";
+  AudioEngine.setHumLevel(0);
+  document.getElementById("termGlow").setAttribute("opacity", 0);
+  // begin the "fall to floor, then return home" sequence
+  cable.phase = "falling";
+  cable.fallStart = performance.now();
+});
+
+window.addEventListener("pointercancel", () => {
+  if (!app.draggingCable) return;
+  const cable = app.draggingCable;
+  cable.dragging = false;
+  app.draggingCable = null;
+  app.holdStart = 0;
+  AudioEngine.setHumLevel(0);
+  document.getElementById("termGlow").setAttribute("opacity", 0);
+  cable.phase = "falling";
+  cable.fallStart = performance.now();
+});
+
+/* Tooltip helpers */
+function showTooltip(text, svgX, svgY) {
+  const ctm = scene.getScreenCTM();
+  if (!ctm) return;
+  const pt = scene.createSVGPoint();
+  pt.x = svgX; pt.y = svgY;
+  const screenPt = pt.matrixTransform(ctm);
+  tooltip.textContent = text;
+  tooltip.style.left = screenPt.x + "px";
+  tooltip.style.top = screenPt.y + "px";
+  tooltip.classList.add("show");
+}
+function hideTooltip() {
+  tooltip.classList.remove("show");
+}
+
+/* =========================================================
+   TRACK PICKER (dropdown) & PLAYBACK CONTROLS
+   ========================================================= */
+const loadTrackBtn = document.getElementById("loadTrackBtn");
+const trackMenu = document.getElementById("trackMenu");
+const trackItems = trackMenu.querySelectorAll(".track-item");
+const playBtn = document.getElementById("playBtn");
+const trackName = document.getElementById("trackName");
+
+function openMenu(open) {
+  const isOpen = open ?? !trackMenu.classList.contains("open");
+  trackMenu.classList.toggle("open", isOpen);
+  loadTrackBtn.classList.toggle("open", isOpen);
+  loadTrackBtn.setAttribute("aria-expanded", String(isOpen));
+}
+
+loadTrackBtn.addEventListener("click", (e) => {
+  e.stopPropagation();
+  openMenu();
+});
+
+// close on outside click
+document.addEventListener("click", (e) => {
+  if (!trackMenu.classList.contains("open")) return;
+  if (!trackMenu.contains(e.target) && e.target !== loadTrackBtn) {
+    openMenu(false);
+  }
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") openMenu(false);
+});
+
+trackItems.forEach((item) => {
+  item.addEventListener("click", async () => {
+    const src = item.dataset.src;
+    const name = item.dataset.name;
+    openMenu(false);
+    trackItems.forEach(i => i.classList.remove("active"));
+    item.classList.add("active");
+    trackName.textContent = "loading…";
+    try {
+      await AudioEngine.loadUrl(src);
+      trackName.textContent = name;
+      playBtn.removeAttribute("disabled");
+      AudioEngine.play();
+      setPlayBtn(true);
+    } catch (err) {
+      console.error(err);
+      trackName.textContent = "couldn't load that track";
+    }
+  });
+});
+
+playBtn.addEventListener("click", () => {
+  if (!AudioEngine.isReady()) return;
+  if (AudioEngine.playing()) {
+    AudioEngine.pause();
+    setPlayBtn(false);
+  } else {
+    AudioEngine.play();
+    setPlayBtn(true);
+  }
+});
+
+function setPlayBtn(playing) {
+  if (playing) {
+    playBtn.innerHTML = '<svg width="12" height="12" viewBox="0 0 12 12"><rect x="2" y="1" width="3" height="10" fill="#1c1a16"/><rect x="7" y="1" width="3" height="10" fill="#1c1a16"/></svg>';
+  } else {
+    playBtn.innerHTML = '<svg width="12" height="12" viewBox="0 0 12 12"><path d="M2 1 L10 6 L2 11 Z" fill="#1c1a16"/></svg>';
+  }
+}
+
+/* =========================================================
+   METER UPDATE
+   ========================================================= */
+const meterBars = document.querySelectorAll("#meter span");
+function updateMeter() {
+  const lvl = AudioEngine.getLevel();
+  const active = Math.floor(lvl * 28); // amplify a bit
+  meterBars.forEach((bar, i) => {
+    bar.classList.remove("on", "peak");
+    if (i < active) {
+      bar.classList.add("on");
+      if (i >= meterBars.length - 3) bar.classList.add("peak");
+    }
+  });
+}
+
+/* =========================================================
+   MAIN ANIMATION LOOP
+   ========================================================= */
+function tick() {
+  for (const cable of app.cables) {
+    cable.step();
+    cable.draw();
+  }
+  updateMeter();
+  requestAnimationFrame(tick);
+}
+tick();
+
+/* =========================================================
+   VOLUME FADER — drag, wheel, keyboard with analog sfx
+   ========================================================= */
+(function initFader() {
+  const fader = document.getElementById("fader");
+  const knob = document.getElementById("faderKnob");
+  const volVal = document.getElementById("volumeVal");
+  let value = 72;              // 0..100 (fader position)
+  let dragging = false;
+  let lastPos = 0;
+  let lastT = 0;
+
+  // fader position → master level 0..1.15 (top of travel lets you push past unity)
+  function setFromValue(v, opts = {}) {
+    value = Math.max(0, Math.min(100, v));
+    const pct = value;
+    knob.style.left = pct + "%";
+    volVal.textContent = Math.round(value);
+    fader.setAttribute("aria-valuenow", String(Math.round(value)));
+    const masterLevel = (value / 100) * 1.15;
+    AudioEngine.setMasterLevel(masterLevel);
+    if (opts.scrape) AudioEngine.faderMove(opts.scrape);
+  }
+
+  function posToValue(clientX) {
+    const rect = fader.getBoundingClientRect();
+    const x = clientX - rect.left;
+    return Math.max(0, Math.min(100, (x / rect.width) * 100));
+  }
+
+  fader.addEventListener("pointerdown", (e) => {
+    dragging = true;
+    fader.setPointerCapture(e.pointerId);
+    fader.classList.add("grabbing");
+    AudioEngine.faderClick("grab");
+    lastPos = e.clientX;
+    lastT = performance.now();
+    setFromValue(posToValue(e.clientX), { scrape: 0.3 });
+    e.preventDefault();
+  });
+  fader.addEventListener("pointermove", (e) => {
+    if (!dragging) return;
+    const now = performance.now();
+    const dt = Math.max(1, now - lastT);
+    const dx = Math.abs(e.clientX - lastPos);
+    const speed = Math.min(1.5, dx / dt * 8); // rough normalized velocity
+    lastPos = e.clientX;
+    lastT = now;
+    const newVal = posToValue(e.clientX);
+    const delta = Math.abs(newVal - value);
+    setFromValue(newVal, { scrape: delta > 0.3 ? speed : 0 });
+  });
+  function endDrag(e) {
+    if (!dragging) return;
+    dragging = false;
+    try { fader.releasePointerCapture(e.pointerId); } catch (err) {}
+    fader.classList.remove("grabbing");
+    AudioEngine.faderClick("release");
+  }
+  fader.addEventListener("pointerup", endDrag);
+  fader.addEventListener("pointercancel", endDrag);
+
+  // wheel = fine adjust
+  fader.addEventListener("wheel", (e) => {
+    e.preventDefault();
+    const step = e.deltaY > 0 ? -2 : 2;
+    setFromValue(value + step, { scrape: 0.2 });
+  }, { passive: false });
+
+  // keyboard support
+  fader.addEventListener("keydown", (e) => {
+    let step = 0;
+    if (e.key === "ArrowLeft" || e.key === "ArrowDown") step = -2;
+    else if (e.key === "ArrowRight" || e.key === "ArrowUp") step = 2;
+    else if (e.key === "Home") { setFromValue(0, { scrape: 0.4 }); return; }
+    else if (e.key === "End") { setFromValue(100, { scrape: 0.4 }); return; }
+    if (step) {
+      e.preventDefault();
+      setFromValue(value + step, { scrape: 0.25 });
+    }
+  });
+
+  // initialize master level on first user gesture
+  function primeOnce() {
+    setFromValue(value);
+    window.removeEventListener("pointerdown", primeOnce);
+    window.removeEventListener("keydown", primeOnce);
+  }
+  window.addEventListener("pointerdown", primeOnce, { once: true });
+  window.addEventListener("keydown", primeOnce, { once: true });
+})();
+
+</script>
+</body>
+</html>
