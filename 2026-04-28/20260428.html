@@ -50,7 +50,10 @@
 
   #stage {
     position: fixed;
-    inset: 0;
+    top: 56px;
+    bottom: 140px;
+    left: 0;
+    right: 0;
     z-index: 3;
   }
   svg.scene {
@@ -59,15 +62,34 @@
     display: block;
   }
 
-  /* Footer info — everything lives here */
+  /* Top status bar — now connected / character / track */
+  .status-bar {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    padding: 18px 32px 22px;
+    display: flex;
+    gap: 36px;
+    justify-content: center;
+    align-items: flex-end;
+    z-index: 10;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    pointer-events: none;
+    background: linear-gradient(to bottom, rgba(241,234,216,0.85), rgba(241,234,216,0));
+  }
+
+  /* Footer player — centered single row with progress above */
   .info-bar {
     position: fixed;
     bottom: 0; left: 0; right: 0;
-    padding: 16px 28px 20px;
+    padding: 28px 28px 20px;
     display: flex;
-    justify-content: space-between;
-    align-items: flex-end;
-    gap: 24px;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
     z-index: 10;
     pointer-events: none;
     font-family: 'JetBrains Mono', monospace;
@@ -75,9 +97,21 @@
     letter-spacing: 0.18em;
     text-transform: uppercase;
     color: var(--ink-soft);
-    background: linear-gradient(to top, rgba(241,234,216,0.85), rgba(241,234,216,0));
+    background: linear-gradient(to top, rgba(241,234,216,0.96) 45%, rgba(241,234,216,0));
   }
   .info-bar > * { pointer-events: auto; }
+  .info-row {
+    display: flex;
+    align-items: center;
+    gap: 22px;
+    justify-content: center;
+  }
+  .info-row.top-row { width: min(720px, 90vw); }
+  .info-row.main-row { flex-wrap: wrap; }
+
+  /* Global header/footer gradients are applied directly to .status-bar and .info-bar,
+     so they stay tied to the actual UI surfaces and don't wash over the speaker. */
+
   .legend {
     display: flex;
     gap: 26px;
@@ -88,6 +122,8 @@
     display: flex;
     flex-direction: column;
     gap: 4px;
+    align-items: center;
+    text-align: center;
   }
   .legend-item span:first-child {
     color: var(--rust);
@@ -104,11 +140,66 @@
     color: var(--ink);
   }
   .legend-item.track-legend span:last-child {
-    max-width: 180px;
+    max-width: 220px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+
+  /* Progress bar + time */
+  .progress-wrap {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+  }
+  .time-val {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    color: var(--ink-soft);
+    min-width: 38px;
+    text-align: center;
+    flex: 0 0 auto;
+  }
+  .progress {
+    position: relative;
+    flex: 1 1 auto;
+    height: 22px;
+    cursor: pointer;
+    touch-action: none;
+  }
+  .progress-track {
+    position: absolute;
+    left: 0; right: 0; top: 50%;
+    height: 3px;
+    transform: translateY(-50%);
+    background: var(--paper-2);
+    border: 1px solid var(--ink);
+  }
+  .progress-fill {
+    position: absolute;
+    left: 0; top: 50%;
+    width: 0%;
+    height: 3px;
+    transform: translateY(-50%);
+    background: var(--rust);
+    pointer-events: none;
+  }
+  .progress-handle {
+    position: absolute;
+    top: 50%;
+    left: 0%;
+    width: 11px; height: 11px;
+    transform: translate(-50%, -50%);
+    background: var(--ink);
+    border: 1px solid var(--ink);
+    border-radius: 50%;
+    pointer-events: none;
+    box-shadow: 0 2px 4px var(--shadow);
+  }
+  .progress:focus { outline: none; }
+  .progress:focus .progress-handle { background: var(--rust); }
 
   .transport {
     display: flex;
@@ -341,7 +432,7 @@
 <body>
 
 <div id="stage">
-  <svg class="scene" id="scene" viewBox="0 0 1600 1000" preserveAspectRatio="xMidYMid meet">
+  <svg class="scene" id="scene" viewBox="0 0 1600 1000" preserveAspectRatio="xMidYMid slice">
     <defs>
       <!-- speaker body gradient -->
       <linearGradient id="speakerBody" x1="0" y1="0" x2="0" y2="1">
@@ -514,68 +605,82 @@
   </svg>
 </div>
 
+<div class="status-bar">
+  <div class="legend-item">
+    <span>Now Connected</span>
+    <span id="currentCable">— none —</span>
+  </div>
+  <div class="legend-item">
+    <span>Character</span>
+    <span id="currentChar">silence</span>
+  </div>
+  <div class="legend-item track-legend">
+    <span>Track</span>
+    <span id="trackName">— none —</span>
+  </div>
+</div>
+
 <div class="info-bar">
-  <div class="legend">
-    <div class="legend-item">
-      <span>Now Connected</span>
-      <span id="currentCable">— none —</span>
-    </div>
-    <div class="legend-item">
-      <span>Character</span>
-      <span id="currentChar">silence</span>
-    </div>
-    <div class="legend-item track-legend">
-      <span>Track</span>
-      <span id="trackName">— none —</span>
-    </div>
-  </div>
-
-  <div class="transport">
-    <div class="track-picker">
-      <button type="button" class="track-picker-btn" id="loadTrackBtn" aria-haspopup="true" aria-expanded="false">Load Track</button>
-      <div class="track-menu" id="trackMenu" role="menu">
-        <button class="track-item" role="menuitem" data-src="1_늑구빵.mp3" data-name="늑구빵">
-          <span class="track-num">01</span><span class="track-title">늑구빵</span>
-        </button>
-        <button class="track-item" role="menuitem" data-src="2_러브버그.mp3" data-name="러브버그">
-          <span class="track-num">02</span><span class="track-title">러브버그</span>
-        </button>
-        <button class="track-item" role="menuitem" data-src="3_자랑스런날개.mp3" data-name="자랑스런 날개">
-          <span class="track-num">03</span><span class="track-title">자랑스런 날개</span>
-        </button>
-        <button class="track-item" role="menuitem" data-src="4_피고는스마트폰.mp3" data-name="피고는 스마트폰">
-          <span class="track-num">04</span><span class="track-title">피고는 스마트폰</span>
-        </button>
+  <div class="info-row top-row">
+    <div class="progress-wrap">
+      <span class="time-val" id="timeCurrent">0:00</span>
+      <div class="progress" id="progress" role="slider" aria-label="playhead"
+           aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" tabindex="0">
+        <div class="progress-track"></div>
+        <div class="progress-fill" id="progressFill"></div>
+        <div class="progress-handle" id="progressHandle"></div>
       </div>
+      <span class="time-val" id="timeTotal">0:00</span>
     </div>
-    <button class="play-btn" id="playBtn" disabled aria-label="play">
-      <svg width="12" height="12" viewBox="0 0 12 12"><path d="M2 1 L10 6 L2 11 Z" fill="#1c1a16"/></svg>
-    </button>
   </div>
-
-  <div class="volume">
-    <span class="volume-label">Volume</span>
-    <div class="fader" id="fader" role="slider" aria-label="master volume"
-         aria-valuemin="0" aria-valuemax="100" aria-valuenow="72" tabindex="0">
-      <div class="fader-track">
-        <span class="fader-tick" data-at="0"></span>
-        <span class="fader-tick" data-at="25"></span>
-        <span class="fader-tick" data-at="50"></span>
-        <span class="fader-tick" data-at="75"></span>
-        <span class="fader-tick" data-at="100"></span>
+  <div class="info-row main-row">
+    <div class="transport">
+      <div class="track-picker">
+        <button type="button" class="track-picker-btn" id="loadTrackBtn" aria-haspopup="true" aria-expanded="false">Load Track</button>
+        <div class="track-menu" id="trackMenu" role="menu">
+          <button class="track-item" role="menuitem" data-src="1_늑구빵.mp3" data-name="늑구빵">
+            <span class="track-num">01</span><span class="track-title">늑구빵</span>
+          </button>
+          <button class="track-item" role="menuitem" data-src="2_러브버그.mp3" data-name="러브버그">
+            <span class="track-num">02</span><span class="track-title">러브버그</span>
+          </button>
+          <button class="track-item" role="menuitem" data-src="3_자랑스런날개.mp3" data-name="자랑스런 날개">
+            <span class="track-num">03</span><span class="track-title">자랑스런 날개</span>
+          </button>
+          <button class="track-item" role="menuitem" data-src="4_피고는스마트폰.mp3" data-name="피고는 스마트폰">
+            <span class="track-num">04</span><span class="track-title">피고는 스마트폰</span>
+          </button>
+        </div>
       </div>
-      <div class="fader-knob" id="faderKnob"></div>
+      <button class="play-btn" id="playBtn" disabled aria-label="play">
+        <svg width="12" height="12" viewBox="0 0 12 12"><path d="M2 1 L10 6 L2 11 Z" fill="#1c1a16"/></svg>
+      </button>
     </div>
-    <span class="volume-val" id="volumeVal">72</span>
-  </div>
 
-  <div class="signal-meter">
-    <div class="meter-bars" id="meter">
-      <span></span><span></span><span></span><span></span><span></span><span></span>
-      <span></span><span></span><span></span><span></span><span></span><span></span>
-      <span></span><span></span><span></span><span></span>
+    <div class="volume">
+      <span class="volume-label">Volume</span>
+      <div class="fader" id="fader" role="slider" aria-label="master volume"
+           aria-valuemin="0" aria-valuemax="100" aria-valuenow="72" tabindex="0">
+        <div class="fader-track">
+          <span class="fader-tick" data-at="0"></span>
+          <span class="fader-tick" data-at="25"></span>
+          <span class="fader-tick" data-at="50"></span>
+          <span class="fader-tick" data-at="75"></span>
+          <span class="fader-tick" data-at="100"></span>
+        </div>
+        <div class="fader-knob" id="faderKnob"></div>
+      </div>
+      <span class="volume-val" id="volumeVal">72</span>
     </div>
-    <span style="font-size: 9px; opacity: 0.6;">SIGNAL · DB</span>
+
+    <div class="signal-meter">
+      <div class="meter-bars" id="meter">
+        <span></span><span></span><span></span><span></span><span></span><span></span>
+        <span></span><span></span><span></span><span></span><span></span><span></span>
+        <span></span><span></span><span></span><span></span>
+      </div>
+      <span style="font-size: 9px; opacity: 0.6;">SIGNAL · DB</span>
+    </div>
   </div>
 </div>
 
@@ -611,7 +716,7 @@ const CABLES = [
     jacket: "#2b2a26",
     accent: "#7a3e22",
     // physics: heavy & droopy
-    segments: 75,
+    segments: 110,
     segmentLength: 16,
     stiffness: 0.42,
     gravity: 0.85,
@@ -624,9 +729,9 @@ const CABLES = [
       drive: 0.12,
       noiseFloor: 0.012
     },
-    startPlug: { x: 960, y: 800 },
-    // tail anchor (off-screen, to the right)
-    tail: { x: 1720, y: 815 }
+    startPlug: { x: 960, y: 700 },
+    // tail anchor (off-screen, to the right; well beyond viewBox so slice rendering fills the edge)
+    tail: { x: 2100, y: 715 }
   },
   {
     id: "brass",
@@ -636,20 +741,20 @@ const CABLES = [
     plugColor: "#d4a850",
     jacket: "#4a3820",
     accent: "#8a6822",
-    segments: 76,
+    segments: 105,
     segmentLength: 16,
     stiffness: 0.55,
     gravity: 0.7,
     damping: 0.88,
     audio: {
       lowShelf:  { freq: 200, gain: -1.5 },
-      mid:       { freq: 2200, q: 1.6, gain: +3.5 },
+      mid:       { freq: 2200, q: 1.2, gain: +2.0 },
       highShelf: { freq: 7000, gain: +1.5 },
-      drive: 0.18,
+      drive: 0.12,
       noiseFloor: 0.02
     },
-    startPlug: { x: 960, y: 740 },
-    tail: { x: 1720, y: 755 }
+    startPlug: { x: 960, y: 640 },
+    tail: { x: 2100, y: 655 }
   },
   {
     id: "silver",
@@ -659,7 +764,7 @@ const CABLES = [
     plugColor: "#e0e0d8",
     jacket: "#1a1a18",
     accent: "#888884",
-    segments: 75,
+    segments: 100,
     segmentLength: 16,
     stiffness: 0.7,
     gravity: 0.55,
@@ -671,8 +776,8 @@ const CABLES = [
       drive: 0.04,
       noiseFloor: 0.006
     },
-    startPlug: { x: 960, y: 680 },
-    tail: { x: 1720, y: 695 }
+    startPlug: { x: 960, y: 580 },
+    tail: { x: 2100, y: 595 }
   },
   {
     id: "gold24k",
@@ -682,7 +787,7 @@ const CABLES = [
     plugColor: "#f0c860",
     jacket: "#3a2a14",
     accent: "#c89030",
-    segments: 72,
+    segments: 95,
     segmentLength: 16,
     stiffness: 0.85,
     gravity: 0.4,
@@ -694,8 +799,8 @@ const CABLES = [
       drive: 0.0,
       noiseFloor: 0.002
     },
-    startPlug: { x: 960, y: 620 },
-    tail: { x: 1720, y: 635 }
+    startPlug: { x: 960, y: 520 },
+    tail: { x: 2100, y: 535 }
   }
 ];
 
@@ -1387,7 +1492,7 @@ const AudioEngine = (() => {
 
   // 0..1 — caller decides based on plug distance to terminal
   function setHumLevel(level) {
-    humTargetGain = Math.max(0, Math.min(1, level)) * 0.35;
+    humTargetGain = Math.max(0, Math.min(1, level)) * 0.455;
   }
 
   function makeDriveCurve(amount) {
@@ -1455,6 +1560,37 @@ const AudioEngine = (() => {
     isPlaying = false;
   }
 
+  function getDuration() {
+    return buffer ? buffer.duration : 0;
+  }
+
+  // Normalized position within [0, duration).
+  function getPosition() {
+    if (!buffer) return 0;
+    const raw = isPlaying ? (ctx.currentTime - startedAt) : pausedAt;
+    const d = buffer.duration;
+    return d > 0 ? ((raw % d) + d) % d : 0;
+  }
+
+  // Seek to given seconds within the track. Keeps playing/paused state.
+  function seek(seconds) {
+    if (!buffer) return;
+    ensureCtx();
+    const d = buffer.duration;
+    const target = Math.max(0, Math.min(d - 0.01, seconds));
+    if (isPlaying) {
+      if (source) { try { source.stop(); } catch(e){} }
+      source = ctx.createBufferSource();
+      source.buffer = buffer;
+      source.loop = true;
+      source.connect(inputGain);
+      source.start(0, target);
+      startedAt = ctx.currentTime - target;
+    } else {
+      pausedAt = target;
+    }
+  }
+
   // Called the moment the cable is fully inserted. Music begins flowing
   // through the cable's filter chain.
   function connectFinalize(cable) {
@@ -1508,7 +1644,7 @@ const AudioEngine = (() => {
     clickLP.frequency.value = 1200;
     clickLP.Q.value = 4;
     const clickG = ctx.createGain();
-    clickG.gain.value = 0.55 * intensity;
+    clickG.gain.value = 0.715 * intensity;
     clickSrc.connect(clickLP); clickLP.connect(clickG); clickG.connect(masterGain);
     clickSrc.start(t);
     clickSrc.stop(t + clickDur + 0.02);
@@ -1529,7 +1665,7 @@ const AudioEngine = (() => {
     tailBP.frequency.value = 1600 + Math.random() * 1200;
     tailBP.Q.value = 0.7;
     const tailG = ctx.createGain();
-    tailG.gain.value = 0.4 * intensity;
+    tailG.gain.value = 0.52 * intensity;
     tailSrc.connect(tailBP); tailBP.connect(tailG); tailG.connect(masterGain);
     tailSrc.start(t + 0.005);
     tailSrc.stop(t + tailDur + 0.05);
@@ -1539,7 +1675,7 @@ const AudioEngine = (() => {
       humMaster.gain.cancelScheduledValues(t);
       const cur = humMaster.gain.value;
       humMaster.gain.setValueAtTime(cur, t);
-      humMaster.gain.linearRampToValueAtTime(Math.min(0.55, cur + 0.45 * intensity), t + 0.01);
+      humMaster.gain.linearRampToValueAtTime(Math.min(0.715, cur + 0.585 * intensity), t + 0.01);
       humMaster.gain.linearRampToValueAtTime(humTargetGain, t + 0.25);
     }
   }
@@ -1635,6 +1771,7 @@ const AudioEngine = (() => {
     connectFinalize, unplug,
     setHumLevel,
     setMasterLevel, faderMove, faderClick,
+    getDuration, getPosition, seek,
     getLevel, isReady, playing
   };
 })();
@@ -1888,13 +2025,97 @@ function tick() {
 tick();
 
 /* =========================================================
+   PROGRESS BAR + TIME
+   ========================================================= */
+(function initProgress() {
+  const prog = document.getElementById("progress");
+  const fill = document.getElementById("progressFill");
+  const handle = document.getElementById("progressHandle");
+  const tCur = document.getElementById("timeCurrent");
+  const tTot = document.getElementById("timeTotal");
+  let scrubbing = false;
+
+  function fmt(s) {
+    if (!isFinite(s) || s < 0) s = 0;
+    const m = Math.floor(s / 60);
+    const r = Math.floor(s % 60);
+    return m + ":" + (r < 10 ? "0" : "") + r;
+  }
+
+  function render() {
+    if (scrubbing) return;
+    const d = AudioEngine.getDuration();
+    const p = AudioEngine.getPosition();
+    const pct = d > 0 ? (p / d) * 100 : 0;
+    fill.style.width = pct + "%";
+    handle.style.left = pct + "%";
+    tCur.textContent = fmt(p);
+    tTot.textContent = fmt(d);
+    prog.setAttribute("aria-valuenow", String(Math.round(pct)));
+  }
+
+  function posToSec(clientX) {
+    const rect = prog.getBoundingClientRect();
+    const x = clientX - rect.left;
+    const frac = Math.max(0, Math.min(1, x / rect.width));
+    return frac * AudioEngine.getDuration();
+  }
+
+  prog.addEventListener("pointerdown", (e) => {
+    if (AudioEngine.getDuration() <= 0) return;
+    scrubbing = true;
+    prog.setPointerCapture(e.pointerId);
+    const sec = posToSec(e.clientX);
+    AudioEngine.seek(sec);
+    // preview immediately in the UI
+    const pct = (sec / AudioEngine.getDuration()) * 100;
+    fill.style.width = pct + "%";
+    handle.style.left = pct + "%";
+    tCur.textContent = fmt(sec);
+  });
+  prog.addEventListener("pointermove", (e) => {
+    if (!scrubbing) return;
+    const sec = posToSec(e.clientX);
+    AudioEngine.seek(sec);
+    const pct = (sec / AudioEngine.getDuration()) * 100;
+    fill.style.width = pct + "%";
+    handle.style.left = pct + "%";
+    tCur.textContent = fmt(sec);
+  });
+  function endScrub(e) {
+    if (!scrubbing) return;
+    scrubbing = false;
+    try { prog.releasePointerCapture(e.pointerId); } catch(err) {}
+  }
+  prog.addEventListener("pointerup", endScrub);
+  prog.addEventListener("pointercancel", endScrub);
+
+  prog.addEventListener("keydown", (e) => {
+    const d = AudioEngine.getDuration();
+    if (d <= 0) return;
+    let step = 0;
+    if (e.key === "ArrowLeft") step = -5;
+    else if (e.key === "ArrowRight") step = 5;
+    else if (e.key === "Home") { AudioEngine.seek(0); render(); e.preventDefault(); return; }
+    else if (e.key === "End")  { AudioEngine.seek(d - 1); render(); e.preventDefault(); return; }
+    if (step) {
+      e.preventDefault();
+      AudioEngine.seek(AudioEngine.getPosition() + step);
+      render();
+    }
+  });
+
+  setInterval(render, 200);
+})();
+
+/* =========================================================
    VOLUME FADER — drag, wheel, keyboard with analog sfx
    ========================================================= */
 (function initFader() {
   const fader = document.getElementById("fader");
   const knob = document.getElementById("faderKnob");
   const volVal = document.getElementById("volumeVal");
-  let value = 72;              // 0..100 (fader position)
+  let value = 50;              // 0..100 (fader position)
   let dragging = false;
   let lastPos = 0;
   let lastT = 0;
