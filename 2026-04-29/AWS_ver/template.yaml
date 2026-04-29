@@ -1,0 +1,210 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: AI Debate Arena - S3 + CloudFront + API Gateway (HttpApi) + Lambda
+
+# ------------------------------------------------------------------
+# 아키텍처
+#   CloudFront
+#   ├── /api/*  → HttpApi → Lambda (FastAPI + Mangum)
+#   └── /*      → S3 (OAC private, index.html)
+# ------------------------------------------------------------------
+
+Globals:
+  Function:
+    Timeout: 60
+    MemorySize: 512
+    Runtime: python3.12
+
+Parameters:
+  AzureOpenAIEndpoint:
+    Type: String
+    NoEcho: true
+  AzureOpenAIApiKey:
+    Type: String
+    NoEcho: true
+  AzureOpenAIDeployment:
+    Type: String
+    Default: gpt-4o
+  GeminiApiKey:
+    Type: String
+    NoEcho: true
+  GeminiModel:
+    Type: String
+    Default: gemini-3-flash-preview
+
+Resources:
+
+  # ------------------------------------------------------------------
+  # Lambda (FastAPI + Mangum)
+  # ------------------------------------------------------------------
+  DebateFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: lambda/
+      Handler: handler.handler
+      Environment:
+        Variables:
+          AZURE_OPENAI_ENDPOINT: !Ref AzureOpenAIEndpoint
+          AZURE_OPENAI_API_KEY: !Ref AzureOpenAIApiKey
+          AZURE_OPENAI_DEPLOYMENT_GPT54: !Ref AzureOpenAIDeployment
+          GEMINI_API_KEY_GENAI: !Ref GeminiApiKey
+          GEMINI_MODEL: !Ref GeminiModel
+      Events:
+        ApiDebate:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref DebateApi
+            Path: /api/debate
+            Method: POST
+        ApiJudge:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref DebateApi
+            Path: /api/judge
+            Method: POST
+        ApiStances:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref DebateApi
+            Path: /api/stances
+            Method: POST
+        ApiConclude:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref DebateApi
+            Path: /api/conclude
+            Method: POST
+        ApiHealth:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref DebateApi
+            Path: /api/health
+            Method: GET
+
+  # ------------------------------------------------------------------
+  # HttpApi (명시 정의 — CloudFront origin 으로 참조하기 위함)
+  # ------------------------------------------------------------------
+  DebateApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      CorsConfiguration:
+        AllowOrigins:
+          - "*"
+        AllowHeaders:
+          - "*"
+        AllowMethods:
+          - "GET"
+          - "POST"
+          - "OPTIONS"
+
+  # ------------------------------------------------------------------
+  # S3 (정적 호스팅 — private, CloudFront OAC 만 접근 허용)
+  # ------------------------------------------------------------------
+  StaticBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+  StaticBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref StaticBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: AllowCloudFrontServicePrincipalReadOnly
+            Effect: Allow
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Action: s3:GetObject
+            Resource: !Sub "${StaticBucket.Arn}/*"
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub "arn:aws:cloudfront::${AWS::AccountId}:distribution/${CloudFrontDistribution}"
+
+  # ------------------------------------------------------------------
+  # CloudFront — OAC 로 S3 접근, /api/* 는 HttpApi 로 프록시
+  # ------------------------------------------------------------------
+  CloudFrontOAC:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Name: !Sub "${AWS::StackName}-oac"
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+
+  CloudFrontDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        Comment: !Sub "${AWS::StackName} — AI Debate Arena"
+        DefaultRootObject: index.html
+        HttpVersion: http2
+        PriceClass: PriceClass_200
+        Origins:
+          # S3 static origin (OAC)
+          - Id: S3Origin
+            DomainName: !GetAtt StaticBucket.RegionalDomainName
+            OriginAccessControlId: !GetAtt CloudFrontOAC.Id
+            S3OriginConfig:
+              OriginAccessIdentity: ""
+          # HttpApi origin — execute-api.<region>.amazonaws.com
+          - Id: ApiOrigin
+            DomainName: !Sub "${DebateApi}.execute-api.${AWS::Region}.amazonaws.com"
+            CustomOriginConfig:
+              OriginProtocolPolicy: https-only
+              OriginSSLProtocols: [TLSv1.2]
+              HTTPSPort: 443
+        DefaultCacheBehavior:
+          TargetOriginId: S3Origin
+          ViewerProtocolPolicy: redirect-to-https
+          AllowedMethods: [GET, HEAD, OPTIONS]
+          CachedMethods: [GET, HEAD]
+          Compress: true
+          # Managed-CachingOptimized
+          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6
+        CacheBehaviors:
+          - PathPattern: /api/*
+            TargetOriginId: ApiOrigin
+            ViewerProtocolPolicy: redirect-to-https
+            AllowedMethods: [GET, HEAD, OPTIONS, PUT, POST, PATCH, DELETE]
+            CachedMethods: [GET, HEAD]
+            Compress: true
+            # Managed-CachingDisabled
+            CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad
+            # Managed-AllViewerExceptHostHeader (API Gateway 는 Host 재작성 필요)
+            OriginRequestPolicyId: b689b0a8-53d0-40ab-baf2-68738e2966ac
+        CustomErrorResponses:
+          # SPA 편의 — 404/403 을 index.html 로 fallback (정적 경로만 해당)
+          - ErrorCode: 403
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+            ErrorCachingMinTTL: 60
+          - ErrorCode: 404
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+            ErrorCachingMinTTL: 60
+
+Outputs:
+  CloudFrontDomain:
+    Description: CloudFront distribution domain (public URL)
+    Value: !GetAtt CloudFrontDistribution.DomainName
+  CloudFrontDistributionId:
+    Description: CloudFront distribution ID (for invalidation)
+    Value: !Ref CloudFrontDistribution
+  StaticBucketName:
+    Description: S3 bucket for static assets (upload target)
+    Value: !Ref StaticBucket
+  ApiEndpoint:
+    Description: Raw HttpApi endpoint (debug only — use CloudFront for production)
+    Value: !Sub "https://${DebateApi}.execute-api.${AWS::Region}.amazonaws.com"

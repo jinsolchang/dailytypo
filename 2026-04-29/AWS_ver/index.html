@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AI DEBATE ARENA — 지피티쨩 VS 잼민이</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Press+Start+2P&family=Zen+Kaku+Gothic+New:wght@400;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="floor-grid"></div>
+<div class="impact" id="impact"></div>
+
+<div class="app">
+
+  <!-- ============ TOP BAR ============ -->
+  <div class="topbar">
+    <div class="topbar-spacer"></div>
+    <div class="logo">
+      지피티쨩 <span class="vs">VS</span> 잼민이<span class="logo-sub"> 끝장 토론</span>
+    </div>
+    <div class="round-pill">
+      <span class="status-dot" id="statusDot"></span>
+      ROUND <b id="roundCount">0</b> / 10
+      <span style="margin-left:14px; color:var(--text-dim)" id="phaseLabel">READY</span>
+    </div>
+  </div>
+
+  <!-- ============ STAGE ============ -->
+  <div class="stage">
+
+    <!-- ===== AZ (LEFT) ===== -->
+    <div class="char-panel az" id="panelAZ">
+      <div class="char-header">
+        <div>
+          <div class="char-name">지피티쨩</div>
+        </div>
+        <div class="stance-badge stance-none" id="stanceAZ">—</div>
+      </div>
+      <div class="hp-wrap">
+        <div class="hp-label">
+          <span class="num" id="hpNumAZ">100 / 100</span>
+        </div>
+        <div class="hp-bar"><div class="hp-fill" id="hpAZ"></div></div>
+      </div>
+      <div class="char-stage">
+        <div class="bubble" id="bubbleAZ">
+          <div class="bubble-text" id="bubbleAZText">...</div>
+        </div>
+        <div class="char" id="charAZ" style="--lunge: 30px;">
+          <div class="char-glow"></div>
+          <img class="char-img" id="imgAZ" src="assets/az/idle.png" alt="AZ"/>
+        </div>
+        <div class="char-spotlight"></div>
+      </div>
+    </div>
+
+    <!-- ===== CENTER ===== -->
+    <div class="center">
+      <div class="topic-card">
+        <label>📡 INPUT THE ETERNAL QUESTION</label>
+        <div class="topic-row">
+          <input class="topic-input" id="topicInput"
+                 placeholder="예) 부먹 vs 찍먹 / AI는 예술가를 대체할 수 있는가? / 라면엔 김치가 필수인가?"
+                 maxlength="120" />
+          <button class="btn primary" id="startBtn">START !</button>
+        </div>
+      </div>
+
+      <div class="timeline" id="timeline">
+        <div class="timeline-empty" id="emptyState">
+          <span class="big">⚔ 토론장이 비어있다 ⚔</span>
+          위에 주제를 입력하고<br>
+          START 버튼을 눌러라.<br><br>
+          <span style="color:var(--az)">지피티쨩</span>과 <span style="color:var(--gem)">잼민이</span>가 자동으로<br>
+          입장을 나눠 격돌한다.
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== GEM (RIGHT) ===== -->
+    <div class="char-panel gem" id="panelGEM">
+      <div class="char-header">
+        <div>
+          <div class="char-name">잼민이</div>
+        </div>
+        <div class="stance-badge stance-none" id="stanceGEM">—</div>
+      </div>
+      <div class="hp-wrap">
+        <div class="hp-label">
+          <span class="num" id="hpNumGEM">100 / 100</span>
+        </div>
+        <div class="hp-bar"><div class="hp-fill" id="hpGEM"></div></div>
+      </div>
+      <div class="char-stage">
+        <div class="bubble" id="bubbleGEM">
+          <div class="bubble-text" id="bubbleGEMText">...</div>
+        </div>
+        <div class="char" id="charGEM" style="--lunge: -30px;">
+          <div class="char-glow"></div>
+          <img class="char-img" id="imgGEM" src="assets/gem/idle.png" alt="GEM"/>
+        </div>
+        <div class="char-spotlight"></div>
+      </div>
+    </div>
+
+    <!-- VS splash -->
+    <div class="vs-splash" id="vsSplash">VS</div>
+
+  </div>
+
+  <!-- ============ BOTTOM CONTROLS ============ -->
+  <div class="controls">
+    <button class="btn ghost" id="resetBtn">RESET</button>
+    <button class="btn danger" id="surrenderBtn" disabled>FORCE END</button>
+    <div class="grow"></div>
+  </div>
+
+</div>
+
+<!-- ============ MODAL ============ -->
+<div class="modal-back" id="modalBack">
+  <div class="modal" id="modal">
+    <!-- filled by JS -->
+  </div>
+</div>
+
+<script type="module" src="debate.js"></script>
+</body>
+</html>

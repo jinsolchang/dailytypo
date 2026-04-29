@@ -1,0 +1,19 @@
+# SAM CLI 배포 설정 — x02 계정용
+# 배포: sam build && sam deploy
+
+version = 0.1
+
+[default.deploy.parameters]
+stack_name = "ai-debate-arena"
+resolve_s3 = true
+s3_prefix = "ai-debate-arena"
+region = "ap-northeast-2"
+confirm_changeset = true
+capabilities = "CAPABILITY_IAM"
+
+# 환경변수는 배포 시 --parameter-overrides로 전달
+# sam deploy --parameter-overrides \
+#   AzureOpenAIEndpoint=$AZURE_OPENAI_ENDPOINT \
+#   AzureOpenAIApiKey=$AZURE_OPENAI_API_KEY \
+#   AzureOpenAIDeployment=$AZURE_OPENAI_DEPLOYMENT_GPT54 \
+#   GeminiApiKey=$GEMINI_API_KEY_GENAI

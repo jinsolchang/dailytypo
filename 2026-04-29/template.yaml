@@ -1,0 +1,66 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: AI Debate Arena - Lambda + API Gateway
+
+Globals:
+  Function:
+    Timeout: 60
+    MemorySize: 512
+    Runtime: python3.11
+
+Parameters:
+  AzureOpenAIEndpoint:
+    Type: String
+    NoEcho: true
+  AzureOpenAIApiKey:
+    Type: String
+    NoEcho: true
+  AzureOpenAIDeployment:
+    Type: String
+    Default: gpt-4o
+  GeminiApiKey:
+    Type: String
+    NoEcho: true
+  GeminiModel:
+    Type: String
+    Default: gemini-3-flash-preview
+
+Resources:
+  DebateFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: lambda/
+      Handler: handler.handler
+      Environment:
+        Variables:
+          AZURE_OPENAI_ENDPOINT: !Ref AzureOpenAIEndpoint
+          AZURE_OPENAI_API_KEY: !Ref AzureOpenAIApiKey
+          AZURE_OPENAI_DEPLOYMENT_GPT54: !Ref AzureOpenAIDeployment
+          GEMINI_API_KEY_GENAI: !Ref GeminiApiKey
+          GEMINI_MODEL: !Ref GeminiModel
+      Events:
+        ApiDebate:
+          Type: HttpApi
+          Properties:
+            Path: /api/debate
+            Method: POST
+        ApiJudge:
+          Type: HttpApi
+          Properties:
+            Path: /api/judge
+            Method: POST
+        ApiStances:
+          Type: HttpApi
+          Properties:
+            Path: /api/stances
+            Method: POST
+        ApiConclude:
+          Type: HttpApi
+          Properties:
+            Path: /api/conclude
+            Method: POST
+
+Outputs:
+  ApiEndpoint:
+    Description: API Gateway endpoint URL
+    Value: !Sub "https://${ServerlessHttpApi}.execute-api.${AWS::Region}.amazonaws.com"

@@ -11,3 +11,16 @@ output/
 2026-04-21/screenshots/
 2026-04-22/check_hero.py
 2026-04-22/hero_check.png
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+
+# Env files (keys must never be committed)
+.env
+**/.env
+
+# AWS SAM build artifacts
+**/.aws-sam/
+**/samconfig.toml.local
