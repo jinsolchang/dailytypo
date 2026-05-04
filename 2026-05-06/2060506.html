@@ -1,0 +1,911 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LP Player</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@700&family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,600&family=JetBrains+Mono:wght@300;400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg-0: #0a0a0c;
+    --bg-1: #131318;
+    --ink: #f4f1ea;
+    --ink-dim: rgba(244, 241, 234, 0.55);
+    --ink-faint: rgba(244, 241, 234, 0.18);
+    --accent: #ff5b3a;
+    --accent-glow: rgba(255, 91, 58, 0.4);
+    --gold: #d4a574;
+    /* Midnight Candy 파란 비닐 팔레트 */
+    --vinyl-blue: #0b5cff;
+    --vinyl-blue-deep: #063bc4;
+    --vinyl-blue-light: #4a8dff;
+    --vinyl-blue-darkest: #021b5c;
+    --label-yellow: #ffd83a;
+    --label-red: #a9142a;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: var(--bg-0);
+    color: var(--ink);
+    font-family: 'Fraunces', serif;
+    -webkit-font-smoothing: antialiased;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  /* ---------- Background atmosphere ---------- */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 80% 60% at 20% 50%, rgba(212, 165, 116, 0.08), transparent 60%),
+      radial-gradient(ellipse 60% 80% at 90% 80%, rgba(255, 91, 58, 0.06), transparent 55%),
+      linear-gradient(180deg, var(--bg-1) 0%, var(--bg-0) 100%);
+    z-index: 0;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+    opacity: 0.05;
+    pointer-events: none;
+    z-index: 1;
+    mix-blend-mode: overlay;
+  }
+
+  /* ---------- Header / chrome ---------- */
+  .chrome {
+    position: fixed;
+    top: 64px;
+    left: 0;
+    right: 0;
+    padding: 0 36px;
+    display: flex;
+    justify-content: flex-end;
+    align-items: flex-start;
+    z-index: 10;
+    pointer-events: none;
+  }
+
+  .brand {
+    font-family: 'Fraunces', serif;
+    font-weight: 300;
+    font-size: 14px;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: var(--ink-dim);
+  }
+
+  .brand .dot {
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    margin: 0 10px 2px 0;
+    box-shadow: 0 0 12px var(--accent-glow);
+    vertical-align: middle;
+  }
+
+  .meta {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--ink-dim);
+    letter-spacing: 0.1em;
+    text-align: left;
+    line-height: 1.9;
+  }
+
+  .meta .label {
+    color: var(--ink-faint);
+    display: inline-block;
+    width: 64px;
+  }
+
+  /* ---------- LP stage ---------- */
+  .stage {
+    position: fixed;
+    inset: 0;
+    z-index: 2;
+    overflow: hidden;
+  }
+
+  /*
+   LP은 화면 좌측이 중심부, 화면 우측이 LP 가장자리(3시 방향)가 보이도록 배치.
+   매우 큰 원이라 화면에는 일부만 보임.
+  */
+  .lp-wrapper {
+    position: absolute;
+    /* 거대한 LP의 중심을 화면 좌측 한참 바깥에 배치 → 화면에는 우측 가장자리 일부만 보임 */
+    left: -135vh;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 280vh;
+    height: 280vh;
+    pointer-events: none;
+  }
+
+  .lp {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background:
+      /* 라벨 (중심) — Midnight Candy 빨간 라벨 */
+      radial-gradient(circle at center,
+        #c42a42 0%,
+        var(--label-red) 10%,
+        #6a0a1a 17%,
+        transparent 17.5%),
+      /* 빛 반사 (sweeping highlight) */
+      conic-gradient(from var(--reflect-angle, 0deg),
+        transparent 0deg,
+        rgba(255, 255, 255, 0.08) 6deg,
+        rgba(255, 255, 255, 0.22) 12deg,
+        rgba(255, 255, 255, 0.08) 18deg,
+        transparent 26deg,
+        transparent 175deg,
+        rgba(255, 255, 255, 0.05) 183deg,
+        rgba(255, 255, 255, 0.15) 190deg,
+        rgba(255, 255, 255, 0.05) 197deg,
+        transparent 205deg,
+        transparent 360deg),
+      /* 비닐 본체: 파란색 반투명 그라데이션 */
+      radial-gradient(circle at center,
+        var(--vinyl-blue-light) 0%,
+        var(--vinyl-blue) 45%,
+        var(--vinyl-blue-deep) 80%,
+        var(--vinyl-blue-darkest) 100%);
+    box-shadow:
+      inset 0 0 400px rgba(0, 0, 0, 0.55),
+      inset 0 -60px 120px rgba(0, 0, 0, 0.35),
+      inset 0 60px 120px rgba(255, 255, 255, 0.08),
+      0 60px 200px rgba(0, 0, 0, 0.7);
+    transform: rotate(0deg);
+    transition: transform 0.05s linear;
+  }
+
+  /* 비닐 그루브 (동심원 라인) - 파란 비닐에 어둡게 깔림 */
+  .grooves {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    overflow: hidden;
+    opacity: 0.55;
+    mix-blend-mode: multiply;
+    pointer-events: none;
+  }
+
+  .grooves svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+
+  /* 라벨 위 작은 디테일 (가운데 구멍, 주변 텍스트) */
+  .label-detail {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    pointer-events: none;
+  }
+
+  .center-hole {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 1.2vh;
+    height: 1.2vh;
+    background: var(--bg-0);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    box-shadow: inset 0 0 4px rgba(0,0,0,0.9);
+    z-index: 2;
+  }
+
+  /* Midnight Candy 라벨 로고 (손글씨 노란 타이틀) */
+  .label-text {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) translateY(-1.6vh);
+    font-family: 'Caveat', cursive;
+    font-weight: 700;
+    color: var(--label-yellow);
+    font-size: 2.2vh;
+    line-height: 0.85;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+    text-align: center;
+    letter-spacing: -0.02em;
+  }
+
+  .label-text span { display: block; }
+  .label-text span:last-child { margin-left: 1.5em; margin-top: -0.1em; }
+
+  .label-stereo {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) translateY(2vh);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.8vh;
+    letter-spacing: 0.3em;
+    color: rgba(255, 248, 224, 0.7);
+    border: 1px solid rgba(255, 248, 224, 0.5);
+    border-radius: 100px;
+    padding: 0.3vh 1vh;
+  }
+
+  .label-rpm {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) translate(5.5vh, 0);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.9vh;
+    line-height: 1.1;
+    letter-spacing: 0.1em;
+    color: rgba(255, 248, 224, 0.85);
+    text-align: center;
+  }
+
+  /* 먼지 디테일 (작은 점들) */
+  .dust {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    pointer-events: none;
+    opacity: 0.4;
+  }
+
+  /* ---------- Tonearm (바늘) ---------- */
+  .tonearm-dock {
+    position: fixed;
+    right: 0;
+    bottom: 0;
+    width: 320px;
+    height: 320px;
+    z-index: 5;
+    pointer-events: none;
+  }
+
+  .tonearm-base {
+    position: absolute;
+    right: 36px;
+    bottom: 36px;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background:
+      radial-gradient(circle at 35% 30%, #3a3a40, #18181c 60%, #0a0a0c);
+    box-shadow:
+      0 0 0 1px rgba(255,255,255,0.06),
+      0 8px 24px rgba(0,0,0,0.6),
+      inset 0 1px 1px rgba(255,255,255,0.1);
+    z-index: 1;
+  }
+
+  .tonearm-base::after {
+    content: '';
+    position: absolute;
+    inset: 14px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 40% 35%, #5a5a62, #2a2a30);
+    box-shadow: inset 0 -2px 4px rgba(0,0,0,0.5);
+  }
+
+  .tonearm {
+    position: absolute;
+    right: 64px;
+    bottom: 64px;
+    width: 240px;
+    height: 16px;
+    transform-origin: right center;
+    transform: rotate(-25deg);
+    pointer-events: auto;
+    cursor: grab;
+    z-index: 4;
+    transition: transform 0.6s cubic-bezier(0.34, 1.4, 0.64, 1);
+    /* 잡기 쉽게 invisible padding (hit area 확장) */
+    padding: 12px 0;
+    margin: -12px 0;
+    box-sizing: content-box;
+    touch-action: none;
+  }
+
+  .tonearm.dragging {
+    cursor: grabbing;
+    transition: none;
+  }
+
+  .tonearm.playing {
+    transition: transform 1.2s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .tonearm-stem {
+    position: absolute;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 100%;
+    height: 6px;
+    background: linear-gradient(180deg,
+      #c0c0c8 0%,
+      #8a8a92 40%,
+      #5a5a62 60%,
+      #3a3a40 100%);
+    border-radius: 3px;
+    box-shadow:
+      0 2px 6px rgba(0,0,0,0.6),
+      inset 0 1px 0 rgba(255,255,255,0.3);
+  }
+
+  .tonearm-head {
+    position: absolute;
+    left: -2px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 38px;
+    height: 22px;
+    background: linear-gradient(180deg, #2a2a30 0%, #18181c 50%, #0a0a0c 100%);
+    border-radius: 3px;
+    box-shadow:
+      0 4px 10px rgba(0,0,0,0.7),
+      inset 0 1px 0 rgba(255,255,255,0.15),
+      inset 0 -1px 0 rgba(0,0,0,0.5);
+  }
+
+  .tonearm-needle {
+    position: absolute;
+    left: 4px;
+    top: 100%;
+    width: 2px;
+    height: 10px;
+    background: linear-gradient(180deg, #d4a574, #8a6a44);
+    border-radius: 0 0 1px 1px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.5);
+  }
+
+  /* needle tip glow when playing */
+  .tonearm.playing .tonearm-needle::after {
+    content: '';
+    position: absolute;
+    bottom: -4px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: radial-gradient(circle, var(--accent-glow) 0%, transparent 70%);
+    animation: pulse 0.8s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 0.4; transform: translateX(-50%) scale(1); }
+    50% { opacity: 0.8; transform: translateX(-50%) scale(1.4); }
+  }
+
+  /* ---------- Drop zone hint ---------- */
+  .drop-hint {
+    position: fixed;
+    right: 60px;
+    bottom: 280px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    color: var(--ink-faint);
+    text-transform: uppercase;
+    z-index: 4;
+    pointer-events: none;
+    transition: opacity 0.4s ease;
+  }
+
+  .drop-hint .arrow {
+    display: block;
+    margin-top: 8px;
+    font-size: 14px;
+    color: var(--accent);
+    animation: float 2s ease-in-out infinite;
+  }
+
+  @keyframes float {
+    0%, 100% { transform: translateY(0); opacity: 0.6; }
+    50% { transform: translateY(4px); opacity: 1; }
+  }
+
+  .drop-hint.hidden { opacity: 0; }
+
+  /* ---------- Track info ---------- */
+  .track-info {
+    position: fixed;
+    left: 36px;
+    bottom: 36px;
+    z-index: 6;
+    max-width: 420px;
+  }
+
+  .track-side {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.3em;
+    color: var(--accent);
+    margin-bottom: 12px;
+    text-transform: uppercase;
+    opacity: 0;
+    transform: translateY(8px);
+    transition: all 0.6s ease;
+  }
+
+  .track-title {
+    font-family: 'Fraunces', serif;
+    font-weight: 300;
+    font-size: 56px;
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+    margin-bottom: 8px;
+    font-style: italic;
+    opacity: 0;
+    transform: translateY(12px);
+    transition: all 0.8s ease 0.1s;
+  }
+
+  .track-artist {
+    font-family: 'Fraunces', serif;
+    font-size: 14px;
+    color: var(--ink-dim);
+    letter-spacing: 0.1em;
+    opacity: 0;
+    transform: translateY(8px);
+    transition: all 0.6s ease 0.2s;
+  }
+
+  .playing .track-side,
+  .playing .track-title,
+  .playing .track-artist {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  /* ---------- BPM indicator ---------- */
+  .bpm {
+    position: fixed;
+    top: 50%;
+    right: 40px;
+    transform: translateY(-50%);
+    z-index: 6;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    color: var(--ink-faint);
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+    opacity: 0;
+    transition: opacity 0.6s ease;
+  }
+
+  .playing .bpm { opacity: 0.6; }
+
+  /* ---------- Crackle overlay ---------- */
+  .crackle {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 3;
+    opacity: 0;
+    background:
+      radial-gradient(circle at 30% 40%, rgba(255,255,255,0.02) 0%, transparent 8%),
+      radial-gradient(circle at 70% 60%, rgba(255,255,255,0.015) 0%, transparent 6%);
+    transition: opacity 0.8s ease;
+  }
+
+  .playing .crackle { opacity: 1; }
+
+  /* ---------- Reset button ---------- */
+  .reset-btn {
+    position: fixed;
+    top: 28px;
+    right: 36px;
+    background: transparent;
+    border: 1px solid var(--ink-faint);
+    color: var(--ink-dim);
+    padding: 8px 16px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    cursor: pointer;
+    border-radius: 100px;
+    transition: all 0.3s ease;
+    z-index: 11;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .playing .reset-btn {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .reset-btn:hover {
+    border-color: var(--ink);
+    color: var(--ink);
+  }
+
+  /* 재생 중 미세 진동은 JS의 BPM 펄스에서 처리 */
+
+  /* Mobile adjustments */
+  @media (max-width: 768px) {
+    .track-title { font-size: 36px; }
+    .tonearm-dock { width: 240px; height: 240px; }
+    .tonearm { width: 180px; right: 50px; bottom: 50px; }
+    .tonearm-base { right: 22px; bottom: 22px; width: 44px; height: 44px; }
+    .chrome { padding: 20px; }
+    .track-info { left: 20px; bottom: 20px; }
+    .reset-btn { right: 20px; top: 20px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Header chrome -->
+<div class="chrome">
+  <div class="meta">
+    <div><span class="label">SIDE</span>A</div>
+    <div><span class="label">RPM</span>33⅓</div>
+    <div><span class="label">FORMAT</span>12" VINYL</div>
+  </div>
+</div>
+
+<button class="reset-btn" id="resetBtn">↺ Lift needle</button>
+
+<!-- The LP stage -->
+<div class="stage">
+  <div class="lp-wrapper" id="lpWrapper">
+    <div class="lp" id="lp">
+      <div class="grooves">
+        <svg viewBox="0 0 1000 1000" preserveAspectRatio="xMidYMid meet">
+          <defs>
+            <radialGradient id="grooveFade" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stop-color="#000" stop-opacity="0"/>
+              <stop offset="18%" stop-color="#000" stop-opacity="0"/>
+              <stop offset="20%" stop-color="#000" stop-opacity="1"/>
+              <stop offset="100%" stop-color="#000" stop-opacity="1"/>
+            </radialGradient>
+            <mask id="grooveMask">
+              <rect width="1000" height="1000" fill="url(#grooveFade)"/>
+            </mask>
+          </defs>
+          <g mask="url(#grooveMask)" id="grooveLines"></g>
+        </svg>
+      </div>
+      <div class="dust" id="dust"></div>
+      <div class="label-detail">
+        <div class="label-text">
+          <span>Midnight</span>
+          <span>Candy</span>
+        </div>
+        <div class="label-stereo">STEREO</div>
+        <div class="label-rpm">45<br>RPM</div>
+        <div class="center-hole"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Crackle overlay -->
+<div class="crackle"></div>
+
+<!-- Track info (hidden until playing) -->
+<div class="track-info">
+  <div class="track-side">A1 · 04:32</div>
+  <div class="track-title">Nocturne in<br>Slow Motion</div>
+  <div class="track-artist">— THE QUIET HOURS</div>
+</div>
+
+<div class="bpm" id="bpmText">BPM 92 · KEY Am</div>
+
+<!-- Tonearm dock -->
+<div class="tonearm-dock">
+  <div class="tonearm-base"></div>
+  <div class="tonearm" id="tonearm">
+    <div class="tonearm-stem"></div>
+    <div class="tonearm-head">
+      <div class="tonearm-needle"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Drop hint -->
+<div class="drop-hint" id="dropHint">
+  Drag the tonearm onto the record
+  <span class="arrow">↖</span>
+</div>
+
+<script>
+  // ---------- Generate groove lines (concentric circles with subtle variation) ----------
+  const grooveLines = document.getElementById('grooveLines');
+  const grooveCount = 140;
+  for (let i = 0; i < grooveCount; i++) {
+    const r = 200 + (i / grooveCount) * 290; // radii from 200 to 490
+    const opacity = 0.06 + Math.random() * 0.14;
+    const stroke = i % 14 === 0 ? 1.0 : 0.35;
+    const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    circle.setAttribute('cx', '500');
+    circle.setAttribute('cy', '500');
+    circle.setAttribute('r', r);
+    circle.setAttribute('fill', 'none');
+    circle.setAttribute('stroke', `rgba(255, 255, 255, ${opacity})`);
+    circle.setAttribute('stroke-width', stroke);
+    grooveLines.appendChild(circle);
+  }
+
+  // ---------- Generate dust particles (다양한 크기와 분포) ----------
+  const dust = document.getElementById('dust');
+
+  // 1) 작은 먼지 점들 (많이)
+  for (let i = 0; i < 120; i++) {
+    const angle = Math.random() * 360;
+    const distance = 19 + Math.random() * 31; // % from center (그루브 영역)
+    const size = 0.4 + Math.random() * 1.4;
+    const opacity = 0.15 + Math.random() * 0.5;
+    const x = 50 + Math.cos(angle * Math.PI / 180) * distance;
+    const y = 50 + Math.sin(angle * Math.PI / 180) * distance;
+    const dot = document.createElement('div');
+    dot.style.cssText = `
+      position: absolute;
+      left: ${x}%;
+      top: ${y}%;
+      width: ${size}px;
+      height: ${size}px;
+      background: rgba(244, 241, 234, ${opacity});
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+      box-shadow: 0 0 1.5px rgba(244, 241, 234, ${opacity * 0.6});
+    `;
+    dust.appendChild(dot);
+  }
+
+  // 2) 가는 먼지 실선 (머리카락 같은) - 몇 개만
+  for (let i = 0; i < 8; i++) {
+    const angle = Math.random() * 360;
+    const distance = 22 + Math.random() * 25;
+    const length = 6 + Math.random() * 18;
+    const rotate = Math.random() * 360;
+    const opacity = 0.1 + Math.random() * 0.25;
+    const x = 50 + Math.cos(angle * Math.PI / 180) * distance;
+    const y = 50 + Math.sin(angle * Math.PI / 180) * distance;
+    const line = document.createElement('div');
+    line.style.cssText = `
+      position: absolute;
+      left: ${x}%;
+      top: ${y}%;
+      width: ${length}px;
+      height: 0.6px;
+      background: rgba(244, 241, 234, ${opacity});
+      transform: translate(-50%, -50%) rotate(${rotate}deg);
+      filter: blur(0.3px);
+    `;
+    dust.appendChild(line);
+  }
+
+  // 3) 작은 스크래치/흠집 호선 - 정통 LP 느낌
+  const scratchSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  scratchSvg.setAttribute('viewBox', '0 0 100 100');
+  scratchSvg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+  scratchSvg.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;opacity:0.6;';
+  for (let i = 0; i < 5; i++) {
+    const r = 25 + Math.random() * 18;
+    const startAngle = Math.random() * 360;
+    const sweep = 8 + Math.random() * 22;
+    const x1 = 50 + Math.cos(startAngle * Math.PI / 180) * r;
+    const y1 = 50 + Math.sin(startAngle * Math.PI / 180) * r;
+    const x2 = 50 + Math.cos((startAngle + sweep) * Math.PI / 180) * r;
+    const y2 = 50 + Math.sin((startAngle + sweep) * Math.PI / 180) * r;
+    const arc = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    arc.setAttribute('d', `M ${x1} ${y1} A ${r} ${r} 0 0 1 ${x2} ${y2}`);
+    arc.setAttribute('fill', 'none');
+    arc.setAttribute('stroke', `rgba(244, 241, 234, ${0.08 + Math.random() * 0.12})`);
+    arc.setAttribute('stroke-width', '0.08');
+    scratchSvg.appendChild(arc);
+  }
+  dust.appendChild(scratchSvg);
+
+  // ---------- Tonearm drag interaction ----------
+  const tonearm = document.getElementById('tonearm');
+  const lp = document.getElementById('lp');
+  const lpWrapper = document.getElementById('lpWrapper');
+  const dropHint = document.getElementById('dropHint');
+  const resetBtn = document.getElementById('resetBtn');
+
+  let isDragging = false;
+  let isPlaying = false;
+  let currentAngle = -25; // resting position
+  let rotation = 0;
+  let rotationSpeed = 0;
+  const targetSpeed = 33.33 / 60 * 360 / 60;
+
+  // 클램프 범위: 휴식(-25°) ~ LP 위로 충분히 들어올린 각도(-95°)
+  const REST_DEG = -25;
+  const MIN_DEG = -95;
+  const MAX_DEG = -15;
+  const PLAY_LAND_DEG = -75;
+
+  /**
+   * 톤암 피벗의 화면 좌표.
+   * .tonearm: right: 64px, bottom: 64px, height: 16px, transform-origin: right center
+   *   → 피벗 = (innerWidth - 64, innerHeight - 64 - 8)
+   * 모바일: right: 50px, bottom: 50px (CSS의 @media와 동기화)
+   */
+  function getPivot() {
+    const isMobile = window.innerWidth <= 768;
+    const right = isMobile ? 50 : 64;
+    const bottom = isMobile ? 50 : 64;
+    return {
+      x: window.innerWidth - right,
+      y: window.innerHeight - bottom - 8,
+    };
+  }
+
+  /**
+   * 마우스 좌표 → 톤암이 가리켜야 할 CSS rotate 각도(도).
+   *
+   * 유도:
+   * - transform-origin: right center. 회전 0°에서 arm tip은 피벗의 좌측(-x 방향).
+   * - CSS rotate 양의 각도 = 화면상 시계방향 = arm tip이 아래로.
+   * - 회전 θ에서 arm tip 방향 벡터 = (-cos θ, -sin θ).
+   * - 마우스가 피벗 기준 (dx, dy)에 있다면 arm tip이 그쪽을 가리키려면:
+   *   cos θ = -dx / |v|, sin θ = -dy / |v|
+   *   → θ = atan2(-dy, -dx) = -atan2(dy, -dx) (부호 정리)
+   *   편하게 θ = atan2(-dy, -dx) 사용.
+   *
+   * 검증:
+   * - 마우스 피벗 좌측 수평 (dx=-, dy=0): atan2(0, +) = 0°  → arm 수평 좌측 ✓
+   * - 마우스 피벗 위쪽 (dx=0, dy=-): atan2(+, 0) = +90° 
+   *   ... 이건 tip이 아래로 가는 CSS 회전인데 마우스는 위쪽. 부호가 반대.
+   *
+   * 재확인: CSS rotate(+90deg) 하면 화면에서 시계방향 90° → (-1,0)은 (0, -1)이 됨
+   *   즉 arm tip이 피벗 위로 감. 그럼 위 공식 맞음.
+   *   화면좌표에서 y는 아래가 양수이므로 "(0, -1) = 위쪽" 맞음.
+   *   → 마우스 위쪽(dy=음수)에서 θ=+90°, tip이 위쪽(-y)으로 감. OK.
+   *
+   * 하지만 우리 톤암은 "위로 올리는 게 음의 각도(-25 → -95)"로 정의되어 있음.
+   * 여기서 부호가 안 맞음. 결국 θ = -atan2(-dy, -dx) = atan2(dy, -dx) 가 아니라
+   * 실제로는 CSS 화면좌표와 '위=음수' 컨벤션을 맞추기 위해 부호 반전 필요.
+   *
+   * 정리: CSS 회전 양의 값이 시계방향인데, "위로 들어올림"을 음수로 쓰려면
+   * 계산 결과에 -1을 곱함. 즉 finalDeg = -atan2(-dy, -dx) = atan2(dy, -dx) · (-1)
+   *   다시: θ = atan2(-dy, -dx), 우리 표기는 -θ.
+   *   마우스 위쪽(dy=-100, dx=-100) → atan2(100, 100) = 45° → finalDeg = -45° ✓
+   *   마우스 좌측(dy=0, dx=-100) → atan2(0, 100) = 0° → 0° ✓
+   *   마우스 좌상단(dy=-100, dx=-200) → atan2(100, 200) ≈ 26.5° → -26.5° ✓
+   */
+  function mouseToArmDeg(clientX, clientY) {
+    const pivot = getPivot();
+    const dx = clientX - pivot.x;
+    const dy = clientY - pivot.y;
+    const rad = Math.atan2(-dy, -dx);
+    return -(rad * 180 / Math.PI);
+  }
+
+  function setArmAngle(deg) {
+    currentAngle = deg;
+    tonearm.style.transform = `rotate(${deg}deg)`;
+  }
+
+  function startDrag(e) {
+    if (isPlaying) return;
+    isDragging = true;
+    tonearm.classList.add('dragging');
+    document.body.style.cursor = 'grabbing';
+    e.preventDefault();
+  }
+
+  function onDrag(e) {
+    if (!isDragging) return;
+    const point = e.touches ? e.touches[0] : e;
+    let deg = mouseToArmDeg(point.clientX, point.clientY);
+    deg = Math.max(MIN_DEG, Math.min(MAX_DEG, deg));
+    setArmAngle(deg);
+    if (e.cancelable) e.preventDefault();
+  }
+
+  function endDrag() {
+    if (!isDragging) return;
+    isDragging = false;
+    tonearm.classList.remove('dragging');
+    document.body.style.cursor = '';
+
+    // 드롭 존: 톤암이 충분히 LP 방향을 향하는 각도
+    if (currentAngle <= -55 && currentAngle >= -95) {
+      startPlaying();
+    } else {
+      setArmAngle(REST_DEG);
+    }
+  }
+
+  function startPlaying() {
+    isPlaying = true;
+    document.body.classList.add('playing');
+    tonearm.classList.add('playing');
+    dropHint.classList.add('hidden');
+
+    setArmAngle(PLAY_LAND_DEG);
+
+    triggerCracklePulse();
+    rotationSpeed = 0;
+  }
+
+  function stopPlaying() {
+    isPlaying = false;
+    document.body.classList.remove('playing');
+    tonearm.classList.remove('playing');
+    dropHint.classList.remove('hidden');
+    setArmAngle(REST_DEG);
+    lpWrapper.style.transform = '';
+  }
+
+  function triggerCracklePulse() {
+    const crackle = document.querySelector('.crackle');
+    crackle.style.transition = 'opacity 0.1s ease';
+    crackle.style.opacity = '1.5';
+    setTimeout(() => {
+      crackle.style.transition = 'opacity 0.8s ease';
+    }, 150);
+  }
+
+  tonearm.addEventListener('mousedown', startDrag);
+  tonearm.addEventListener('touchstart', startDrag, { passive: false });
+  document.addEventListener('mousemove', onDrag);
+  document.addEventListener('touchmove', onDrag, { passive: false });
+  document.addEventListener('mouseup', endDrag);
+  document.addEventListener('touchend', endDrag);
+  resetBtn.addEventListener('click', stopPlaying);
+
+  setArmAngle(REST_DEG);
+
+  // ---------- Animation loop ----------
+  let reflectAngle = 0;
+
+  function animate(timestamp) {
+    // Smooth speed transition
+    if (isPlaying) {
+      rotationSpeed += (targetSpeed - rotationSpeed) * 0.02;
+    } else {
+      // 빠르게 정지하도록 + 0에 가까우면 완전히 0으로
+      rotationSpeed *= 0.97;
+      if (Math.abs(rotationSpeed) < 0.0005) rotationSpeed = 0;
+    }
+
+    if (rotationSpeed !== 0) {
+      rotation = (rotation + rotationSpeed) % 360;
+      lp.style.transform = `rotate(${rotation}deg)`;
+    }
+
+    // Reflection slowly sweeps - 재생 중에만
+    if (isPlaying) {
+      reflectAngle = (reflectAngle + 0.15) % 360;
+      lp.style.setProperty('--reflect-angle', `${reflectAngle}deg`);
+
+      // BPM micro-pulse on LP wrapper (재생 중에만 적용)
+      const bpm = 92;
+      const beatInterval = 60000 / bpm;
+      const phase = (timestamp % beatInterval) / beatInterval;
+      const pulse = Math.sin(phase * Math.PI * 2) * 0.0008;
+      lpWrapper.style.transform = `translateY(-50%) scale(${1 + pulse})`;
+    }
+
+    requestAnimationFrame(animate);
+  }
+  requestAnimationFrame(animate);
+</script>
+</body>
+</html>
