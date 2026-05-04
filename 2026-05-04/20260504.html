@@ -1,0 +1,644 @@
+<meta charset="utf-8">
+<title>Grid Distortion Typography v7 — living grid</title>
+<style>
+  html, body { margin:0; padding:0; height:100%; background:#f4f6f3; overflow:hidden;
+    font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif; }
+  #stage { position:fixed; inset:0; display:block; }
+  #mask  { position:absolute; left:-99999px; top:-99999px; }
+  #input {
+    position:fixed; inset:0; width:100%; height:100%;
+    background:transparent; color:transparent; caret-color:transparent;
+    border:0; outline:0; resize:none; padding:0; margin:0;
+    font-size:16px; z-index:10;
+  }
+  #hint {
+    position:fixed; left:50%; bottom:24px; transform:translateX(-50%);
+    color:#7a7f78; font-size:13px; letter-spacing:.04em; pointer-events:none;
+    z-index:5; user-select:none;
+    background:rgba(244,246,243,.6); padding:6px 12px; border-radius:999px;
+    backdrop-filter: blur(6px);
+  }
+  #hint.hidden { opacity:0; transition:opacity .6s ease; }
+</style>
+
+<canvas id="stage"></canvas>
+<canvas id="mask"></canvas>
+<textarea id="input" autofocus autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></textarea>
+<div id="hint">type anything · 무엇이든 입력해 보세요</div>
+
+<script>
+(() => {
+  const stage = document.getElementById('stage');
+  const ctx   = stage.getContext('2d');
+  const mask  = document.getElementById('mask');
+  const mctx  = mask.getContext('2d', { willReadFrequently: true });
+  const input = document.getElementById('input');
+  const hint  = document.getElementById('hint');
+
+  let W = 0, H = 0, DPR = 1;
+  // SDF resolution is half of canvas resolution — 4x less pixel work.
+  // Grid physics still operates in canvas coordinates; we scale when sampling.
+  const SDF_SCALE = 2;
+  let SW = 0, SH = 0; // SDF grid size
+  function resize(){
+    DPR = Math.min(window.devicePixelRatio || 1, 2);
+    W = Math.floor(window.innerWidth  * DPR);
+    H = Math.floor(window.innerHeight * DPR);
+    SW = Math.ceil(W / SDF_SCALE);
+    SH = Math.ceil(H / SDF_SCALE);
+    stage.width = W; stage.height = H;
+    stage.style.width  = window.innerWidth  + 'px';
+    stage.style.height = window.innerHeight + 'px';
+    mask.width = SW; mask.height = SH;
+    rebuildEverything();
+  }
+  window.addEventListener('resize', resize);
+
+  // ============================================================
+  // PART 1 — text mask + signed distance field
+  // ============================================================
+  let maskBytes = null;
+  let distField = null;
+  let MAX_DIST = 0;
+  let fontSizeUsed = 0;
+
+  function drawMask(text){
+    mctx.clearRect(0,0,SW,SH);
+    if(!text){ maskBytes = null; distField = null; return null; }
+
+    // Work in canvas-coordinate space for layout (so rest of the code is
+    // unchanged), then draw to the SDF canvas with a 1/SDF_SCALE transform.
+    const pad = W * 0.05;
+    const maxW = W - pad*2;
+    const maxH = H - pad*2;
+    const lines = text.split(/\r?\n/);
+
+    let fontSize = Math.min(H * 0.35, W * 0.42);
+    let wrapped = [];
+    // Measure at canvas scale, then draw at SDF scale.
+    for(let attempt=0; attempt<14; attempt++){
+      mctx.font = `900 ${fontSize}px "Helvetica Neue", "Arial Black", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif`;
+      wrapped = [];
+      for(const raw of lines){
+        if(raw === ''){ wrapped.push(''); continue; }
+        let line = '';
+        for(const ch of raw){
+          const test = line + ch;
+          if(mctx.measureText(test).width > maxW && line.length){
+            wrapped.push(line); line = ch;
+          } else line = test;
+        }
+        wrapped.push(line);
+      }
+      const totalH = wrapped.length * fontSize * 1.0;
+      const fits = totalH <= maxH && wrapped.every(l => mctx.measureText(l).width <= maxW);
+      if(fits) break;
+      fontSize *= 0.88;
+    }
+    fontSizeUsed = fontSize;
+
+    // Draw at SDF scale.
+    mctx.save();
+    mctx.scale(1/SDF_SCALE, 1/SDF_SCALE);
+    mctx.fillStyle = '#fff';
+    mctx.textBaseline = 'top';
+    mctx.textAlign = 'left';
+    mctx.font = `900 ${fontSize}px "Helvetica Neue", "Arial Black", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif`;
+    const lineH = fontSize * 1.0;
+    let yStart = (H - wrapped.length * lineH) / 2;
+    let y = yStart;
+
+    let lastLineWidth = 0;
+    if(wrapped.length){
+      const last = wrapped[wrapped.length - 1];
+      lastLineWidth = mctx.measureText(last).width;
+    }
+
+    for(const ln of wrapped){
+      mctx.fillText(ln, pad, y);
+      y += lineH;
+    }
+    mctx.restore();
+
+    // Read mask at SDF resolution.
+    const data = mctx.getImageData(0,0,SW,SH).data;
+    maskBytes = new Uint8Array(SW * SH);
+    for(let i=0, j=3; i<maskBytes.length; i++, j+=4){
+      maskBytes[i] = data[j] > 128 ? 1 : 0;
+    }
+
+    // Distance field at SDF resolution. Values are in SDF-pixel units.
+    distField = new Float32Array(SW * SH);
+    const INF = 1e9;
+    for(let i=0; i<distField.length; i++){
+      distField[i] = maskBytes[i] ? 0 : INF;
+    }
+    for(let yy=0; yy<SH; yy++){
+      for(let xx=0; xx<SW; xx++){
+        const i = yy*SW + xx;
+        let d = distField[i];
+        if(xx>0)               d = Math.min(d, distField[i-1] + 1);
+        if(yy>0)               d = Math.min(d, distField[i-SW] + 1);
+        if(xx>0 && yy>0)       d = Math.min(d, distField[i-SW-1] + 1.4142);
+        if(xx<SW-1 && yy>0)    d = Math.min(d, distField[i-SW+1] + 1.4142);
+        distField[i] = d;
+      }
+    }
+    for(let yy=SH-1; yy>=0; yy--){
+      for(let xx=SW-1; xx>=0; xx--){
+        const i = yy*SW + xx;
+        let d = distField[i];
+        if(xx<SW-1)            d = Math.min(d, distField[i+1] + 1);
+        if(yy<SH-1)            d = Math.min(d, distField[i+SW] + 1);
+        if(xx<SW-1 && yy<SH-1) d = Math.min(d, distField[i+SW+1] + 1.4142);
+        if(xx>0 && yy<SH-1)    d = Math.min(d, distField[i+SW-1] + 1.4142);
+        distField[i] = d;
+      }
+    }
+    MAX_DIST = fontSize * 0.7;
+
+    // epicenter in canvas coordinates
+    const epiX = pad + lastLineWidth;
+    const epiY = yStart + (wrapped.length - 0.5) * lineH;
+    return { epiX, epiY };
+  }
+
+  function maskAt(x, y){
+    if(!maskBytes) return 0;
+    const sx = (x / SDF_SCALE) | 0;
+    const sy = (y / SDF_SCALE) | 0;
+    if(sx<0||sy<0||sx>=SW||sy>=SH) return 0;
+    return maskBytes[sy*SW + sx];
+  }
+  function sampleDist(x, y){
+    // returns distance in CANVAS pixel units (scaled up from SDF pixels)
+    if(!distField) return 1e9;
+    const sx = x / SDF_SCALE, sy = y / SDF_SCALE;
+    if(sx<0||sy<0||sx>=SW-1||sy>=SH-1) return 1e9;
+    const x0 = sx|0, y0 = sy|0;
+    const fx = sx - x0, fy = sy - y0;
+    const i00 = y0*SW + x0;
+    const d00 = distField[i00];
+    const d10 = distField[i00 + 1];
+    const d01 = distField[i00 + SW];
+    const d11 = distField[i00 + SW + 1];
+    const top = d00 + (d10 - d00)*fx;
+    const bot = d01 + (d11 - d01)*fx;
+    return (top + (bot - top)*fy) * SDF_SCALE;
+  }
+  function distGrad(x, y){
+    const e = 1.5 * DPR;
+    const gx = sampleDist(x+e, y) - sampleDist(x-e, y);
+    const gy = sampleDist(x, y+e) - sampleDist(x, y-e);
+    return [gx, gy];
+  }
+
+  // ============================================================
+  // PART 2 — grid as physics system
+  // ============================================================
+  let hLines = [];
+  let vLines = [];
+  const GRID = 14;
+  const PAD  = 16;
+
+  function makePoint(x, y, id){
+    return {
+      id: id,
+      ox: x, oy: y,
+      tx: x, ty: y,
+      x:  x, y:  y,
+      vx: 0, vy: 0,
+      phaseA: (id * 12.9898) % 6.2831,
+      phaseB: (id * 78.233)  % 6.2831,
+    };
+  }
+
+  function buildGrid(){
+    const spacing = GRID * DPR;
+    const pad = PAD * DPR;
+    const sampleStep = Math.max(2*DPR, spacing * 0.30);
+
+    hLines = [];
+    vLines = [];
+    let id = 0;
+
+    for(let y = pad; y <= H - pad + 0.5; y += spacing){
+      const pts = [];
+      for(let x = pad; x <= W - pad + 0.5; x += sampleStep){
+        pts.push(makePoint(x, y, id++));
+      }
+      const last = pts[pts.length-1];
+      if(last.ox < W - pad - 0.1) pts.push(makePoint(W-pad, y, id++));
+      hLines.push(pts);
+    }
+
+    for(let x = pad; x <= W - pad + 0.5; x += spacing){
+      const pts = [];
+      for(let y = pad; y <= H - pad + 0.5; y += sampleStep){
+        pts.push(makePoint(x, y, id++));
+      }
+      const last = pts[pts.length-1];
+      if(last.oy < H - pad - 0.1) pts.push(makePoint(x, H-pad, id++));
+      vLines.push(pts);
+    }
+  }
+
+  // ============================================================
+  // PART 3 — compute target positions (where each point WANTS to be)
+  // ============================================================
+
+  // Per-input random seed — different every time the text changes,
+  // so the same word produces a slightly different layout each time.
+  let inputSeed = 0;
+  // deterministic-but-seeded random: hashes (id, seed) into [0, 1)
+  function srand(id, salt){
+    let h = (id * 374761393 + inputSeed * 668265263 + salt * 2147483647) | 0;
+    h = (h ^ (h >>> 13)) * 1274126177 | 0;
+    h = h ^ (h >>> 16);
+    return ((h >>> 0) % 100000) / 100000;
+  }
+  // signed [-1, 1)
+  function srand2(id, salt){ return srand(id, salt) * 2 - 1; }
+
+  function escapeAlong(x, y, dx, dy, maxSearch){
+    let dist = 0;
+    // step in canvas pixels, but SDF_SCALE pixels at a time is enough —
+    // the mask is only resolved at SDF_SCALE anyway.
+    const step = SDF_SCALE * DPR;
+    let cx = x, cy = y;
+    while(dist < maxSearch){
+      cx += dx * step; cy += dy * step; dist += step;
+      if(!maskAt(cx, cy)) return dist;
+    }
+    return Infinity;
+  }
+  function ejectFromLetterTarget(p){
+    if(!maskAt(p.tx, p.ty)) return;
+    for(let i=0; i<400; i++){
+      const [gx, gy] = distGrad(p.tx, p.ty);
+      const gl = Math.hypot(gx, gy) + 1e-6;
+      p.tx += (gx/gl) * (1.0 * DPR);
+      p.ty += (gy/gl) * (1.0 * DPR);
+      if(!maskAt(p.tx, p.ty)) break;
+    }
+    const [gx, gy] = distGrad(p.tx, p.ty);
+    const gl = Math.hypot(gx, gy) + 1e-6;
+    p.tx += (gx/gl) * (1.5 * DPR);
+    p.ty += (gy/gl) * (1.5 * DPR);
+  }
+
+  function relaxTargets(pts, iters){
+    for(let it=0; it<iters; it++){
+      for(let i=1; i<pts.length-1; i++){
+        const p = pts[i], a = pts[i-1], b = pts[i+1];
+        const tx = (a.tx + b.tx) * 0.5;
+        const ty = (a.ty + b.ty) * 0.5;
+        const w = 0.4;
+        const steps = [w, w*0.5, w*0.25];
+        for(const s of steps){
+          const nx = p.tx + (tx - p.tx) * s;
+          const ny = p.ty + (ty - p.ty) * s;
+          if(!maskAt(nx, ny)){
+            p.tx = nx; p.ty = ny;
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  function fixCrossingSegments(pts){
+    for(let pass=0; pass<3; pass++){
+      let fixed = false;
+      for(let i=0; i<pts.length-1; i++){
+        const a = pts[i], b = pts[i+1];
+        const dx = b.tx - a.tx, dy = b.ty - a.ty;
+        const len = Math.hypot(dx, dy);
+        if(len < 1) continue;
+        const samples = Math.max(2, Math.ceil(len / (1.5 * DPR)));
+        for(let s=1; s<samples; s++){
+          const t = s / samples;
+          if(maskAt(a.tx + dx*t, a.ty + dy*t)){
+            const target = t < 0.5 ? a : b;
+            ejectFromLetterTarget(target);
+            const [gx, gy] = distGrad(target.tx, target.ty);
+            const gl = Math.hypot(gx, gy) + 1e-6;
+            target.tx += (gx/gl) * (3.0 * DPR);
+            target.ty += (gy/gl) * (3.0 * DPR);
+            fixed = true;
+            break;
+          }
+        }
+      }
+      if(!fixed) break;
+    }
+  }
+
+  function computeTargetsHorizontal(pts){
+    if(!distField){
+      for(const p of pts){ p.tx = p.ox; p.ty = p.oy; }
+      return;
+    }
+    for(const p of pts){
+      let x = p.ox, y = p.oy;
+      if(maskAt(x, y)){
+        const upD   = escapeAlong(x, y, 0, -1, H);
+        const downD = escapeAlong(x, y, 0, +1, H);
+        if(upD === Infinity && downD === Infinity){
+          // gradient eject below
+        } else {
+          // Per-point random preference: when distances are similar, 50/50.
+          // When one side is clearly closer (1.4× or more), it still wins.
+          // This breaks the symmetry of "always shorter side" so the same
+          // letter looks slightly different each time.
+          const r = srand(p.id, 1);
+          const bias = (downD - upD) / Math.max(1, Math.min(upD, downD));
+          // bias positive => up is closer; choose up if r < threshold
+          const pickUp = bias + (r * 2 - 1) * 0.45 > 0;
+          // a touch of extra clearance, also randomized so the "wall" of grid
+          // points isn't uniform
+          const extra = (2.0 + srand(p.id, 2) * 4.0) * DPR;
+          if(pickUp) y -= upD + extra;
+          else       y += downD + extra;
+        }
+      }
+      p.tx = x; p.ty = y;
+      if(maskAt(p.tx, p.ty)) ejectFromLetterTarget(p);
+
+      // small lateral jitter for points sitting just outside letters,
+      // so the contour bundle has organic variance instead of a clean wall
+      const d = sampleDist(p.tx, p.ty);
+      if(d > 0 && d < GRID * DPR * 1.5){
+        const jx = srand2(p.id, 3) * 1.5 * DPR;
+        const jy = srand2(p.id, 4) * 1.5 * DPR;
+        const tryX = p.tx + jx;
+        const tryY = p.ty + jy;
+        if(!maskAt(tryX, tryY)){ p.tx = tryX; p.ty = tryY; }
+      }
+    }
+    relaxTargets(pts, 12);
+    fixCrossingSegments(pts);
+  }
+
+  function computeTargetsVertical(pts){
+    if(!distField){
+      for(const p of pts){ p.tx = p.ox; p.ty = p.oy; }
+      return;
+    }
+    for(const p of pts){
+      let x = p.ox, y = p.oy;
+      if(maskAt(x, y)){
+        const leftD  = escapeAlong(x, y, -1, 0, W);
+        const rightD = escapeAlong(x, y, +1, 0, W);
+        if(leftD === Infinity && rightD === Infinity){
+          // gradient eject below
+        } else {
+          const r = srand(p.id, 5);
+          const bias = (rightD - leftD) / Math.max(1, Math.min(leftD, rightD));
+          const pickLeft = bias + (r * 2 - 1) * 0.45 > 0;
+          const extra = (2.0 + srand(p.id, 6) * 4.0) * DPR;
+          if(pickLeft) x -= leftD + extra;
+          else         x += rightD + extra;
+        }
+      }
+      p.tx = x; p.ty = y;
+      if(maskAt(p.tx, p.ty)) ejectFromLetterTarget(p);
+
+      const d = sampleDist(p.tx, p.ty);
+      if(d > 0 && d < GRID * DPR * 1.5){
+        const jx = srand2(p.id, 7) * 1.5 * DPR;
+        const jy = srand2(p.id, 8) * 1.5 * DPR;
+        const tryX = p.tx + jx;
+        const tryY = p.ty + jy;
+        if(!maskAt(tryX, tryY)){ p.tx = tryX; p.ty = tryY; }
+      }
+    }
+    relaxTargets(pts, 12);
+    fixCrossingSegments(pts);
+  }
+
+  function recomputeAllTargets(){
+    for(const ln of hLines) computeTargetsHorizontal(ln);
+    for(const ln of vLines) computeTargetsVertical(ln);
+  }
+
+  // ============================================================
+  // PART 4 — physics: spring chase + idle drift + ripples
+  // ============================================================
+  const STIFFNESS    = 0.06;
+  const DAMPING      = 0.86;
+  const IDLE_AMP     = 0.6;
+  const IDLE_FREQ    = 0.25;
+  const RIPPLE_SPEED = 900;   // px / s
+  const RIPPLE_AMP   = 18;
+  const RIPPLE_WIDTH = 80;    // px
+
+  const ripples = [];
+
+  function applyRipple(epi){
+    if(!epi) return;
+    ripples.push({
+      x: epi.epiX,
+      y: epi.epiY,
+      t0: performance.now() / 1000,
+      life: 1.6,
+      // per-ripple random twist so ripples curl differently each time
+      twist: (Math.random() * 2 - 1) * 0.4,
+      // overall mix between radial and tangential push, also jittered
+      tangentMix: 0.5 + (Math.random() * 2 - 1) * 0.2,
+    });
+    if(ripples.length > 8) ripples.shift();
+  }
+
+  function physicsStep(dt){
+    const tNow = performance.now() / 1000;
+
+    function rippleImpulseAt(x, y){
+      let ix = 0, iy = 0;
+      for(let r=0; r<ripples.length; r++){
+        const rp = ripples[r];
+        const age = tNow - rp.t0;
+        if(age < 0 || age > rp.life) continue;
+        const dx = x - rp.x, dy = y - rp.y;
+        const dist = Math.hypot(dx, dy);
+        const wavefront = age * RIPPLE_SPEED * DPR;
+        const front = dist - wavefront;
+        const w = Math.exp(- (front*front) / ((RIPPLE_WIDTH*DPR) * (RIPPLE_WIDTH*DPR)));
+        const decay = 1 - (age / rp.life);
+        const amp = RIPPLE_AMP * DPR * w * decay * decay;
+        if(dist > 1e-3 && amp > 0.001){
+          const rx = dx / dist, ry = dy / dist;
+          // rotate radial direction by per-ripple twist for variety
+          const cosT = Math.cos(rp.twist), sinT = Math.sin(rp.twist);
+          const radX = rx * cosT - ry * sinT;
+          const radY = rx * sinT + ry * cosT;
+          // tangent (90° from radial)
+          const tanX = -radY, tanY = radX;
+          const tm = rp.tangentMix;
+          ix += (radX * (1 - tm) + tanX * tm) * amp;
+          iy += (radY * (1 - tm) + tanY * tm) * amp;
+        }
+      }
+      return [ix, iy];
+    }
+
+    function step(pts){
+      for(const p of pts){
+        // spring toward target
+        const dx = p.tx - p.x;
+        const dy = p.ty - p.y;
+        p.vx += dx * STIFFNESS;
+        p.vy += dy * STIFFNESS;
+
+        // ripple impulses
+        const [ix, iy] = rippleImpulseAt(p.x, p.y);
+        p.vx += ix * dt;
+        p.vy += iy * dt;
+
+        // organic idle drift — gentle noise via per-point phase
+        const dxIdle = Math.sin(tNow * IDLE_FREQ + p.phaseA);
+        const dyIdle = Math.cos(tNow * IDLE_FREQ * 0.83 + p.phaseB);
+        p.vx += dxIdle * IDLE_AMP * DPR * 0.02;
+        p.vy += dyIdle * IDLE_AMP * DPR * 0.02;
+
+        // damping
+        p.vx *= DAMPING;
+        p.vy *= DAMPING;
+
+        // integrate
+        p.x += p.vx;
+        p.y += p.vy;
+
+        // hard constraint: never inside a letter
+        if(maskAt(p.x, p.y)){
+          const [gx, gy] = distGrad(p.x, p.y);
+          const gl = Math.hypot(gx, gy) + 1e-6;
+          const nx = gx / gl, ny = gy / gl;
+          // step out
+          p.x += nx * (1.5 * DPR);
+          p.y += ny * (1.5 * DPR);
+          // remove velocity component pointing into letter
+          const vDotInward = p.vx * (-nx) + p.vy * (-ny);
+          if(vDotInward > 0){
+            p.vx -= (-nx) * vDotInward;
+            p.vy -= (-ny) * vDotInward;
+          }
+        }
+      }
+    }
+
+    for(const ln of hLines) step(ln);
+    for(const ln of vLines) step(ln);
+
+    // prune dead ripples
+    for(let i=ripples.length-1; i>=0; i--){
+      if(tNow - ripples[i].t0 > ripples[i].life) ripples.splice(i, 1);
+    }
+  }
+
+  // ============================================================
+  // PART 5 — drawing
+  // ============================================================
+  function strokeCurve(pts, dx, dy, color, alpha){
+    if(pts.length < 2) return;
+    ctx.strokeStyle = color;
+    ctx.globalAlpha = alpha;
+    ctx.lineWidth = 0.9 * DPR;
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x + dx, pts[0].y + dy);
+    for(let i=1; i<pts.length-1; i++){
+      const p = pts[i], n = pts[i+1];
+      const mx = (p.x + n.x) * 0.5;
+      const my = (p.y + n.y) * 0.5;
+      ctx.quadraticCurveTo(p.x + dx, p.y + dy, mx + dx, my + dy);
+    }
+    const last = pts[pts.length-1];
+    ctx.lineTo(last.x + dx, last.y + dy);
+    ctx.stroke();
+  }
+
+  let lastFrameTime = performance.now();
+  function frame(){
+    const now = performance.now();
+    let dt = (now - lastFrameTime) / 1000;
+    lastFrameTime = now;
+    if(dt > 1/30) dt = 1/30;
+
+    physicsStep(dt);
+
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = '#f4f6f3';
+    ctx.fillRect(0,0,W,H);
+
+    const t = now / 1000;
+    const wob  = Math.sin(t*0.5) * 0.5 * DPR;
+    const wob2 = Math.cos(t*0.4) * 0.5 * DPR;
+
+    const layers = [
+      { dx:  1.6*DPR + wob,  dy: -0.8*DPR - wob2, color: '#d96cc4', alpha: 0.7 },
+      { dx: -1.2*DPR - wob,  dy:  1.4*DPR + wob2, color: '#5fc77f', alpha: 0.7 },
+      { dx:  0.2*DPR + wob2, dy: -1.6*DPR - wob,  color: '#5e9ee8', alpha: 0.7 },
+    ];
+
+    for(const L of layers){
+      for(const ln of hLines) strokeCurve(ln, L.dx, L.dy, L.color, L.alpha);
+      for(const ln of vLines) strokeCurve(ln, L.dx, L.dy, L.color, L.alpha);
+    }
+
+    requestAnimationFrame(frame);
+  }
+
+  // ============================================================
+  // PART 6 — input + rebuild orchestration
+  // ============================================================
+  let curText = '';
+
+  function rebuildEverything(){
+    drawMask(curText);
+    buildGrid();
+    recomputeAllTargets();
+    // snap live positions to targets on resize / first build
+    for(const ln of hLines) for(const p of ln){ p.x = p.tx; p.y = p.ty; p.vx = 0; p.vy = 0; }
+    for(const ln of vLines) for(const p of ln){ p.x = p.tx; p.y = p.ty; p.vx = 0; p.vy = 0; }
+  }
+
+  function softRebuild(){
+    // bump seed so the same text renders slightly differently each time
+    inputSeed = (inputSeed + 1 + ((Math.random() * 100000) | 0)) | 0;
+    const epi = drawMask(curText);
+    if(!hLines.length) buildGrid();
+    recomputeAllTargets();
+    if(epi) applyRipple(epi);
+  }
+
+  // Coalesce rapid input events (IME composition, fast typing) into one
+  // rebuild per animation frame.
+  let rebuildScheduled = false;
+  function scheduleSoftRebuild(){
+    if(rebuildScheduled) return;
+    rebuildScheduled = true;
+    requestAnimationFrame(() => {
+      rebuildScheduled = false;
+      softRebuild();
+    });
+  }
+
+  function handleInput(){
+    curText = input.value;
+    if(curText.length) hint.classList.add('hidden');
+    else hint.classList.remove('hidden');
+    scheduleSoftRebuild();
+  }
+  input.addEventListener('input', handleInput);
+  input.addEventListener('compositionupdate', handleInput);
+  input.addEventListener('compositionend', handleInput);
+  window.addEventListener('click', () => input.focus());
+  window.addEventListener('touchstart', () => input.focus(), { passive:true });
+
+  resize();
+  frame();
+  input.focus();
+})();
+</script>

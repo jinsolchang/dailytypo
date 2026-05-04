@@ -51,6 +51,8 @@ body{background:#0a0a0a;font-family:'Noto Sans KR',sans-serif;color:#fff;min-hei
   <div class="ticker-label">속보</div>
   <div class="ticker-track">
     <div class="ticker-text">
+      Living Grid — 타이핑하면 격자가 글자를 피해 출렁이는 타이포 실험 &nbsp;│&nbsp;
+      지피티쨩 VS 잼민이 — 10라운드 끝장토론 오픈 &nbsp;│&nbsp;
       Cable Lab 오픈 — 네 개의 하이파이 케이블을 직접 꽂아 소리의 차이를 듣다 &nbsp;│&nbsp;
       [단독] 2026 수능 현장서 '잉크 뚝뚝' 불량 사인펜 무더기…"판독 불가 처리" 속출 &nbsp;│&nbsp;
       웹캠에 비친 얼굴이 한글이 되는 순간 — '한글 Face' 실험 &nbsp;│&nbsp;
@@ -67,21 +69,37 @@ body{background:#0a0a0a;font-family:'Noto Sans KR',sans-serif;color:#fff;min-hei
 
 <div class="main">
 
-  <!-- 히어로: 최신 기사 (4/28) Cable Lab -->
-  <a class="hero" href="2026-04-28/20260428.html">
+  <!-- 히어로: 최신 기사 (5/4) Grid Distortion Typography -->
+  <a class="hero" href="2026-05-04/20260504.html">
     <div class="hero-visual">
-      <canvas id="hero-cable"></canvas>
+      <canvas id="hero-grid"></canvas>
     </div>
     <div class="hero-body">
-      <div class="hero-tag">실험·오디오</div>
-      <div class="hero-title">Cable Lab — 네 개의 케이블, 네 개의 소리. 직접 꽂아 듣는 하이파이 청음실</div>
-      <div class="hero-meta">2026.04.28 · 인터랙티브 · CABLE LAB</div>
+      <div class="hero-tag">실험·타이포그래피</div>
+      <div class="hero-title">Living Grid — 입력한 글자가 격자를 밀어내고 출렁이게 만드는 타이포 실험</div>
+      <div class="hero-meta">2026.05.04 · 인터랙티브 · GRID DISTORTION</div>
     </div>
   </a>
 
   <!-- 이전 기사 -->
   <div class="section-label">이전 기사</div>
   <div class="grid">
+    <a class="card" href="2026-04-28/20260428.html">
+      <div class="card-body">
+        <div class="card-tag">실험·오디오</div>
+        <div class="card-title">Cable Lab — 네 개의 케이블, 네 개의 소리. 직접 꽂아 듣는 하이파이 청음실</div>
+        <div class="card-date">2026.04.28</div>
+      </div>
+      <div class="card-thumb"><canvas id="thumb-cable" width="100" height="72"></canvas></div>
+    </a>
+    <a class="card" href="2026-04-29/20260429.html">
+      <div class="card-body">
+        <div class="card-tag">기술·엔터</div>
+        <div class="card-title">지피티쨩 VS 잼민이 — 10라운드 끝장토론 아레나</div>
+        <div class="card-date">2026.04.29</div>
+      </div>
+      <div class="card-thumb"><canvas id="thumb-ai" width="100" height="72"></canvas></div>
+    </a>
     <a class="card" href="2026-04-27/20260427.html">
       <div class="card-body">
         <div class="card-tag">단독·사회</div>
@@ -153,142 +171,233 @@ body{background:#0a0a0a;font-family:'Noto Sans KR',sans-serif;color:#fff;min-hei
 <div class="footer">NEWSROOM — This is fiction. 실제 뉴스가 아닙니다.</div>
 
 <script>
-// ── 히어로: Cable Lab (빈티지 스피커 + 꿈틀대는 케이블) ──
+// ── 히어로: Living Grid (격자가 글자를 피해 출렁) ──
 (function(){
-  const cv = document.getElementById('hero-cable');
+  const cv = document.getElementById('hero-grid');
   if (!cv) return;
   const rect = cv.parentElement.getBoundingClientRect();
   const DPR = Math.min(devicePixelRatio||1, 2);
   cv.width = rect.width * DPR; cv.height = rect.height * DPR;
-  const cx = cv.getContext('2d');
-  cx.scale(DPR, DPR);
-  const W = rect.width, H = rect.height;
+  const ctx = cv.getContext('2d');
+  const W = cv.width, H = cv.height;
 
-  // Paper / warm tone background (same palette as Cable Lab)
-  const PAPER = '#f1ead8', PAPER2 = '#e6dec5', INK = '#1c1a16', RUST = '#b04a2a', GOLD = '#c8a04a';
-
-  // Speaker anchor: left side, 3/4 view
-  const spk = { x: W*0.32, y: H*0.55, w: W*0.22, h: H*0.62 };
-  // Terminal (target point where cables want to go)
-  const term = { x: spk.x + spk.w*0.42, y: spk.y - spk.h*0.05 };
-
-  // Four cables with distinct colors
-  const cables = [
-    { color: '#8a7a60', jacket: '#3a3020', ampY: 18, speed: 0.9, phase: 0.0, offY: 0,   tension: 0.55 },
-    { color: '#d4a850', jacket: '#4a3820', ampY: 14, speed: 1.1, phase: 1.3, offY: 24,  tension: 0.62 },
-    { color: '#e0e0d8', jacket: '#1a1a18', ampY: 10, speed: 1.4, phase: 2.6, offY: 48,  tension: 0.72 },
-    { color: '#f0c860', jacket: '#3a2a14', ampY:  7, speed: 1.8, phase: 3.9, offY: 72,  tension: 0.85 },
-  ];
-
-  // right edge (cables come from off-screen right)
-  const tailX = W + 30;
-
-  function drawPaperBg(){
-    cx.fillStyle = PAPER;
-    cx.fillRect(0,0,W,H);
-    // warm vignette
-    const g = cx.createRadialGradient(W*0.35, H*0.45, 0, W*0.35, H*0.45, W*0.8);
-    g.addColorStop(0, 'rgba(176,74,42,0.06)');
-    g.addColorStop(1, 'rgba(0,0,0,0.18)');
-    cx.fillStyle = g; cx.fillRect(0,0,W,H);
-    // horizon line
-    cx.strokeStyle = 'rgba(28,26,22,0.22)'; cx.lineWidth = 1;
-    cx.beginPath(); cx.moveTo(0, H*0.78); cx.lineTo(W, H*0.78); cx.stroke();
+  // Build simple text mask for the word "LIVING"
+  const mask = document.createElement('canvas');
+  mask.width = W; mask.height = H;
+  const mctx = mask.getContext('2d');
+  function buildMask(){
+    mctx.clearRect(0,0,W,H);
+    mctx.fillStyle = '#fff';
+    mctx.textBaseline = 'middle';
+    mctx.textAlign = 'center';
+    const fs = H * 0.55;
+    mctx.font = `900 ${fs}px "Helvetica Neue", "Arial Black", sans-serif`;
+    mctx.fillText('LIVING', W/2, H/2);
   }
+  buildMask();
+  const md = mctx.getImageData(0,0,W,H).data;
+  const mBytes = new Uint8Array(W*H);
+  for (let i=0, j=3; i<mBytes.length; i++, j+=4) mBytes[i] = md[j] > 128 ? 1 : 0;
 
-  function drawSpeaker(){
-    const {x, y, w, h} = spk;
-    // contact shadow
-    cx.fillStyle = 'rgba(0,0,0,0.3)';
-    cx.beginPath(); cx.ellipse(x, y + h*0.5 + 6, w*0.7, 8, 0, 0, Math.PI*2); cx.fill();
+  // escape distance lookup
+  function maskAt(x,y){ if(x<0||y<0||x>=W||y>=H) return 0; return mBytes[(y|0)*W+(x|0)]; }
 
-    // rear side panel (3/4 view)
-    cx.fillStyle = '#7a715a';
-    cx.beginPath();
-    cx.moveTo(x + w*0.5, y - h*0.5);
-    cx.lineTo(x + w*0.95, y - h*0.48);
-    cx.lineTo(x + w*0.95, y + h*0.48);
-    cx.lineTo(x + w*0.5, y + h*0.5);
-    cx.closePath(); cx.fill();
+  // Build grid lines (horizontal + vertical)
+  const GRID = 18 * DPR;
+  const PAD = 20 * DPR;
+  const hLines = [], vLines = [];
+  const sampleStep = GRID * 0.4;
 
-    // front baffle
-    const bafGrad = cx.createLinearGradient(x - w*0.5, 0, x + w*0.5, 0);
-    bafGrad.addColorStop(0, '#d8d0b8');
-    bafGrad.addColorStop(1, '#fbf8ee');
-    cx.fillStyle = bafGrad;
-    cx.fillRect(x - w*0.5, y - h*0.5, w, h);
-    cx.strokeStyle = INK; cx.lineWidth = 1.2;
-    cx.strokeRect(x - w*0.5, y - h*0.5, w, h);
-
-    // woofer
-    const woofY = y + h*0.15;
-    const woofR = w*0.36;
-    const woofG = cx.createRadialGradient(x - w*0.05, woofY - woofR*0.15, 0, x, woofY, woofR);
-    woofG.addColorStop(0, '#3a352c');
-    woofG.addColorStop(0.7, '#1c1a16');
-    woofG.addColorStop(1, '#0a0908');
-    cx.fillStyle = woofG;
-    cx.beginPath(); cx.arc(x, woofY, woofR, 0, Math.PI*2); cx.fill();
-    // dust cap
-    cx.fillStyle = '#5a5240';
-    cx.beginPath(); cx.arc(x - woofR*0.08, woofY - woofR*0.1, woofR*0.28, 0, Math.PI*2); cx.fill();
-
-    // tweeter
-    cx.fillStyle = '#1c1a16';
-    cx.beginPath(); cx.arc(x, y - h*0.25, w*0.16, 0, Math.PI*2); cx.fill();
-
-    // terminal (the jack) — brass ring + socket
-    cx.fillStyle = GOLD;
-    cx.beginPath(); cx.arc(term.x, term.y, 9, 0, Math.PI*2); cx.fill();
-    cx.fillStyle = '#0a0908';
-    cx.beginPath(); cx.arc(term.x, term.y, 5.5, 0, Math.PI*2); cx.fill();
-  }
-
-  function drawCable(c, t){
-    // gentle breathing wave from right (off-screen) to the terminal area
-    const steps = 34;
-    cx.strokeStyle = c.jacket;
-    cx.lineWidth = 6;
-    cx.lineCap = 'round';
-    cx.beginPath();
-    for (let i = 0; i <= steps; i++) {
-      const u = i / steps;
-      const baseX = tailX - (tailX - (term.x + 80)) * u;
-      const baseY = (term.y + c.offY + 30) + (1 - u) * -8;
-      // wave disturbance strongest in middle, pinned at both ends
-      const fall = Math.sin(u * Math.PI);
-      const wy = Math.sin(t * c.speed + c.phase + u * 7) * c.ampY * fall;
-      const wx = Math.cos(t * c.speed * 0.7 + c.phase + u * 5) * c.ampY * 0.3 * fall;
-      const px = baseX + wx;
-      const py = baseY + wy;
-      i === 0 ? cx.moveTo(px, py) : cx.lineTo(px, py);
+  function buildTargets(pts, horizontal){
+    // For each point inside a letter, push it out along perpendicular direction
+    // to the nearest free pixel, with random side choice.
+    for (const p of pts){
+      let tx = p.ox, ty = p.oy;
+      if (maskAt(tx, ty)){
+        const step = 2 * DPR;
+        if (horizontal){
+          // push up or down
+          let up = 0, down = 0;
+          let cy = ty;
+          while(cy > 0 && maskAt(tx, cy)){ cy -= step; up += step; }
+          let cy2 = ty;
+          while(cy2 < H && maskAt(tx, cy2)){ cy2 += step; down += step; }
+          const pickUp = (up < down) ^ (Math.random() < 0.3);
+          ty += pickUp ? -up - 3*DPR : down + 3*DPR;
+        } else {
+          let left = 0, right = 0;
+          let cx = tx;
+          while(cx > 0 && maskAt(cx, ty)){ cx -= step; left += step; }
+          let cx2 = tx;
+          while(cx2 < W && maskAt(cx2, ty)){ cx2 += step; right += step; }
+          const pickLeft = (left < right) ^ (Math.random() < 0.3);
+          tx += pickLeft ? -left - 3*DPR : right + 3*DPR;
+        }
+      }
+      p.tx = tx; p.ty = ty;
+      p.x = tx; p.y = ty;
+      p.phase = Math.random() * Math.PI * 2;
     }
-    cx.stroke();
-    // metallic highlight
-    cx.strokeStyle = c.color;
-    cx.lineWidth = 2;
-    cx.stroke();
+  }
+
+  for (let y = PAD; y <= H - PAD; y += GRID){
+    const pts = [];
+    for (let x = PAD; x <= W - PAD; x += sampleStep){
+      pts.push({ox: x, oy: y, tx: x, ty: y, x, y, phase: 0});
+    }
+    hLines.push(pts);
+  }
+  for (let x = PAD; x <= W - PAD; x += GRID){
+    const pts = [];
+    for (let y = PAD; y <= H - PAD; y += sampleStep){
+      pts.push({ox: x, oy: y, tx: x, ty: y, x, y, phase: 0});
+    }
+    vLines.push(pts);
+  }
+  for (const l of hLines) buildTargets(l, true);
+  for (const l of vLines) buildTargets(l, false);
+
+  function strokeCurve(pts, dx, dy, color, alpha){
+    if (pts.length < 2) return;
+    ctx.strokeStyle = color;
+    ctx.globalAlpha = alpha;
+    ctx.lineWidth = 1 * DPR;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x + dx, pts[0].y + dy);
+    for (let i = 1; i < pts.length - 1; i++){
+      const p = pts[i], n = pts[i+1];
+      const mx = (p.x + n.x) * 0.5, my = (p.y + n.y) * 0.5;
+      ctx.quadraticCurveTo(p.x + dx, p.y + dy, mx + dx, my + dy);
+    }
+    const last = pts[pts.length-1];
+    ctx.lineTo(last.x + dx, last.y + dy);
+    ctx.stroke();
   }
 
   function loop(){
     const t = performance.now() * 0.001;
-    drawPaperBg();
-
-    // draw cables from bottom layer (first) to top
-    for (let i = cables.length - 1; i >= 0; i--) {
-      drawCable(cables[i], t);
+    // gentle idle drift
+    for (const ln of hLines) for (const p of ln){
+      p.x = p.tx + Math.sin(t * 0.8 + p.phase) * 1.5 * DPR;
+      p.y = p.ty + Math.cos(t * 0.6 + p.phase * 1.3) * 1.2 * DPR;
+    }
+    for (const ln of vLines) for (const p of ln){
+      p.x = p.tx + Math.sin(t * 0.7 + p.phase * 0.9) * 1.5 * DPR;
+      p.y = p.ty + Math.cos(t * 0.9 + p.phase) * 1.2 * DPR;
     }
 
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = '#f4f6f3';
+    ctx.fillRect(0,0,W,H);
+
+    const wob = Math.sin(t*0.5) * 0.5 * DPR;
+    const layers = [
+      { dx:  1.6*DPR + wob, dy: -0.8*DPR, color: '#d96cc4', alpha: 0.7 },
+      { dx: -1.2*DPR - wob, dy:  1.4*DPR, color: '#5fc77f', alpha: 0.7 },
+      { dx:  0.2*DPR,       dy: -1.6*DPR, color: '#5e9ee8', alpha: 0.7 },
+    ];
+    for (const L of layers){
+      for (const ln of hLines) strokeCurve(ln, L.dx, L.dy, L.color, L.alpha);
+      for (const ln of vLines) strokeCurve(ln, L.dx, L.dy, L.color, L.alpha);
+    }
+    requestAnimationFrame(loop);
+  }
+  loop();
+})();
+
+// ── 썸네일: Cable Lab ──
+(function(){
+  const cv = document.getElementById('thumb-cable');
+  if (!cv) return;
+  cv.width = 200; cv.height = 144;
+  const cx = cv.getContext('2d');
+  const W = 200, H = 144;
+  const cables = [
+    { color: '#8a7a60', jacket: '#3a3020', amp: 8,  speed: 0.9, phase: 0.0, off: -18 },
+    { color: '#d4a850', jacket: '#4a3820', amp: 6,  speed: 1.1, phase: 1.3, off: -6  },
+    { color: '#e0e0d8', jacket: '#1a1a18', amp: 5,  speed: 1.4, phase: 2.6, off:  6  },
+    { color: '#f0c860', jacket: '#3a2a14', amp: 4,  speed: 1.8, phase: 3.9, off:  18 },
+  ];
+  function drawBg(){
+    cx.fillStyle = '#f1ead8'; cx.fillRect(0,0,W,H);
+    const g = cx.createRadialGradient(W*0.35, H*0.45, 0, W*0.35, H*0.45, W*0.8);
+    g.addColorStop(0, 'rgba(176,74,42,0.06)');
+    g.addColorStop(1, 'rgba(0,0,0,0.18)');
+    cx.fillStyle = g; cx.fillRect(0,0,W,H);
+  }
+  function drawSpeaker(){
+    const x = W*0.32, y = H*0.55, w = W*0.26, h = H*0.66;
+    cx.fillStyle = '#fbf8ee';
+    cx.fillRect(x - w*0.5, y - h*0.5, w, h);
+    cx.strokeStyle = '#1c1a16'; cx.lineWidth = 1;
+    cx.strokeRect(x - w*0.5, y - h*0.5, w, h);
+    cx.fillStyle = '#1c1a16';
+    cx.beginPath(); cx.arc(x, y + h*0.12, w*0.3, 0, Math.PI*2); cx.fill();
+    cx.fillStyle = '#c8a04a';
+    cx.beginPath(); cx.arc(x + w*0.45, y - h*0.1, 3, 0, Math.PI*2); cx.fill();
+  }
+  function drawCable(c, t){
+    const steps = 24;
+    cx.strokeStyle = c.jacket; cx.lineWidth = 3.5; cx.lineCap = 'round';
+    cx.beginPath();
+    for (let i = 0; i <= steps; i++){
+      const u = i / steps;
+      const baseX = (W+15) - ((W+15) - W*0.52) * u;
+      const baseY = H*0.5 + c.off + (1-u) * -4;
+      const fall = Math.sin(u * Math.PI);
+      const wy = Math.sin(t * c.speed + c.phase + u * 7) * c.amp * fall;
+      i === 0 ? cx.moveTo(baseX, baseY + wy) : cx.lineTo(baseX, baseY + wy);
+    }
+    cx.stroke();
+    cx.strokeStyle = c.color; cx.lineWidth = 1.2; cx.stroke();
+  }
+  function loop(){
+    const t = performance.now() * 0.001;
+    drawBg();
+    for (let i = cables.length - 1; i >= 0; i--) drawCable(cables[i], t);
     drawSpeaker();
+    requestAnimationFrame(loop);
+  }
+  loop();
+})();
 
-    // subtle grain overlay
-    cx.globalAlpha = 0.04;
-    for (let i = 0; i < 60; i++) {
-      cx.fillStyle = INK;
-      cx.fillRect(Math.random()*W, Math.random()*H, 1, 1);
+// ── 썸네일: 지피티쨩 VS 잼민이 (두 HP 바) ──
+(function(){
+  const cv = document.getElementById('thumb-ai');
+  if (!cv) return;
+  cv.width = 200; cv.height = 144;
+  const cx = cv.getContext('2d');
+  const W = 200, H = 144;
+  function loop(){
+    const t = performance.now() * 0.001;
+    cx.fillStyle = '#0c0f1a'; cx.fillRect(0,0,W,H);
+    // faux floor grid
+    cx.strokeStyle = 'rgba(80,120,200,0.12)'; cx.lineWidth = 1;
+    for (let y = H*0.55; y < H; y += 8){
+      cx.beginPath(); cx.moveTo(0, y); cx.lineTo(W, y); cx.stroke();
     }
-    cx.globalAlpha = 1;
-
+    // HP bar A (left, cyan)
+    const hpA = 0.55 + Math.sin(t*0.9)*0.2;
+    cx.fillStyle = 'rgba(255,255,255,0.1)'; cx.fillRect(10, 14, 75, 6);
+    cx.fillStyle = '#37e0ff'; cx.fillRect(10, 14, 75*hpA, 6);
+    // HP bar B (right, pink)
+    const hpB = 0.65 + Math.cos(t*1.1)*0.18;
+    cx.fillStyle = 'rgba(255,255,255,0.1)'; cx.fillRect(W-85, 14, 75, 6);
+    cx.fillStyle = '#ff69b4'; cx.fillRect(W-85, 14, 75*hpB, 6);
+    // VS text
+    cx.font = `900 20px "Press Start 2P", sans-serif`;
+    cx.textAlign = 'center'; cx.fillStyle = '#ffd84a';
+    cx.fillText('VS', W/2, H*0.52 + Math.sin(t*3)*2);
+    // chibi blocks (simple pixel avatars)
+    cx.fillStyle = '#37e0ff';
+    cx.fillRect(W*0.18, H*0.55, 18, 26);
+    cx.fillStyle = '#022';
+    cx.fillRect(W*0.19, H*0.59, 3, 3); cx.fillRect(W*0.23, H*0.59, 3, 3);
+    cx.fillStyle = '#ff69b4';
+    cx.fillRect(W*0.74, H*0.55, 18, 26);
+    cx.fillStyle = '#220';
+    cx.fillRect(W*0.75, H*0.59, 3, 3); cx.fillRect(W*0.79, H*0.59, 3, 3);
     requestAnimationFrame(loop);
   }
   loop();
