@@ -1,708 +1,1160 @@
-<div style="background: var(--color-background-secondary); border-radius: var(--border-radius-lg); padding: 1rem; border: 0.5px solid var(--color-border-tertiary);">
-  <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px; font-size: 12px; color: var(--color-text-secondary);">
-    <span style="width: 10px; height: 10px; border-radius: 50%; background: #ff5f57;"></span>
-    <span style="width: 10px; height: 10px; border-radius: 50%; background: #febc2e;"></span>
-    <span style="width: 10px; height: 10px; border-radius: 50%; background: #28c840;"></span>
-    <span style="margin-left: 8px;">untitled — Paint</span>
-  </div>
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Letter Domino</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,600;1,400;1,500&family=Cormorant+Garamond:ital,wght@0,400;1,400&display=swap');
+  
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  
+  :root {
+    --paper: #efe9d8;
+    --paper-dark: #ddd5be;
+    --ink: #2a2620;
+    --ink-light: #5a5247;
+    --accent: #6b5b3f;
+  }
+  
+  body {
+    font-family: 'EB Garamond', 'Cormorant Garamond', Georgia, serif;
+    background: var(--paper);
+    background-image: 
+      linear-gradient(rgba(120, 100, 70, 0.06) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(120, 100, 70, 0.06) 1px, transparent 1px);
+    background-size: 24px 24px;
+    min-height: 100vh;
+    overflow: hidden;
+    color: var(--ink);
+    user-select: none;
+  }
+  
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: 
+      radial-gradient(ellipse at center, transparent 0%, rgba(80, 60, 40, 0.08) 100%),
+      url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2'/%3E%3CfeColorMatrix values='0 0 0 0 0.3 0 0 0 0 0.25 0 0 0 0 0.18 0 0 0 0.09 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 1;
+  }
+  
+  .corner-note {
+    position: fixed;
+    top: 24px;
+    left: 24px;
+    z-index: 100;
+    font-style: italic;
+    font-size: 13px;
+    color: var(--ink-light);
+    line-height: 1.4;
+    max-width: 180px;
+  }
+  
+  .corner-note .dash { letter-spacing: 2px; }
+  
+  .stones-counter {
+    position: fixed;
+    top: 24px;
+    right: 24px;
+    z-index: 100;
+    font-style: italic;
+    font-size: 14px;
+    border: 1.5px solid var(--ink);
+    padding: 8px 16px;
+    background: var(--paper);
+    box-shadow: 3px 3px 0 var(--ink);
+  }
+  
+  .stones-counter .dot {
+    margin: 0 4px;
+    color: var(--accent);
+  }
+  
+  .header {
+    position: fixed;
+    top: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 100;
+    text-align: center;
+    width: 90%;
+    max-width: 600px;
+  }
+  
+  .title {
+    font-size: 32px;
+    font-style: italic;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+  }
+  
+  .title svg {
+    width: 24px;
+    height: 24px;
+  }
+  
+  .subtitle {
+    font-style: italic;
+    font-size: 15px;
+    color: var(--ink-light);
+    margin-top: 2px;
+  }
+  
+  .ornament {
+    margin: 6px 0 12px;
+    color: var(--ink-light);
+    letter-spacing: 8px;
+    font-size: 14px;
+  }
+  
+  .control-frame {
+    border: 1.5px solid var(--ink);
+    background: var(--paper);
+    padding: 10px 14px;
+    display: inline-flex;
+    align-items: center;
+    gap: 14px;
+    box-shadow: 4px 4px 0 var(--ink);
+    margin: 0 auto;
+  }
+  
+  .instruction {
+    font-style: italic;
+    font-size: 14px;
+    color: var(--ink-light);
+    letter-spacing: 0.3px;
+  }
+  
+  /* 한글 IME 입력 받기 위한 숨겨진 input - 화면엔 안 보이지만 포커스는 받음 */
+  #hiddenInput {
+    position: fixed;
+    top: -100px;
+    left: -100px;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    pointer-events: none;
+    border: none;
+    background: transparent;
+  }
+  
+  .vbtn {
+    border: 1.5px solid var(--ink);
+    background: var(--paper);
+    font-family: inherit;
+    font-style: italic;
+    font-size: 15px;
+    color: var(--ink);
+    padding: 6px 18px;
+    cursor: pointer;
+    transition: all 0.1s;
+  }
+  
+  .vbtn:hover {
+    background: var(--ink);
+    color: var(--paper);
+  }
+  
+  .vbtn:active {
+    transform: translate(1px, 1px);
+  }
+  
+  .vbtn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+  
+  .stage-wrap {
+    position: fixed;
+    inset: 0;
+    z-index: 2;
+    pointer-events: none;
+  }
+  
+  .stage {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 0;
+    height: 0;
+    transform-origin: 0 0;
+    transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    pointer-events: auto;
+  }
+  
+  /* 도미노 SVG */
+  .domino-svg {
+    position: absolute;
+    cursor: pointer;
+    transform-origin: var(--ox) var(--oy);
+    will-change: transform;
+    overflow: visible;
+  }
+  
+  .domino-svg.appearing {
+    animation: appear 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  }
+  
+  @keyframes appear {
+    0% { opacity: 0; transform: translateY(-20px) scale(0.9); }
+    100% { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  
+  .domino-svg:hover .face-front {
+    fill: #f5efde;
+  }
+  
+  .hint {
+    position: fixed;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-style: italic;
+    font-size: 14px;
+    color: var(--ink-light);
+    pointer-events: none;
+    z-index: 50;
+    background: var(--paper);
+    padding: 6px 16px;
+    border: 1px solid var(--ink-light);
+    transition: opacity 0.3s;
+  }
+  
+  .hint.hidden { opacity: 0; }
+  
+  /* 먼지 */
+  .dust {
+    position: absolute;
+    background: var(--ink-light);
+    border-radius: 50%;
+    pointer-events: none;
+    will-change: transform, opacity;
+    z-index: 200;
+  }
+  
+  /* 피날레 - 정렬되는 글자들 */
+  .finale-letter {
+    position: fixed;
+    font-family: 'EB Garamond', Georgia, serif;
+    font-style: italic;
+    font-weight: 600;
+    font-size: 56px;
+    color: var(--ink);
+    pointer-events: none;
+    z-index: 50;
+    will-change: left, top, transform, opacity;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    line-height: 1;
+  }
+  
+  @media (max-width: 700px) {
+    .title { font-size: 22px; }
+    .subtitle { font-size: 12px; }
+    .instruction { font-size: 11px; }
+    .control-frame { gap: 8px; padding: 8px 10px; }
+    .vbtn { font-size: 13px; padding: 5px 12px; }
+    .corner-note { font-size: 11px; max-width: 120px; top: 12px; left: 12px; }
+    .stones-counter { font-size: 12px; padding: 6px 10px; top: 12px; right: 12px; }
+    .header { top: 12px; }
+  }
+</style>
+</head>
+<body>
 
-  <div style="display: flex; gap: 16px;">
-    <!-- 좌측: 파라미터 -->
-    <div style="display: flex; flex-direction: column; gap: 12px; min-width: 130px;">
-      <div>
-        <label style="font-size: 12px; color: var(--color-text-secondary); display: block; margin-bottom: 4px;">스타일</label>
-        <select id="ms-style" style="width: 100%; font-size: 12px; padding: 2px;">
-          <option value="1">1 — 선</option>
-          <option value="2">2 — 구슬</option>
-        </select>
-      </div>
-      <div>
-        <label style="font-size: 12px; color: var(--color-text-secondary); display: block; margin-bottom: 4px;">굵기</label>
-        <input type="range" id="ms-thick" min="1" max="3" value="1" step="1" style="width: 100%;">
-        <span id="ms-thick-out" style="font-size: 11px; color: var(--color-text-tertiary);">1</span>
-      </div>
-      <div>
-        <label style="font-size: 12px; color: var(--color-text-secondary); display: block; margin-bottom: 4px;">글자크기</label>
-        <input type="range" id="ms-scale" min="20" max="70" value="44" step="2" style="width: 100%;">
-        <span id="ms-scale-out" style="font-size: 11px; color: var(--color-text-tertiary);">44</span>
-      </div>
-      <div>
-        <label style="font-size: 12px; color: var(--color-text-secondary); display: block; margin-bottom: 4px;">끊김</label>
-        <input type="range" id="ms-break" min="0" max="100" value="2" step="1" style="width: 100%;">
-        <span id="ms-break-out" style="font-size: 11px; color: var(--color-text-tertiary);">2%</span>
-      </div>
-      <div>
-        <label style="font-size: 12px; color: var(--color-text-secondary); display: block; margin-bottom: 4px;">떨림</label>
-        <input type="range" id="ms-jitter" min="0" max="3" value="1" step="1" style="width: 100%;">
-        <span id="ms-jitter-out" style="font-size: 11px; color: var(--color-text-tertiary);">1</span>
-      </div>
-      <div>
-        <label style="font-size: 12px; color: var(--color-text-secondary);"><input type="checkbox" id="ms-anim" checked> 애니메이션</label>
-      </div>
-      <button id="ms-clear" style="font-size: 12px; margin-top: 8px;">지우기</button>
-    </div>
-
-    <!-- 우측: 캔버스 -->
-    <div style="background: white; border: 1px solid var(--color-border-secondary); border-radius: 4px; overflow: hidden;">
-      <canvas id="ms-canvas" width="660" height="400" style="display: block; width: 660px; height: 400px; cursor: text;"></canvas>
-    </div>
-  </div>
-
-  <input id="ms-input" type="text" autocomplete="off" autocapitalize="off" spellcheck="false"
-    style="position: absolute; opacity: 0; pointer-events: none; width: 1px; height: 1px;">
+<div class="corner-note">
+  <div class="dash">— A small diversion —</div>
+  <div>type to summon stones,</div>
+  <div>press enter to topple them</div>
 </div>
 
+<div class="stones-counter">
+  <span style="font-style:italic">stones</span>
+  <span class="dot">·</span>
+  <span id="stoneCount">0</span>
+</div>
+
+<div class="header">
+  <div class="title">
+    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2 L14 8 L20 8 L15 12 L17 18 L12 14 L7 18 L9 12 L4 8 L10 8 Z" opacity="0.6"/></svg>
+    <span>Letter Domino</span>
+    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2 L14 8 L20 8 L15 12 L17 18 L12 14 L7 18 L9 12 L4 8 L10 8 Z" opacity="0.6"/></svg>
+  </div>
+  <div class="subtitle">a curious mechanical diversion</div>
+  <div class="ornament">✦ · ✦ · ✦</div>
+  <div class="control-frame">
+    <span class="instruction">type to inscribe · backspace to undo · enter to topple</span>
+    <button class="vbtn" onclick="clearAll()">clear</button>
+  </div>
+</div>
+
+<!-- 한글 IME 입력을 받기 위한 숨겨진 입력창 -->
+<input type="text" id="hiddenInput" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+
+<div class="stage-wrap">
+  <div class="stage" id="stage"></div>
+</div>
+
+<div class="hint hidden" id="hint">click stones · or press enter to topple all ✦</div>
+
 <script>
-(function(){
-  const canvas = document.getElementById('ms-canvas');
-  const ctx = canvas.getContext('2d');
-  const input = document.getElementById('ms-input');
-  const thickEl = document.getElementById('ms-thick');
-  const thickOut = document.getElementById('ms-thick-out');
-  const scaleEl = document.getElementById('ms-scale');
-  const scaleOut = document.getElementById('ms-scale-out');
-  const breakEl = document.getElementById('ms-break');
-  const breakOut = document.getElementById('ms-break-out');
-  const jitterEl = document.getElementById('ms-jitter');
-  const jitterOut = document.getElementById('ms-jitter-out');
-  const animEl = document.getElementById('ms-anim');
-  const clearBtn = document.getElementById('ms-clear');
-  const styleEl = document.getElementById('ms-style');
-
-  const W = 660, H = 400;
-  canvas.width = W; canvas.height = H;
-  ctx.imageSmoothingEnabled = false;
-
-  let thick = 1, scale = 44, breakFreq = 2, jitter = 1;
-  let color = '#000000';
-  let drawStyle = 1;
-  let cursor = { x: 12, y: 12 };
-  let history = [];
-  let strokeQueue = [];
-  let rafId = null;
-
-  const G = {
-    'A': [[[0,1],[0.3,0.5],[0.5,0],[0.7,0.5],[1,1]], [[0.18,0.65],[0.82,0.65]]],
-    'B': [[[0,0],[0,1]], [[0,0],[0.7,0.05],[0.9,0.18],[0.85,0.4],[0.6,0.5],[0,0.5]], [[0,0.5],[0.7,0.55],[0.95,0.7],[0.9,0.9],[0.6,1],[0,1]]],
-    'C': [[[1,0.15],[0.7,0.02],[0.3,0.05],[0.05,0.3],[0,0.6],[0.15,0.85],[0.5,1],[0.85,0.95],[1,0.85]]],
-    'D': [[[0,0],[0,1]], [[0,0],[0.55,0.05],[0.9,0.25],[1,0.5],[0.9,0.75],[0.55,0.95],[0,1]]],
-    'E': [[[1,0],[0,0],[0,1],[1,1]], [[0,0.5],[0.7,0.5]]],
-    'F': [[[1,0],[0,0],[0,1]], [[0,0.5],[0.7,0.5]]],
-    'G': [[[1,0.15],[0.7,0.02],[0.3,0.05],[0.05,0.3],[0,0.6],[0.15,0.85],[0.5,1],[0.85,0.95],[1,0.85],[1,0.55],[0.55,0.55]]],
-    'H': [[[0,0],[0,1]], [[1,0],[1,1]], [[0,0.5],[1,0.5]]],
-    'I': [[[0.15,0],[0.85,0]], [[0.5,0],[0.5,1]], [[0.15,1],[0.85,1]]],
-    'J': [[[0.2,0],[1,0]], [[0.7,0],[0.7,0.85],[0.55,1],[0.3,1],[0.1,0.9]]],
-    'K': [[[0,0],[0,1]], [[1,0],[0.05,0.5],[1,1]]],
-    'L': [[[0,0],[0,1],[1,1]]],
-    'M': [[[0,1],[0,0],[0.5,0.7],[1,0],[1,1]]],
-    'N': [[[0,1],[0,0],[1,1],[1,0]]],
-    'O': [[[0.3,0],[0.7,0],[0.95,0.2],[1,0.5],[0.95,0.8],[0.7,1],[0.3,1],[0.05,0.8],[0,0.5],[0.05,0.2],[0.3,0]]],
-    'P': [[[0,1],[0,0],[0.7,0.05],[0.95,0.2],[1,0.4],[0.7,0.55],[0,0.55]]],
-    'Q': [[[0.3,0],[0.7,0],[0.95,0.2],[1,0.5],[0.95,0.8],[0.7,1],[0.3,1],[0.05,0.8],[0,0.5],[0.05,0.2],[0.3,0]], [[0.55,0.7],[1.05,1.05]]],
-    'R': [[[0,1],[0,0],[0.7,0.05],[0.95,0.2],[1,0.4],[0.7,0.55],[0,0.55]], [[0.4,0.55],[1,1]]],
-    'S': [[[1,0.15],[0.75,0.02],[0.3,0],[0.05,0.15],[0.05,0.4],[0.5,0.5],[0.95,0.6],[1,0.85],[0.7,1],[0.3,1],[0,0.85]]],
-    'T': [[[0,0],[1,0]], [[0.5,0],[0.5,1]]],
-    'U': [[[0,0],[0,0.7],[0.2,0.95],[0.5,1],[0.8,0.95],[1,0.7],[1,0]]],
-    'V': [[[0,0],[0.5,1],[1,0]]],
-    'W': [[[0,0],[0.25,1],[0.5,0.4],[0.75,1],[1,0]]],
-    'X': [[[0,0],[1,1]], [[1,0],[0,1]]],
-    'Y': [[[0,0],[0.5,0.5],[1,0]], [[0.5,0.5],[0.5,1]]],
-    'Z': [[[0,0],[1,0],[0,1],[1,1]]],
-    'a': [[[0.2,0.45],[0.7,0.4],[0.9,0.55],[0.9,1]], [[0.9,0.7],[0.5,0.7],[0.2,0.85],[0.4,1],[0.9,0.95]]],
-    'b': [[[0,0],[0,1]], [[0,0.65],[0.3,0.5],[0.7,0.55],[0.9,0.75],[0.7,0.95],[0.3,1],[0,0.9]]],
-    'c': [[[0.9,0.55],[0.6,0.45],[0.2,0.55],[0.05,0.75],[0.2,0.95],[0.6,1],[0.9,0.9]]],
-    'd': [[[1,0],[1,1]], [[1,0.6],[0.7,0.5],[0.3,0.55],[0.1,0.75],[0.3,0.95],[0.7,1],[1,0.9]]],
-    'e': [[[0.05,0.75],[0.95,0.75],[0.95,0.55],[0.6,0.45],[0.2,0.55],[0.05,0.75],[0.2,0.95],[0.6,1],[0.9,0.9]]],
-    'f': [[[0.4,1],[0.4,0.2],[0.55,0.05],[0.85,0.05]], [[0.1,0.5],[0.7,0.5]]],
-    'g': [[[1,0.55],[0.7,0.45],[0.3,0.5],[0.1,0.7],[0.3,0.9],[0.7,0.95],[1,0.85]], [[1,0.55],[1,1.15],[0.85,1.3],[0.4,1.3],[0.1,1.2]]],
-    'h': [[[0,0],[0,1]], [[0,0.6],[0.3,0.45],[0.7,0.5],[0.9,0.7],[0.9,1]]],
-    'i': [[[0.5,0.2],[0.5,0.28]], [[0.5,0.45],[0.5,1]]],
-    'j': [[[0.6,0.2],[0.6,0.28]], [[0.6,0.45],[0.6,1.1],[0.45,1.25],[0.15,1.25]]],
-    'k': [[[0,0],[0,1]], [[0.85,0.5],[0,0.78]], [[0.3,0.7],[0.85,1]]],
-    'l': [[[0.3,0],[0.5,0],[0.5,1]]],
-    'm': [[[0,1],[0,0.45]], [[0,0.55],[0.2,0.4],[0.4,0.5],[0.5,0.7],[0.5,1]], [[0.5,0.55],[0.7,0.4],[0.9,0.5],[1,0.7],[1,1]]],
-    'n': [[[0,1],[0,0.45]], [[0,0.55],[0.3,0.4],[0.7,0.45],[0.95,0.65],[0.95,1]]],
-    'o': [[[0.3,0.45],[0.7,0.45],[0.95,0.65],[0.95,0.85],[0.7,1],[0.3,1],[0.05,0.85],[0.05,0.65],[0.3,0.45]]],
-    'p': [[[0,1.3],[0,0.45]], [[0,0.55],[0.3,0.4],[0.7,0.45],[0.95,0.65],[0.95,0.85],[0.7,1],[0.3,1],[0,0.9]]],
-    'q': [[[1,1.3],[1,0.45]], [[1,0.55],[0.7,0.4],[0.3,0.45],[0.05,0.65],[0.05,0.85],[0.3,1],[0.7,1],[1,0.9]]],
-    'r': [[[0,1],[0,0.45]], [[0,0.6],[0.3,0.45],[0.7,0.45],[0.9,0.55]]],
-    's': [[[0.85,0.5],[0.5,0.4],[0.2,0.5],[0.1,0.65],[0.4,0.75],[0.7,0.85],[0.85,0.95],[0.6,1],[0.2,1],[0.05,0.9]]],
-    't': [[[0.4,0.15],[0.4,0.85],[0.55,1],[0.85,0.95]], [[0.1,0.4],[0.75,0.4]]],
-    'u': [[[0,0.45],[0,0.85],[0.2,1],[0.5,1],[0.8,0.95],[0.95,0.7]], [[0.95,0.45],[0.95,1]]],
-    'v': [[[0,0.45],[0.5,1],[1,0.45]]],
-    'w': [[[0,0.45],[0.25,1],[0.5,0.6],[0.75,1],[1,0.45]]],
-    'x': [[[0,0.45],[1,1]], [[1,0.45],[0,1]]],
-    'y': [[[0,0.45],[0.5,1]], [[1,0.45],[0.4,1.25],[0.1,1.3]]],
-    'z': [[[0,0.45],[1,0.45],[0,1],[1,1]]],
-    '0': [[[0.3,0],[0.7,0],[0.95,0.2],[1,0.5],[0.95,0.8],[0.7,1],[0.3,1],[0.05,0.8],[0,0.5],[0.05,0.2],[0.3,0]], [[0.85,0.15],[0.15,0.85]]],
-    '1': [[[0.2,0.2],[0.5,0],[0.5,1]], [[0.2,1],[0.85,1]]],
-    '2': [[[0.05,0.2],[0.4,0],[0.7,0],[1,0.2],[1,0.4],[0,1],[1,1]]],
-    '3': [[[0.1,0.1],[0.4,0],[0.8,0.05],[0.95,0.25],[0.7,0.45],[0.4,0.5]], [[0.4,0.5],[0.85,0.55],[1,0.75],[0.85,0.95],[0.4,1],[0.1,0.9]]],
-    '4': [[[0.7,0],[0,0.7],[1,0.7]], [[0.7,0.4],[0.7,1]]],
-    '5': [[[1,0],[0.1,0],[0,0.5],[0.5,0.4],[0.85,0.5],[1,0.7],[0.85,0.95],[0.4,1],[0.1,0.9]]],
-    '6': [[[0.9,0.05],[0.3,0.15],[0.05,0.5],[0,0.8],[0.2,1],[0.6,1],[0.9,0.85],[0.95,0.65],[0.7,0.45],[0.3,0.5],[0.05,0.7]]],
-    '7': [[[0,0],[1,0],[0.3,1]]],
-    '8': [[[0.5,0.45],[0.2,0.3],[0.2,0.15],[0.5,0],[0.8,0.15],[0.8,0.3],[0.5,0.45],[0.15,0.6],[0.05,0.8],[0.3,1],[0.7,1],[0.95,0.8],[0.85,0.6],[0.5,0.45]]],
-    '9': [[[0.95,0.5],[0.7,0.55],[0.3,0.5],[0.05,0.35],[0.05,0.2],[0.3,0.05],[0.7,0],[0.95,0.2],[1,0.5],[0.85,0.85],[0.5,1],[0.15,0.95]]],
-    '.': [[[0.45,0.98],[0.55,0.98]]],
-    ',': [[[0.5,0.92],[0.45,1.1],[0.3,1.2]]],
-    '!': [[[0.5,0],[0.5,0.7]], [[0.5,0.95],[0.5,1]]],
-    '?': [[[0.1,0.2],[0.4,0],[0.8,0.05],[0.95,0.25],[0.7,0.45],[0.5,0.6],[0.5,0.75]], [[0.5,0.95],[0.5,1]]],
-    "'": [[[0.5,0],[0.5,0.2]]],
-    '"': [[[0.3,0],[0.3,0.2]], [[0.7,0],[0.7,0.2]]],
-    ':': [[[0.5,0.4],[0.5,0.42]], [[0.5,0.95],[0.5,1]]],
-    ';': [[[0.5,0.4],[0.5,0.42]], [[0.55,0.95],[0.45,1.1],[0.35,1.2]]],
-    '-': [[[0.1,0.55],[0.9,0.55]]],
-    '_': [[[0,1.05],[1,1.05]]],
-    '+': [[[0.1,0.55],[0.9,0.55]], [[0.5,0.25],[0.5,0.85]]],
-    '=': [[[0.1,0.4],[0.9,0.4]], [[0.1,0.7],[0.9,0.7]]],
-    '/': [[[0.9,0],[0.1,1.05]]],
-    '(': [[[0.7,0],[0.3,0.3],[0.3,0.7],[0.7,1]]],
-    ')': [[[0.3,0],[0.7,0.3],[0.7,0.7],[0.3,1]]],
-    ' ': []
-  };
-
-  function rand(n){ return (Math.random() * 2 - 1) * n; }
-
-  function plotLine(x0, y0, x1, y1){
-    x0 = Math.round(x0); y0 = Math.round(y0);
-    x1 = Math.round(x1); y1 = Math.round(y1);
-    const dx = Math.abs(x1 - x0), sx = x0 < x1 ? 1 : -1;
-    const dy = -Math.abs(y1 - y0), sy = y0 < y1 ? 1 : -1;
-    let err = dx + dy;
-    let safety = 0;
-    while (safety++ < 5000){
-      if (drawStyle === 1){
-        if (thick === 1) ctx.fillRect(x0, y0, 1, 1);
-        else ctx.fillRect(x0 - Math.floor(thick/2), y0 - Math.floor(thick/2), thick, thick);
-      }
-      if (x0 === x1 && y0 === y1) break;
-      const e2 = 2 * err;
-      if (e2 >= dy){ err += dy; x0 += sx; }
-      if (e2 <= dx){ err += dx; y0 += sy; }
-    }
+  // ==========================================
+  // 아이소메트릭 글자 도미노
+  // ==========================================
+  
+  const stage = document.getElementById('stage');
+  const hiddenInput = document.getElementById('hiddenInput');
+  const stoneCount = document.getElementById('stoneCount');
+  const hint = document.getElementById('hint');
+  
+  // 아이소메트릭 변환 (각도 30도)
+  // 도미노는 3D 박스: 폭(W) × 높이(H) × 두께(D)
+  // 카메라는 오른쪽-위에서 비스듬히 봄
+  const ISO_ANGLE = 30 * Math.PI / 180;
+  const COS = Math.cos(ISO_ANGLE);
+  const SIN = Math.sin(ISO_ANGLE);
+  
+  // 월드 좌표 (x: 진행 방향, y: 세로(중력), z: 깊이)를 화면 좌표로 변환
+  function worldToScreen(x, y, z) {
+    // 표준 아이소메트릭 투영 (z축이 화면에서 뒤로)
+    const sx = (x - z) * COS;
+    const sy = y + (x + z) * SIN;
+    return { x: sx, y: sy };
   }
-
-  // 스타일 2: 원통(튜브) — 획 경로를 따라 손그림 원을 이어 그림
-  const TUBE_RADIUS = 3; // 원 반지름
-  const TUBE_STEP = 5;   // 원 간격 (작을수록 빽빽)
-  const CIRCLE_PTS = 8;  // 원 하나를 구성하는 점 수
-
-  function drawCircleAt(cx, cy, r){
-    // 단독 원 그리기 (윤곽만, 손그림 느낌)
-    ctx.fillStyle = color;
-    const pts = CIRCLE_PTS;
-    for (let i = 0; i < pts; i++){
-      const a0 = (i / pts) * Math.PI * 2;
-      const a1 = ((i + 1) / pts) * Math.PI * 2;
-      const x0 = cx + Math.cos(a0) * (r + rand(jitter));
-      const y0 = cy + Math.sin(a0) * (r + rand(jitter));
-      const x1 = cx + Math.cos(a1) * (r + rand(jitter));
-      const y1 = cy + Math.sin(a1) * (r + rand(jitter));
-      let px = Math.round(x0), py = Math.round(y0);
-      const ex = Math.round(x1), ey = Math.round(y1);
-      const ddx = Math.abs(ex - px), ssx = px < ex ? 1 : -1;
-      const ddy = -Math.abs(ey - py), ssy = py < ey ? 1 : -1;
-      let e = ddx + ddy, s = 0;
-      while (s++ < 200){
-        ctx.fillRect(px, py, thick, thick);
-        if (px === ex && py === ey) break;
-        const e2 = 2 * e;
-        if (e2 >= ddy){ e += ddy; px += ssx; }
-        if (e2 <= ddx){ e += ddx; py += ssy; }
-      }
-    }
+  
+  let dominos = [];
+  let path = []; // 도미노들이 놓일 경로 (x, z 좌표)
+  let scale = 1;
+  let stageOffsetX = 0;
+  let stageOffsetY = 0;
+  
+  // 도미노 크기 (월드 단위)
+  const DOMINO_W = 50;   // 폭 (진행 방향과 수직)
+  const DOMINO_H = 90;   // 높이
+  const DOMINO_D = 16;   // 두께 (진행 방향)
+  const SPACING = 26;    // 도미노 간격 (진행 방향, 두께보다 살짝 큼)
+  
+  // === 사운드 ===
+  let audioCtx = null;
+  function getAudio() {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    return audioCtx;
   }
-
-  // 오프스크린 캔버스로 원들의 합집합 윤곽 추출
-  const tubeOff = document.createElement('canvas');
-  const tubeCtx = tubeOff.getContext('2d', {willReadFrequently: true});
-
-  function drawTubeOutline(circles){
-    if (circles.length === 0) return;
-    if (circles.length === 1){
-      drawCircleAt(circles[0][0], circles[0][1], circles[0][2]);
-      return;
+  
+  function playKnock(pitch = 1, volume = 1) {
+    try {
+      const ctx = getAudio();
+      const now = ctx.currentTime;
+      
+      // 청아한 톡! 사운드 - 종/실로폰 느낌
+      // 짧은 클릭 노이즈 (충돌 어택) - 고역 위주로 짧게
+      const buf = ctx.createBuffer(1, ctx.sampleRate * 0.015, ctx.sampleRate);
+      const data = buf.getChannelData(0);
+      for (let i = 0; i < data.length; i++) {
+        data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / data.length, 4);
+      }
+      const noise = ctx.createBufferSource();
+      noise.buffer = buf;
+      const nFilter = ctx.createBiquadFilter();
+      nFilter.type = 'highpass';
+      nFilter.frequency.value = 4000;
+      const nGain = ctx.createGain();
+      nGain.gain.setValueAtTime(0.15 * volume, now);
+      nGain.gain.exponentialRampToValueAtTime(0.001, now + 0.02);
+      noise.connect(nFilter); nFilter.connect(nGain); nGain.connect(ctx.destination);
+      noise.start(now);
+      
+      // 메인 톤 - 고음역 sine wave (실로폰/종) 
+      // 기본 주파수 ~880Hz (A5) ~ 1320Hz (E6) 사이를 pitch로 흔듦
+      const baseFreq = 880 * pitch;
+      const osc1 = ctx.createOscillator();
+      osc1.type = 'sine';
+      osc1.frequency.setValueAtTime(baseFreq, now);
+      const g1 = ctx.createGain();
+      g1.gain.setValueAtTime(0, now);
+      g1.gain.linearRampToValueAtTime(0.35 * volume, now + 0.003); // 빠른 어택
+      g1.gain.exponentialRampToValueAtTime(0.001, now + 0.5);       // 길게 울리는 릴리즈
+      osc1.connect(g1); g1.connect(ctx.destination);
+      osc1.start(now); osc1.stop(now + 0.55);
+      
+      // 하모닉 - 3배음(완전5도+1옥타브) sine으로 청아함 더하기
+      const osc2 = ctx.createOscillator();
+      osc2.type = 'sine';
+      osc2.frequency.setValueAtTime(baseFreq * 3, now);
+      const g2 = ctx.createGain();
+      g2.gain.setValueAtTime(0, now);
+      g2.gain.linearRampToValueAtTime(0.1 * volume, now + 0.002);
+      g2.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+      osc2.connect(g2); g2.connect(ctx.destination);
+      osc2.start(now); osc2.stop(now + 0.3);
+      
+      // 옥타브 위 살짝 - 반짝이는 셔머
+      const osc3 = ctx.createOscillator();
+      osc3.type = 'sine';
+      osc3.frequency.setValueAtTime(baseFreq * 2, now);
+      const g3 = ctx.createGain();
+      g3.gain.setValueAtTime(0, now);
+      g3.gain.linearRampToValueAtTime(0.15 * volume, now + 0.003);
+      g3.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+      osc3.connect(g3); g3.connect(ctx.destination);
+      osc3.start(now); osc3.stop(now + 0.45);
+    } catch(e) { console.warn(e); }
+  }
+  
+  // 정렬 피날레 사운드 - 짠! 하는 마무리 (하프/글로켄슈필 느낌의 화음)
+  function playFinaleChime() {
+    try {
+      const ctx = getAudio();
+      const now = ctx.currentTime;
+      
+      // 메이저 화음 음 (C-E-G-C 옥타브) - 살짝 시간차로 아르페지오
+      const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
+      notes.forEach((freq, i) => {
+        const t = now + i * 0.06;
+        const osc = ctx.createOscillator();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, t);
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(0, t);
+        g.gain.linearRampToValueAtTime(0.25, t + 0.005);
+        g.gain.exponentialRampToValueAtTime(0.001, t + 1.2);
+        osc.connect(g); g.connect(ctx.destination);
+        osc.start(t); osc.stop(t + 1.3);
+        
+        // 셔머 옥타브
+        const osc2 = ctx.createOscillator();
+        osc2.type = 'sine';
+        osc2.frequency.setValueAtTime(freq * 2, t);
+        const g2 = ctx.createGain();
+        g2.gain.setValueAtTime(0, t);
+        g2.gain.linearRampToValueAtTime(0.08, t + 0.005);
+        g2.gain.exponentialRampToValueAtTime(0.001, t + 0.8);
+        osc2.connect(g2); g2.connect(ctx.destination);
+        osc2.start(t); osc2.stop(t + 0.85);
+      });
+    } catch(e) { console.warn(e); }
+  }
+  
+  // === 경로 생성 ===
+  // 도미노 N번째가 놓일 (worldX, worldZ) 좌표를 생성.
+  // 핵심: 인접 도미노 간 거리(호 길이)가 항상 SPACING이 되도록 누적 계산.
+  // 진행 방향각 θ(idx)를 정의하고, 점은 (x[i+1], z[i+1]) = (x[i], z[i]) + SPACING * (cos θ, sin θ)
+  
+  let pathSeed = Math.random();
+  let pathType = 'wave';
+  
+  // 캐시: 호 길이 기반이라 매번 누적 계산하면 비싸니까 idx별로 캐싱
+  let pathCache = []; // [{worldX, worldZ}]
+  
+  // idx 위치에서의 진행 방향각 (라디안). 화면 비율과 도미노 수에 맞춰 휘어지는 정도 조절
+  function pathAngleAt(idx) {
+    if (pathType === 'straight') {
+      return 0;
+    } else if (pathType === 'wave') {
+      const period = 22; 
+      const ampDeg = 28;
+      return Math.sin(idx / period * Math.PI * 2 + pathSeed * Math.PI * 2) * ampDeg * Math.PI / 180;
+    } else if (pathType === 'scurve') {
+      const period = 30;
+      const ampDeg = 38;
+      return Math.sin(idx / period * Math.PI * 2 + pathSeed * Math.PI * 2) * ampDeg * Math.PI / 180;
+    } else if (pathType === 'zigzag') {
+      const period = 18;
+      const ampDeg = 35;
+      const phase = idx / period * Math.PI * 2 + pathSeed * Math.PI * 2;
+      const s = Math.sin(phase);
+      const sharp = Math.sign(s) * Math.pow(Math.abs(s), 0.5);
+      return sharp * ampDeg * Math.PI / 180;
     }
-    // 바운딩 박스 계산
+    return 0;
+  }
+  
+  function generatePathPoint(idx) {
+    // 캐시 확인
+    if (pathCache[idx]) return pathCache[idx];
+    
+    if (idx === 0) {
+      const p = { worldX: 0, worldZ: 0 };
+      pathCache[0] = p;
+      return p;
+    }
+    
+    // 이전 점 + SPACING만큼 진행각 방향으로 이동
+    const prev = generatePathPoint(idx - 1);
+    const angle = pathAngleAt(idx - 1);
+    const p = {
+      worldX: prev.worldX + SPACING * Math.cos(angle),
+      worldZ: prev.worldZ + SPACING * Math.sin(angle)
+    };
+    pathCache[idx] = p;
+    return p;
+  }
+  
+  // 진행 방향 각도 (도미노가 경로 방향에 수직으로 서도록)
+  function getDirectionAngle(idx) {
+    if (idx === 0) {
+      // 첫 도미노는 0번→1번 방향
+      return pathAngleAt(0);
+    }
+    // idx-1 → idx 방향각
+    return pathAngleAt(idx - 1);
+  }
+  
+  // === 도미노 SVG 생성 ===
+  // 아이소메트릭 박스 - 진행 방향(direction)을 따라 도미노가 서있음
+  // 도미노의 "폭(넓은 면)"이 진행 방향과 수직이 되도록
+  // 진행 방향 단위 벡터: (cos a, sin a) (월드 평면 xz)
+  // 도미노 폭 방향: (-sin a, cos a)
+  // 도미노 높이 방향: (0, 1, 0) - y축
+  
+  function createDominoSVG(char, idx, total) {
+    const point = generatePathPoint(idx);
+    const angle = getDirectionAngle(idx);
+    
+    // 도미노 박스의 8개 꼭짓점 (월드 좌표)
+    // 중심점 (point.worldX, 0, point.worldZ)에서 출발
+    const cx = point.worldX;
+    const cz = point.worldZ;
+    
+    // 진행방향 (두께 D 방향) 단위벡터
+    const dx = Math.cos(angle), dz = Math.sin(angle);
+    // 폭 방향 (W 방향)
+    const wx = -Math.sin(angle), wz = Math.cos(angle);
+    
+    // 도미노 박스 꼭짓점 (서있을 때) - 아래면 4개, 윗면 4개
+    // 박스 중심을 (cx, H/2, cz)에 두고 W, H, D 방향으로 ±0.5씩 확장
+    const halfW = DOMINO_W / 2;
+    const halfD = DOMINO_D / 2;
+    
+    // 8 corners: 아래(y=0) 4개 + 위(y=H) 4개
+    // p1: -W -D, p2: +W -D, p3: +W +D, p4: -W +D (아래)
+    // p5~p8 (위)
+    const corners3D = [
+      [cx - wx*halfW - dx*halfD, 0, cz - wz*halfW - dz*halfD], // 0: 아래-앞-왼
+      [cx + wx*halfW - dx*halfD, 0, cz + wz*halfW - dz*halfD], // 1: 아래-앞-오
+      [cx + wx*halfW + dx*halfD, 0, cz + wz*halfW + dz*halfD], // 2: 아래-뒤-오
+      [cx - wx*halfW + dx*halfD, 0, cz - wz*halfW + dz*halfD], // 3: 아래-뒤-왼
+      [cx - wx*halfW - dx*halfD, DOMINO_H, cz - wz*halfW - dz*halfD], // 4: 위-앞-왼
+      [cx + wx*halfW - dx*halfD, DOMINO_H, cz + wz*halfW - dz*halfD], // 5: 위-앞-오
+      [cx + wx*halfW + dx*halfD, DOMINO_H, cz + wz*halfW + dz*halfD], // 6: 위-뒤-오
+      [cx - wx*halfW + dx*halfD, DOMINO_H, cz - wz*halfW + dz*halfD], // 7: 위-뒤-왼
+    ];
+    
+    // 각 꼭짓점을 화면 좌표로 변환
+    const screen = corners3D.map(([x, y, z]) => worldToScreen(x, -y, z));
+    // 주의: y는 위로 갈수록 작아져야 하므로 -y
+    
+    // 면 4개 정의 (꼭짓점 인덱스)
+    // 꼭짓점 순서는 화면에서 봤을 때 시계방향 또는 반시계방향으로 일관되게
+    const faceFront1 = [0, 1, 5, 4];   // -D 방향 면 (법선: -d 방향)
+    const faceFront2 = [3, 2, 6, 7];   // +D 방향 면 (법선: +d 방향)
+    const faceTop    = [4, 5, 6, 7];   // 윗면
+    const faceSide1  = [0, 3, 7, 4];   // -W 방향 면 (법선: -w 방향)
+    const faceSide2  = [1, 2, 6, 5];   // +W 방향 면 (법선: +w 방향)
+    
+    // 어느 면이 카메라쪽(=화면에서 더 앞=아래쪽)인지 직접 화면 좌표로 판정.
+    // 월드에서 두 후보 면의 중심을 화면에 투영해서, 화면 y가 더 큰 쪽(=화면 아래쪽=카메라에 가까움)을 보이는 면으로 선택.
+    
+    // 앞면 두 후보의 중심 (월드)
+    const front1WorldCenter = [cx - dx*halfD, DOMINO_H/2, cz - dz*halfD]; // -D쪽 면 중심
+    const front2WorldCenter = [cx + dx*halfD, DOMINO_H/2, cz + dz*halfD]; // +D쪽 면 중심
+    const f1s = worldToScreen(front1WorldCenter[0], -front1WorldCenter[1], front1WorldCenter[2]);
+    const f2s = worldToScreen(front2WorldCenter[0], -front2WorldCenter[1], front2WorldCenter[2]);
+    
+    let frontFaceCorners;
+    if (f2s.y > f1s.y) {
+      // +D쪽 면 중심이 화면에서 더 아래 = 카메라에 가까움 = 우리에게 보이는 면
+      frontFaceCorners = faceFront2;
+    } else {
+      frontFaceCorners = faceFront1;
+    }
+    
+    // 옆면(W방향)도 동일
+    const side1WorldCenter = [cx - wx*halfW, DOMINO_H/2, cz - wz*halfW];
+    const side2WorldCenter = [cx + wx*halfW, DOMINO_H/2, cz + wz*halfW];
+    const s1s = worldToScreen(side1WorldCenter[0], -side1WorldCenter[1], side1WorldCenter[2]);
+    const s2s = worldToScreen(side2WorldCenter[0], -side2WorldCenter[1], side2WorldCenter[2]);
+    
+    let visibleSideCorners;
+    if (s2s.y > s1s.y) {
+      visibleSideCorners = faceSide2;
+    } else {
+      visibleSideCorners = faceSide1;
+    }
+    
+    // SVG path 생성용 - 모든 좌표를 양수로 만들기 위한 bbox 계산
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    for (const [cx, cy, r] of circles){
-      minX = Math.min(minX, cx - r - 2);
-      minY = Math.min(minY, cy - r - 2);
-      maxX = Math.max(maxX, cx + r + 2);
-      maxY = Math.max(maxY, cy + r + 2);
-    }
-    minX = Math.floor(minX); minY = Math.floor(minY);
-    maxX = Math.ceil(maxX); maxY = Math.ceil(maxY);
-    const tw = maxX - minX + 1, th = maxY - minY + 1;
-    if (tw < 2 || th < 2) return;
-
-    tubeOff.width = tw; tubeOff.height = th;
-    tubeCtx.clearRect(0, 0, tw, th);
-    // 모든 원을 채워서 합집합 영역 생성
-    tubeCtx.fillStyle = '#000';
-    for (const [cx, cy, r] of circles){
-      tubeCtx.beginPath();
-      tubeCtx.arc(cx - minX, cy - minY, r, 0, Math.PI * 2);
-      tubeCtx.fill();
-    }
-    // 외곽선만 그리기 — 내부 구멍은 무시 (외곽만 추출)
-    const imgData = tubeCtx.getImageData(0, 0, tw, th);
-    const d = imgData.data;
-    ctx.fillStyle = color;
-    for (let y = 0; y < th; y++){
-      for (let x = 0; x < tw; x++){
-        if (d[(y * tw + x) * 4 + 3] < 128) continue;
-        // 외곽 = 전경이면서 상하좌우 중 하나라도 배경인 픽셀
-        let isEdge = false;
-        const neighbors = [[0,-1],[0,1],[-1,0],[1,0]];
-        for (const [dx2, dy2] of neighbors){
-          const nx = x + dx2, ny = y + dy2;
-          if (nx < 0 || nx >= tw || ny < 0 || ny >= th){ isEdge = true; break; }
-          if (d[(ny * tw + nx) * 4 + 3] < 128){ isEdge = true; break; }
-        }
-        if (isEdge){
-          const px = x + minX + rand(jitter * 0.4);
-          const py = y + minY + rand(jitter * 0.4);
-          ctx.fillRect(Math.round(px), Math.round(py), thick, thick);
-        }
-      }
-    }
+    screen.forEach(p => {
+      if (p.x < minX) minX = p.x;
+      if (p.y < minY) minY = p.y;
+      if (p.x > maxX) maxX = p.x;
+      if (p.y > maxY) maxY = p.y;
+    });
+    
+    const padding = 8;
+    const svgW = maxX - minX + padding * 2;
+    const svgH = maxY - minY + padding * 2;
+    
+    // 회전 원점 = 도미노 바닥 모서리 (진행방향 반대쪽 = 카메라에서 멀어지는 쪽 아니고, 쓰러질 방향의 반대 모서리)
+    // 도미노가 진행방향(+dx,+dz)으로 쓰러진다고 가정 → 회전축은 진행방향 반대쪽 바닥 모서리
+    // = corners3D[0]과 corners3D[1]을 잇는 모서리 (아래-앞-왼/오) = -D 쪽 바닥 모서리
+    // 회전축의 중점을 회전 원점으로 사용
+    const pivotWorld = [
+      cx - dx*halfD,  // 진행 방향 반대 = -D 쪽
+      0,
+      cz - dz*halfD
+    ];
+    const pivotScreen = worldToScreen(pivotWorld[0], 0, pivotWorld[2]);
+    const pivotSvgX = pivotScreen.x - minX + padding;
+    const pivotSvgY = pivotScreen.y - minY + padding;
+    
+    // 면 좌표를 SVG 좌표로 변환 (bbox 기준)
+    const toSvgPoint = (cornerIdx) => {
+      const p = screen[cornerIdx];
+      return [p.x - minX + padding, p.y - minY + padding];
+    };
+    
+    const facePoints = (corners) => corners.map(toSvgPoint);
+    const polyStr = (pts) => pts.map(p => `${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(' ');
+    
+    const topPts = facePoints(faceTop);
+    const frontPts = facePoints(frontFaceCorners);
+    const sidePts = facePoints(visibleSideCorners);
+    
+    // 글자 위치 - 앞면의 중심
+    const frontCenter = [
+      (frontPts[0][0] + frontPts[1][0] + frontPts[2][0] + frontPts[3][0]) / 4,
+      (frontPts[0][1] + frontPts[1][1] + frontPts[2][1] + frontPts[3][1]) / 4
+    ];
+    
+    // 글자 기울기 - 도미노 폭(W) 방향을 화면에 투영한 벡터의 각도
+    // 이게 글자 baseline 방향이 됨 (왼쪽→오른쪽)
+    // 폭 방향 월드 단위벡터 (wx, 0, wz)를 화면 변위로 변환
+    const widthDirScreen = worldToScreen(wx, 0, wz); // 원점 기준 변위
+    let textAngleDeg = Math.atan2(widthDirScreen.y, widthDirScreen.x) * 180 / Math.PI;
+    // 글자가 거꾸로 안 되도록 보장 (-90~90 사이)
+    if (textAngleDeg > 90) textAngleDeg -= 180;
+    if (textAngleDeg < -90) textAngleDeg += 180;
+    
+    // 앞면의 너비 (글자 크기 결정)
+    const frontWidth = Math.hypot(frontPts[1][0] - frontPts[0][0], frontPts[1][1] - frontPts[0][1]);
+    const frontHeight = Math.hypot(frontPts[3][0] - frontPts[0][0], frontPts[3][1] - frontPts[0][1]);
+    const fontSize = Math.min(frontHeight * 0.55, frontWidth * 1.2);
+    
+    // 해칭 패턴 ID (도미노마다 다름)
+    const patternId = `hatch-${idx}`;
+    const dotsId = `dots-${idx}`;
+    
+    // SVG 조립
+    const svgNS = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(svgNS, 'svg');
+    svg.setAttribute('xmlns', svgNS);
+    svg.setAttribute('width', svgW);
+    svg.setAttribute('height', svgH);
+    svg.setAttribute('viewBox', `0 0 ${svgW} ${svgH}`);
+    svg.classList.add('domino-svg', 'appearing');
+    
+    svg.innerHTML = `
+      <defs>
+        <pattern id="${patternId}" patternUnits="userSpaceOnUse" width="6" height="6" patternTransform="rotate(45)">
+          <line x1="0" y1="0" x2="0" y2="6" stroke="${'#5a5247'}" stroke-width="0.6" opacity="0.55"/>
+        </pattern>
+        <pattern id="${dotsId}" patternUnits="userSpaceOnUse" width="5" height="5">
+          <circle cx="2.5" cy="2.5" r="0.7" fill="#5a5247" opacity="0.5"/>
+        </pattern>
+      </defs>
+      <!-- 옆면 (해칭) - 패턴 뒤 비침 방지를 위해 종이색 채움 + 패턴 -->
+      <polygon points="${polyStr(sidePts)}" fill="#efe9d8"/>
+      <polygon points="${polyStr(sidePts)}" fill="url(#${patternId})" stroke="#2a2620" stroke-width="1.2" stroke-linejoin="round"/>
+      <!-- 윗면 (도트) - 패턴 뒤 비침 방지 -->
+      <polygon points="${polyStr(topPts)}" fill="#efe9d8"/>
+      <polygon points="${polyStr(topPts)}" fill="url(#${dotsId})" stroke="#2a2620" stroke-width="1.2" stroke-linejoin="round"/>
+      <!-- 앞면 (글자가 새겨질 곳) -->
+      <polygon class="face-front" points="${polyStr(frontPts)}" fill="#efe9d8" stroke="#2a2620" stroke-width="1.2" stroke-linejoin="round"/>
+      <!-- 글자 -->
+      <text 
+        x="${frontCenter[0]}" 
+        y="${frontCenter[1]}" 
+        text-anchor="middle" 
+        dominant-baseline="central"
+        font-family="'EB Garamond', Georgia, serif"
+        font-size="${fontSize}"
+        font-style="italic"
+        font-weight="500"
+        fill="#2a2620"
+        transform="rotate(${textAngleDeg.toFixed(2)} ${frontCenter[0]} ${frontCenter[1]})"
+      >${escapeText(char)}</text>
+    `;
+    
+    // SVG 위치 설정 - bbox의 좌상단을 stage 좌표로 배치
+    svg.style.left = (minX - padding) + 'px';
+    svg.style.top = (minY - padding) + 'px';
+    svg.style.setProperty('--ox', `${pivotSvgX}px`);
+    svg.style.setProperty('--oy', `${pivotSvgY}px`);
+    svg.style.transformOrigin = `${pivotSvgX}px ${pivotSvgY}px`;
+    
+    return {
+      svg,
+      bbox: { minX, minY, maxX, maxY, width: svgW, height: svgH },
+      pivot: { x: pivotScreen.x, y: pivotScreen.y },
+      worldPos: { x: cx, z: cz },
+      angle,
+      idx
+    };
   }
-
-  // 스타일 2 전용: 한 글자의 모든 원을 모아서 한번에 윤곽 그리기
-  let pendingCircles = [];
-
-  function flushTubeCircles(){
-    if (pendingCircles.length === 0) return;
-    // 겹치는 원들을 그룹으로 묶기
-    const circles = pendingCircles;
-    pendingCircles = [];
-    // 모든 원을 한번에 합집합 윤곽으로 그리기
-    drawTubeOutline(circles);
+  
+  function escapeText(s) {
+    return s.replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'})[c]);
   }
-
-  function plotTube(x0, y0, x1, y1){
-    const dx = x1 - x0, dy = y1 - y0;
-    const dist = Math.sqrt(dx*dx + dy*dy);
-    if (dist < 1){ pendingCircles.push([x0, y0, TUBE_RADIUS]); return; }
-    const gap = TUBE_STEP + (breakFreq / 100) * (TUBE_RADIUS * 3);
-    const steps = Math.max(1, Math.floor(dist / gap));
-    for (let i = 0; i <= steps; i++){
-      const t = i / steps;
-      if (breakFreq > 0 && Math.random() * 100 < breakFreq * 0.3) continue;
-      const cx = x0 + dx * t + rand(jitter * 0.3);
-      const cy = y0 + dy * t + rand(jitter * 0.3);
-      const r = TUBE_RADIUS + rand(jitter * 0.3);
-      pendingCircles.push([cx, cy, r]);
-    }
-  }
-
-  function buildStrokeSegments(stroke, ox, oy, w, h){
-    if (stroke.length < 2) {
-      if (stroke.length === 1){
-        return [[[ox + stroke[0][0]*w + rand(jitter), oy + stroke[0][1]*h + rand(jitter)]]];
-      }
-      return [];
-    }
-
-    const abs = stroke.map(p => [ox + p[0]*w, oy + p[1]*h]);
-    const dense = [abs[0].slice()];
-    for (let i = 0; i < abs.length - 1; i++){
-      const dx = abs[i+1][0] - abs[i][0];
-      const dy = abs[i+1][1] - abs[i][1];
-      const L = Math.sqrt(dx*dx + dy*dy);
-      const stepSize = 4 + Math.random() * 3;
-      const n = Math.max(1, Math.ceil(L / stepSize));
-      for (let k = 1; k <= n; k++){
-        const t = k / n;
-        dense.push([
-          abs[i][0] + dx * t + rand(jitter),
-          abs[i][1] + dy * t + rand(jitter)
-        ]);
-      }
-    }
-
-    // 끊김 0%면 통째로 한 segment
-    if (breakFreq === 0) return [dense];
-
-    const segments = [];
-    let current = [dense[0]];
-    let breaksUsed = 0;
-    const maxBreaks = Math.max(1, Math.floor(dense.length / 10));
-
-    for (let i = 1; i < dense.length; i++){
-      const canBreak = i > 2 && i < dense.length - 2 && breaksUsed < maxBreaks && Math.random() * 100 < breakFreq;
-      if (canBreak){
-        segments.push(current);
-        breaksUsed++;
-        const skipDist = 1 + Math.random() * 1.5;
-        const dx = dense[i][0] - dense[i-1][0];
-        const dy = dense[i][1] - dense[i-1][1];
-        const L = Math.sqrt(dx*dx + dy*dy) || 1;
-        current = [[dense[i][0] + (dx/L)*skipDist, dense[i][1] + (dy/L)*skipDist]];
-      } else {
-        current.push(dense[i]);
-      }
-    }
-    if (current.length) segments.push(current);
-    return segments;
-  }
-
-  function animateStroke(segments){
-    if (!animEl.checked){
-      ctx.fillStyle = color;
-      segments.forEach(seg => {
-        if (seg.length === 1){
-          const p = seg[0];
-          if (drawStyle === 2) pendingCircles.push([Math.round(p[0]), Math.round(p[1]), TUBE_RADIUS]);
-          else if (thick === 1) ctx.fillRect(Math.round(p[0]), Math.round(p[1]), 1, 1);
-          else ctx.fillRect(Math.round(p[0]-thick/2), Math.round(p[1]-thick/2), thick, thick);
-        } else {
-          for (let i = 0; i < seg.length - 1; i++){
-            if (drawStyle === 2) plotTube(seg[i][0], seg[i][1], seg[i+1][0], seg[i+1][1]);
-            else plotLine(seg[i][0], seg[i][1], seg[i+1][0], seg[i+1][1]);
-          }
-        }
-        // 스타일 2: 세그먼트 단위로 flush (각 세그먼트가 하나의 원통)
-        if (drawStyle === 2) flushTubeCircles();
+  
+  // === 글자 한 개 추가 ===
+  function addChar(char) {
+    if (!char || char === ' ' || char === '\n') return;
+    
+    // 피날레가 진행/완료 상태면 자동으로 정리하고 처음부터 새로 시작
+    if (finaleActive) {
+      finaleLetters.forEach(L => {
+        L.el.style.transition = 'opacity 0.3s';
+        L.el.style.opacity = '0';
+        setTimeout(() => L.el.remove(), 300);
       });
-      // flush는 drawChar에서 글자 단위로 처리
+      finaleLetters = [];
+      finaleActive = false;
+      
+      pathCache = [];
+      stage.style.transform = '';
+    }
+    
+    createDomino(char);
+  }
+  
+  // === 마지막 도미노 제거 (backspace) ===
+  function removeLastDomino() {
+    if (dominos.length === 0) return;
+    const last = dominos.pop();
+    last.svg.style.transition = 'opacity 0.25s, transform 0.25s';
+    last.svg.style.opacity = '0';
+    last.svg.style.transform = (last.fallen ? 'rotate(88deg)' : '') + ' translateY(-15px) scale(0.85)';
+    setTimeout(() => last.svg.remove(), 280);
+    
+    // 카운터에서 인덱스가 줄어들었으니 경로 시드는 유지 (다음 글자가 같은 자리에 들어가도록)
+    updateStone();
+    updateLayout();
+  }
+  
+  // === Enter: 모든 도미노 쓰러뜨리기 (서있는 첫 도미노부터) ===
+  function toppleAll() {
+    const standing = dominos.filter(d => !d.fallen && !d.falling);
+    if (standing.length === 0) return;
+    standing.sort((a, b) => a.idx - b.idx);
+    triggerChain(standing[0]);
+  }
+  
+  function createDomino(char) {
+    const idx = dominos.length;
+    
+    // 첫 도미노 생성 시 경로 스타일과 시드를 새로 정하고 캐시 초기화
+    if (idx === 0) {
+      const types = ['wave', 'wave', 'scurve', 'zigzag', 'straight'];
+      pathType = types[Math.floor(Math.random() * types.length)];
+      pathSeed = Math.random();
+      pathCache = [];
+    }
+    
+    const dominoData = createDominoSVG(char, idx, dominos.length + 1);
+    dominoData.fallen = false;
+    dominoData.falling = false;
+    dominoData.char = char;
+    
+    // z-order: 화면 y가 큰 (= 더 앞쪽) 도미노가 위에 오도록
+    // SVG의 top 위치 + height로 baseline 계산
+    const baseline = dominoData.bbox.maxY;
+    dominoData.zIndex = Math.floor(baseline + 1000);
+    dominoData.svg.style.zIndex = dominoData.zIndex;
+    
+    dominoData.svg.addEventListener('click', (e) => {
+      e.stopPropagation();
+      triggerChain(dominoData);
+    });
+    
+    stage.appendChild(dominoData.svg);
+    dominos.push(dominoData);
+    
+    // 등장 애니메이션이 끝난 후 클래스를 제거해야
+    // 이후 style.transform (회전, 등)이 정상 적용됨.
+    // CSS animation은 inline style보다 우선순위가 높으므로 애니메이션이 살아 있으면 회전이 무시됨.
+    setTimeout(() => {
+      dominoData.svg.classList.remove('appearing');
+    }, 500); // appear 애니메이션 길이(0.5s)와 일치
+    
+    updateStone();
+    updateLayout();
+  }
+  
+  // === 레이아웃: 모든 도미노를 화면 중앙에 맞추고, 항상 전체가 보이도록 축소 ===
+  function updateLayout() {
+    if (dominos.length === 0) {
+      stage.style.transform = 'translate(0, 0) scale(1)';
       return;
     }
-    const totalPoints = segments.reduce((a, s) => a + s.length, 0);
-    const duration = Math.max(80, Math.min(drawStyle === 2 ? 500 : 250, totalPoints * (drawStyle === 2 ? 8 : 4)));
-    strokeQueue.push({
-      segments, segIdx: 0, pointIdx: 0, totalPoints, drawnPoints: 0,
-      start: performance.now(), duration, isLast: true
+    
+    // 전체 bbox 계산 (도미노 SVG들의 stage 좌표상 외곽)
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    dominos.forEach(d => {
+      if (d.bbox.minX < minX) minX = d.bbox.minX;
+      if (d.bbox.minY < minY) minY = d.bbox.minY;
+      if (d.bbox.maxX > maxX) maxX = d.bbox.maxX;
+      if (d.bbox.maxY > maxY) maxY = d.bbox.maxY;
     });
-    if (!rafId) rafId = requestAnimationFrame(tick);
+    
+    const totalW = maxX - minX;
+    const totalH = maxY - minY;
+    const centerX = (minX + maxX) / 2;
+    const centerY = (minY + maxY) / 2;
+    
+    // 사용 가능 영역 - UI 요소들이 차지하는 공간을 모두 빼고 여백
+    // 위쪽: 헤더(타이틀+컨트롤박스)
+    // 아래쪽: hint 박스
+    // 좌우: 코너 노트, 카운터 박스 + 일반 여백
+    const isMobile = window.innerWidth < 700;
+    const topInset    = isMobile ? 170 : 220;  // 헤더 + 여유
+    const bottomInset = isMobile ? 70  : 90;   // hint + 여유
+    const sideInset   = isMobile ? 30  : 60;
+    
+    const availW = Math.max(100, window.innerWidth  - sideInset * 2);
+    const availH = Math.max(100, window.innerHeight - topInset - bottomInset);
+    
+    // 스케일: 항상 사용 가능 영역에 들어맞도록 - 상한 1, 하한은 매우 낮게
+    // (도미노가 매우 길어져도 항상 한 화면에 들어오도록)
+    const newScale = Math.min(1, availW / totalW, availH / totalH);
+    
+    // 사용 가능 영역의 중앙 좌표
+    const stageCenterX = sideInset + availW / 2;
+    const stageCenterY = topInset + availH / 2;
+    
+    // stage 좌표상 도미노들의 중심 (centerX, centerY)을 화면 중앙에 정렬
+    const tx = stageCenterX - centerX * newScale;
+    const ty = stageCenterY - centerY * newScale;
+    
+    stage.style.transform = `translate(${tx}px, ${ty}px) scale(${newScale})`;
+    scale = newScale;
   }
-
-  function tick(now){
-    if (strokeQueue.length === 0){ rafId = null; return; }
-    const job = strokeQueue[0];
-    const elapsed = now - job.start;
-    const targetPoints = Math.min(job.totalPoints, Math.floor((elapsed / job.duration) * job.totalPoints));
-
-    ctx.fillStyle = color;
-    while (job.drawnPoints < targetPoints && job.segIdx < job.segments.length){
-      const seg = job.segments[job.segIdx];
-      if (job.pointIdx === 0){
-        const p = seg[0];
-        if (drawStyle === 2) pendingCircles.push([Math.round(p[0]), Math.round(p[1]), TUBE_RADIUS]);
-        else if (thick === 1) ctx.fillRect(Math.round(p[0]), Math.round(p[1]), 1, 1);
-        else ctx.fillRect(Math.round(p[0]-thick/2), Math.round(p[1]-thick/2), thick, thick);
-        job.pointIdx = 1;
-        job.drawnPoints++;
-      } else if (job.pointIdx < seg.length){
-        if (drawStyle === 2) plotTube(seg[job.pointIdx-1][0], seg[job.pointIdx-1][1], seg[job.pointIdx][0], seg[job.pointIdx][1]);
-        else plotLine(seg[job.pointIdx-1][0], seg[job.pointIdx-1][1], seg[job.pointIdx][0], seg[job.pointIdx][1]);
-        job.pointIdx++;
-        job.drawnPoints++;
-      } else {
-        job.segIdx++;
-        job.pointIdx = 0;
-      }
-    }
-
-    if (job.drawnPoints >= job.totalPoints){
-      if (drawStyle === 2) flushTubeCircles();
-      strokeQueue.shift();
-    }
-    rafId = requestAnimationFrame(tick);
+  
+  // === 도미노 쓰러뜨리기 ===
+  function fallOne(d, delay = 0) {
+    if (d.fallen || d.falling) return;
+    d.falling = true;
+    
+    setTimeout(() => {
+      // 등장 애니메이션이 아직 진행 중이면 강제 종료 (CSS animation이 inline transform을 덮어쓰지 않도록)
+      d.svg.classList.remove('appearing');
+      
+      // 진행방향 벡터를 화면에 투영
+      const dirScreenX = COS * Math.cos(d.angle) - COS * 0;
+      const rotateDeg = 88; // 90도지만 살짝 못 미치게 (실제 도미노 효과)
+      
+      d.svg.style.transition = 'transform 0.45s cubic-bezier(0.55, 0.085, 0.68, 0.53)';
+      d.svg.style.transform = `rotate(${rotateDeg}deg)`;
+      
+      // 충격 시점 - 펜타토닉 스케일에서 도미노 idx 기반으로 음정 선택
+      // 같은 화음 안의 음들이라 어떻게 울려도 화음감이 좋음
+      setTimeout(() => {
+        // C 메이저 펜타토닉: C, D, E, G, A → ratio from base
+        // 옥타브를 살짝 분산: 베이스 880Hz 기준, 살짝 위/아래
+        const pentatonic = [1.0, 9/8, 5/4, 3/2, 5/3, 2.0, 9/4, 5/2]; // C,D,E,G,A,C',D',E'
+        const noteIdx = d.idx % pentatonic.length;
+        const pitch = pentatonic[noteIdx] * (0.95 + Math.random() * 0.05); // 살짝의 흔들림
+        playKnock(pitch, 0.7);
+        spawnDust(d);
+      }, 380);
+      
+      setTimeout(() => {
+        d.fallen = true;
+        d.falling = false;
+        updateStone();
+      }, 450);
+    }, delay);
   }
-
-  // 한글 등 미등록 글자: 자모 분해 + 벡터 글리프로 손글씨 느낌
-  // 한글 자모 벡터 글리프 (각 자모의 획을 0~1 좌표로 정의)
-  const CHOSEONG = ['ㄱ','ㄲ','ㄴ','ㄷ','ㄸ','ㄹ','ㅁ','ㅂ','ㅃ','ㅅ','ㅆ','ㅇ','ㅈ','ㅉ','ㅊ','ㅋ','ㅌ','ㅍ','ㅎ'];
-  const JUNGSEONG = ['ㅏ','ㅐ','ㅑ','ㅒ','ㅓ','ㅔ','ㅕ','ㅖ','ㅗ','ㅘ','ㅙ','ㅚ','ㅛ','ㅜ','ㅝ','ㅞ','ㅟ','ㅠ','ㅡ','ㅢ','ㅣ'];
-  const JONGSEONG = [null,'ㄱ','ㄲ','ㄳ','ㄴ','ㄵ','ㄶ','ㄷ','ㄹ','ㄺ','ㄻ','ㄼ','ㄽ','ㄾ','ㄿ','ㅀ','ㅁ','ㅂ','ㅄ','ㅅ','ㅆ','ㅇ','ㅈ','ㅊ','ㅋ','ㅌ','ㅍ','ㅎ'];
-
-  // 자모 획 데이터 (영어 글리프와 동일한 형식)
-  const JAMO = {
-    'ㄱ': [[[0.05,0.15],[0.95,0.15],[0.85,0.95]]],
-    'ㄲ': [[[0.05,0.15],[0.5,0.15],[0.45,0.95]], [[0.5,0.15],[0.95,0.15],[0.9,0.95]]],
-    'ㄴ': [[[0.1,0.05],[0.1,0.9],[0.95,0.9]]],
-    'ㄷ': [[[0.9,0.1],[0.1,0.1],[0.1,0.9],[0.9,0.9]]],
-    'ㄸ': [[[0.45,0.1],[0.05,0.1],[0.05,0.9],[0.45,0.9]], [[0.95,0.1],[0.55,0.1],[0.55,0.9],[0.95,0.9]]],
-    'ㄹ': [[[0.05,0.05],[0.95,0.05]], [[0.95,0.05],[0.95,0.4]], [[0.95,0.4],[0.05,0.4]], [[0.05,0.4],[0.05,0.75]], [[0.05,0.75],[0.95,0.75]]],
-    'ㅁ': [[[0.1,0.1],[0.1,0.9],[0.9,0.9],[0.9,0.1],[0.1,0.1]]],
-    'ㅂ': [[[0.15,0.05],[0.15,0.95]], [[0.85,0.05],[0.85,0.95]], [[0.15,0.5],[0.85,0.5]], [[0.15,0.95],[0.85,0.95]]],
-    'ㅃ': [[[0.08,0.05],[0.08,0.95],[0.45,0.95],[0.45,0.05]], [[0.08,0.5],[0.45,0.5]], [[0.55,0.05],[0.55,0.95],[0.92,0.95],[0.92,0.05]], [[0.55,0.5],[0.92,0.5]]],
-    'ㅅ': [[[0.05,0.9],[0.5,0.1],[0.95,0.9]]],
-    'ㅆ': [[[0.05,0.9],[0.35,0.1],[0.55,0.9]], [[0.45,0.9],[0.65,0.1],[0.95,0.9]]],
-    'ㅇ': [[[0.3,0.15],[0.7,0.15],[0.9,0.4],[0.9,0.65],[0.7,0.85],[0.3,0.85],[0.1,0.65],[0.1,0.4],[0.3,0.15]]],
-    'ㅈ': [[[0.15,0.35],[0.85,0.35]], [[0.1,0.95],[0.5,0.4],[0.9,0.95]]],
-    'ㅉ': [[[0.1,0.35],[0.9,0.35]], [[0.1,0.95],[0.35,0.4],[0.6,0.95]], [[0.4,0.95],[0.65,0.4],[0.9,0.95]]],
-    'ㅊ': [[[0.35,0.05],[0.5,0.2],[0.65,0.05]], [[0.15,0.4],[0.85,0.4]], [[0.1,0.95],[0.5,0.45],[0.9,0.95]]],
-    'ㅋ': [[[0.05,0.15],[0.95,0.15],[0.85,0.9]], [[0.1,0.55],[0.75,0.55]]],
-    'ㅌ': [[[0.9,0.1],[0.1,0.1],[0.1,0.9],[0.9,0.9]], [[0.1,0.5],[0.75,0.5]]],
-    'ㅍ': [[[0.1,0.1],[0.9,0.1]], [[0.3,0.1],[0.3,0.9]], [[0.7,0.1],[0.7,0.9]], [[0.1,0.9],[0.9,0.9]]],
-    'ㅎ': [[[0.35,0.05],[0.65,0.05]], [[0.15,0.3],[0.85,0.3]], [[0.3,0.55],[0.7,0.55],[0.85,0.7],[0.7,0.9],[0.3,0.9],[0.15,0.7],[0.3,0.55]]],
-    // 모음
-    'ㅏ': [[[0.3,0.05],[0.3,0.95]], [[0.3,0.4],[0.9,0.4]]],
-    'ㅐ': [[[0.15,0.05],[0.15,0.95]], [[0.15,0.4],[0.55,0.4]], [[0.75,0.05],[0.75,0.95]]],
-    'ㅑ': [[[0.3,0.05],[0.3,0.95]], [[0.3,0.3],[0.9,0.3]], [[0.3,0.55],[0.9,0.55]]],
-    'ㅒ': [[[0.15,0.05],[0.15,0.95]], [[0.15,0.3],[0.5,0.3]], [[0.15,0.55],[0.5,0.55]], [[0.75,0.05],[0.75,0.95]]],
-    'ㅓ': [[[0.7,0.05],[0.7,0.95]], [[0.1,0.4],[0.7,0.4]]],
-    'ㅔ': [[[0.1,0.4],[0.45,0.4]], [[0.45,0.05],[0.45,0.95]], [[0.75,0.05],[0.75,0.95]]],
-    'ㅕ': [[[0.7,0.05],[0.7,0.95]], [[0.1,0.3],[0.7,0.3]], [[0.1,0.55],[0.7,0.55]]],
-    'ㅖ': [[[0.1,0.3],[0.45,0.3]], [[0.1,0.55],[0.45,0.55]], [[0.45,0.05],[0.45,0.95]], [[0.75,0.05],[0.75,0.95]]],
-    'ㅗ': [[[0.5,0.05],[0.5,0.65]], [[0.1,0.65],[0.9,0.65]]],
-    'ㅘ': [[[0.4,0.9],[0.4,0.3]], [[0.05,0.3],[0.7,0.3]], [[0.8,0.05],[0.8,0.95]], [[0.8,0.4],[0.95,0.4]]],
-    'ㅙ': [[[0.35,0.9],[0.35,0.3]], [[0.05,0.3],[0.55,0.3]], [[0.65,0.05],[0.65,0.95]], [[0.65,0.4],[0.8,0.4]], [[0.9,0.05],[0.9,0.95]]],
-    'ㅚ': [[[0.4,0.9],[0.4,0.3]], [[0.05,0.3],[0.7,0.3]], [[0.8,0.05],[0.8,0.95]]],
-    'ㅛ': [[[0.3,0.05],[0.3,0.65]], [[0.7,0.05],[0.7,0.65]], [[0.1,0.65],[0.9,0.65]]],
-    'ㅜ': [[[0.5,0.95],[0.5,0.35]], [[0.1,0.35],[0.9,0.35]]],
-    'ㅝ': [[[0.2,0.05],[0.2,0.95]], [[0.2,0.5],[0.5,0.5]], [[0.6,0.95],[0.6,0.35]], [[0.2,0.35],[0.9,0.35]]],
-    'ㅞ': [[[0.15,0.05],[0.15,0.95]], [[0.15,0.5],[0.35,0.5]], [[0.45,0.05],[0.45,0.95]], [[0.6,0.95],[0.6,0.35]], [[0.15,0.35],[0.9,0.35]]],
-    'ㅟ': [[[0.5,0.95],[0.5,0.35]], [[0.1,0.35],[0.9,0.35]], [[0.7,0.05],[0.7,0.95]]],
-    'ㅠ': [[[0.3,0.95],[0.3,0.35]], [[0.7,0.95],[0.7,0.35]], [[0.1,0.35],[0.9,0.35]]],
-    'ㅡ': [[[0.05,0.5],[0.95,0.5]]],
-    'ㅢ': [[[0.05,0.5],[0.7,0.5]], [[0.8,0.05],[0.8,0.95]]],
-    'ㅣ': [[[0.5,0.05],[0.5,0.95]]]
-  };
-
-  // 모음 유형: 세로형(오른쪽 배치), 가로형(아래 배치), 복합형
-  const VERTICAL_JUNG = [0,1,2,3,4,5,6,7,20]; // ㅏㅐㅑㅒㅓㅔㅕㅖㅣ
-  const HORIZONTAL_JUNG = [8,11,12,13,17,18]; // ㅗㅚㅛㅜㅟㅠㅡ
-  // 나머지는 복합 (세로+가로)
-
-  function isVerticalVowel(jungIdx){ return VERTICAL_JUNG.includes(jungIdx); }
-  function isHorizontalVowel(jungIdx){ return HORIZONTAL_JUNG.includes(jungIdx); }
-
-  function decomposeHangul(ch){
-    const code = ch.charCodeAt(0);
-    if (code < 0xAC00 || code > 0xD7A3) return null;
-    const offset = code - 0xAC00;
-    const cho = Math.floor(offset / (21 * 28));
-    const jung = Math.floor((offset % (21 * 28)) / 28);
-    const jong = offset % 28;
-    return { cho, jung, jong };
-  }
-
-  function drawHangulChar(ch, startX, startY, w, h){
-    const decomp = decomposeHangul(ch);
-    if (!decomp) return false;
-
-    const { cho, jung, jong } = decomp;
-    const choJamo = CHOSEONG[cho];
-    const jungJamo = JUNGSEONG[jung];
-    const jongJamo = jong > 0 ? JONGSEONG[jong] : null;
-
-    const choStrokes = JAMO[choJamo];
-    const jungStrokes = JAMO[jungJamo];
-    const jongStrokes = jongJamo ? (JAMO[jongJamo] || null) : null;
-
-    if (!choStrokes || !jungStrokes) return false;
-
-    const hasJong = !!jongStrokes;
-    const isVert = isVerticalVowel(jung);
-    const isHoriz = isHorizontalVowel(jung);
-
-    // 레이아웃 계산 (초성/중성/종성 배치 영역)
-    let choBox, jungBox, jongBox;
-
-    if (isVert){
-      if (hasJong){
-        choBox = { x: 0, y: 0, w: 0.55, h: 0.55 };
-        jungBox = { x: 0.58, y: 0, w: 0.42, h: 0.55 };
-        jongBox = { x: 0.05, y: 0.6, w: 0.9, h: 0.4 };
-      } else {
-        choBox = { x: 0, y: 0.05, w: 0.55, h: 0.9 };
-        jungBox = { x: 0.58, y: 0.05, w: 0.42, h: 0.9 };
-      }
-    } else if (isHoriz){
-      if (hasJong){
-        choBox = { x: 0.15, y: 0, w: 0.7, h: 0.45 };
-        jungBox = { x: 0.05, y: 0.47, w: 0.9, h: 0.25 };
-        jongBox = { x: 0.15, y: 0.73, w: 0.7, h: 0.27 };
-      } else {
-        choBox = { x: 0.15, y: 0, w: 0.7, h: 0.55 };
-        jungBox = { x: 0.05, y: 0.58, w: 0.9, h: 0.4 };
-      }
-    } else {
-      // 복합 모음
-      if (hasJong){
-        choBox = { x: 0, y: 0, w: 0.5, h: 0.45 };
-        jungBox = { x: 0, y: 0, w: 1, h: 0.6 };
-        jongBox = { x: 0.05, y: 0.65, w: 0.9, h: 0.35 };
-      } else {
-        choBox = { x: 0, y: 0, w: 0.5, h: 0.55 };
-        jungBox = { x: 0, y: 0, w: 1, h: 0.95 };
-      }
+  
+  function spawnDust(d) {
+    const count = 4;
+    const stageRect = stage.getBoundingClientRect();
+    
+    for (let i = 0; i < count; i++) {
+      const dust = document.createElement('div');
+      dust.className = 'dust';
+      const size = 2 + Math.random() * 4;
+      dust.style.width = size + 'px';
+      dust.style.height = size + 'px';
+      dust.style.opacity = 0.4 + Math.random() * 0.3;
+      // pivot 위치에 먼지 스폰 (stage 좌표계 안에)
+      dust.style.left = (d.pivot.x + (Math.random() - 0.5) * 30) + 'px';
+      dust.style.top = (d.pivot.y + (Math.random() - 0.5) * 10) + 'px';
+      dust.style.zIndex = 999;
+      stage.appendChild(dust);
+      
+      const tx = (Math.random() - 0.3) * 40;
+      const ty = -20 - Math.random() * 25;
+      
+      requestAnimationFrame(() => {
+        dust.style.transition = 'transform 0.8s ease-out, opacity 0.8s ease-out';
+        dust.style.transform = `translate(${tx}px, ${ty}px)`;
+        dust.style.opacity = '0';
+      });
+      
+      setTimeout(() => dust.remove(), 900);
     }
-
-    // 초성 그리기
-    choStrokes.forEach(s => {
-      const mapped = s.map(p => [
-        choBox.x + p[0] * choBox.w,
-        choBox.y + p[1] * choBox.h
-      ]);
-      const segments = buildStrokeSegments(mapped, startX, startY, w, h);
-      animateStroke(segments);
+  }
+  
+  function triggerChain(startDomino) {
+    if (startDomino.fallen || startDomino.falling) return;
+    
+    // 시작 도미노 이후 모든 도미노를 인덱스 순으로 (경로를 따라)
+    const chain = dominos
+      .filter(d => d.idx >= startDomino.idx && !d.fallen && !d.falling)
+      .sort((a, b) => a.idx - b.idx);
+    
+    const cascadeDelay = 110;
+    chain.forEach((d, i) => fallOne(d, i * cascadeDelay));
+    
+    // 마지막 도미노가 쓰러지고 충격까지 끝난 후 피날레
+    // fallOne의 충격 사운드는 delay + 380ms, 회전 완료는 delay + 450ms
+    const finalDelay = (chain.length - 1) * cascadeDelay + 700; // 마지막 충격 후 약간의 여운
+    setTimeout(() => {
+      // 모든 도미노가 정말로 다 쓰러졌는지 확인 (다른 클릭으로 부분 토플된 경우 제외)
+      if (dominos.length > 0 && dominos.every(d => d.fallen)) {
+        playFinale();
+      }
+    }, finalDelay);
+  }
+  
+  // === 피날레: 글자들이 정렬된 한 줄로 모이는 연출 ===
+  let finaleActive = false;
+  let finaleLetters = []; // {el, ...}
+  
+  function playFinale() {
+    if (finaleActive) return;
+    finaleActive = true;
+    
+    // 1. 각 도미노의 글자 자리를 화면 좌표로 계산하고, 그 자리에 글자 div를 새로 띄움
+    //    동시에 도미노 SVG들은 페이드아웃
+    const letters = [];
+    
+    dominos.forEach((d, i) => {
+      const rect = d.svg.getBoundingClientRect();
+      const startX = rect.left + rect.width / 2;
+      const startY = rect.top + rect.height / 2;
+      
+      // 글자만 따로 띄우는 div 생성 (body 직속, position: fixed)
+      const letterEl = document.createElement('div');
+      letterEl.className = 'finale-letter';
+      letterEl.textContent = d.char;
+      letterEl.style.left = startX + 'px';
+      letterEl.style.top = startY + 'px';
+      letterEl.style.transform = `translate(-50%, -50%) rotate(${(Math.random()-0.5)*30}deg) scale(0.8)`;
+      letterEl.style.opacity = '0';
+      document.body.appendChild(letterEl);
+      
+      letters.push({ el: letterEl, char: d.char, idx: i });
+      
+      // 도미노 SVG는 페이드아웃
+      d.svg.style.transition = 'opacity 0.6s ease-out';
+      d.svg.style.opacity = '0';
     });
-
-    // 중성 그리기
-    jungStrokes.forEach(s => {
-      const mapped = s.map(p => [
-        jungBox.x + p[0] * jungBox.w,
-        jungBox.y + p[1] * jungBox.h
-      ]);
-      const segments = buildStrokeSegments(mapped, startX, startY, w, h);
-      animateStroke(segments);
+    
+    finaleLetters = letters;
+    
+    // 2. 글자들이 자기 자리에서 살짝 떠오르는 단계
+    requestAnimationFrame(() => {
+      letters.forEach((L, i) => {
+        setTimeout(() => {
+          L.el.style.transition = 'opacity 0.3s, transform 0.3s';
+          L.el.style.opacity = '1';
+          L.el.style.transform = 'translate(-50%, -50%) rotate(0deg) scale(1)';
+        }, i * 8);
+      });
     });
-
-    // 종성 그리기
-    if (jongStrokes && jongBox){
-      jongStrokes.forEach(s => {
-        const mapped = s.map(p => [
-          jongBox.x + p[0] * jongBox.w,
-          jongBox.y + p[1] * jongBox.h
-        ]);
-        const segments = buildStrokeSegments(mapped, startX, startY, w, h);
-        animateStroke(segments);
+    
+    // 3. 정렬된 한 줄 위치로 이동 - 화면 폭에 맞춰 줄바꿈
+    const totalChars = letters.length;
+    const isMobile = window.innerWidth < 700;
+    const letterFontSize = isMobile ? 36 : 56;
+    const letterSpacing = letterFontSize * 0.85;
+    const lineHeight = letterFontSize * 1.4;
+    
+    const sideMargin = 60;
+    const availLineW = window.innerWidth - sideMargin * 2;
+    const maxPerLine = Math.max(1, Math.floor(availLineW / letterSpacing));
+    const lineCount = Math.ceil(totalChars / maxPerLine);
+    const charsPerLine = Math.ceil(totalChars / lineCount);
+    
+    const totalH = lineCount * lineHeight;
+    const startY = window.innerHeight / 2 - totalH / 2 + lineHeight / 2;
+    
+    letters.forEach((L, i) => {
+      const lineIdx = Math.floor(i / charsPerLine);
+      const colIdx = i % charsPerLine;
+      const lineLen = (lineIdx === lineCount - 1) ? (totalChars - lineIdx * charsPerLine) : charsPerLine;
+      
+      const lineW = (lineLen - 1) * letterSpacing;
+      const lineStartX = window.innerWidth / 2 - lineW / 2;
+      
+      L.targetX = lineStartX + colIdx * letterSpacing;
+      L.targetY = startY + lineIdx * lineHeight;
+    });
+    
+    // 4. 일정 시간 후 정렬 위치로 spring 이동
+    const moveStartDelay = 350;
+    letters.forEach((L, i) => {
+      setTimeout(() => {
+        L.el.style.transition = 'left 0.9s cubic-bezier(0.34, 1.56, 0.64, 1), top 0.9s cubic-bezier(0.34, 1.56, 0.64, 1), font-size 0.6s ease-out';
+        L.el.style.fontSize = letterFontSize + 'px';
+        L.el.style.left = L.targetX + 'px';
+        L.el.style.top = L.targetY + 'px';
+      }, moveStartDelay + i * 25);
+    });
+    
+    // 5. 정렬 완료 시점에 짠! 사운드 + 펄스
+    const arriveTime = moveStartDelay + (totalChars - 1) * 25 + 900;
+    setTimeout(() => {
+      playFinaleChime();
+      letters.forEach((L, i) => {
+        setTimeout(() => {
+          L.el.style.transition = 'transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)';
+          L.el.style.transform = 'translate(-50%, -50%) rotate(0deg) scale(1.15)';
+          setTimeout(() => {
+            L.el.style.transform = 'translate(-50%, -50%) rotate(0deg) scale(1)';
+          }, 300);
+        }, i * 15);
       });
-    }
-
-    return true;
+    }, arriveTime);
+    
+    // dominos 배열은 비워둠
+    dominos = [];
+    pathCache = [];
+    updateStone();
   }
-
-  function drawChar(ch){
-    if (ch === '\n'){
-      cursor.x = 12;
-      cursor.y += scale + Math.round(scale * 0.35);
-      history.push({type:'newline'});
-      return;
-    }
-    let strokes = G[ch] || G[ch.toUpperCase()];
-    const code = ch.charCodeAt(0);
-    const isHangul = code >= 0xAC00 && code <= 0xD7A3;
-    const isKnown = !!strokes;
-    const w = Math.round(scale * (isKnown ? 0.6 : 0.85));
-    const h = scale;
-    const space = Math.round(scale * 0.2);
-
-    if (cursor.x + w > W - 12){
-      cursor.x = 12;
-      cursor.y += scale + Math.round(scale * 0.35);
-    }
-    if (cursor.y + h > H - 12) return;
-
-    const startX = cursor.x;
-    const startY = cursor.y;
-
-    if (isHangul){
-      drawHangulChar(ch, startX, startY, w, h);
-    } else if (strokes){
-      strokes.forEach(s => {
-        const segments = buildStrokeSegments(s, startX, startY, w, h);
-        animateStroke(segments);
+  
+  function clearFinaleLetters() {
+    finaleLetters.forEach(L => L.el.remove());
+    finaleLetters = [];
+    finaleActive = false;
+  }
+  
+  function clearAll() {
+    // 피날레 진행 중이거나 완료된 글자도 함께 제거
+    if (finaleLetters.length > 0) {
+      finaleLetters.forEach((L, i) => {
+        setTimeout(() => {
+          L.el.style.transition = 'opacity 0.4s, transform 0.4s';
+          L.el.style.opacity = '0';
+          L.el.style.transform = (L.el.style.transform || 'translate(-50%, -50%)') + ' scale(0.5)';
+        }, i * 8);
       });
-    } else {
-      // 기타 미등록 문자: 사각형 fallback
-      const fb = [[[0.1,0.2],[0.9,0.2],[0.9,0.9],[0.1,0.9],[0.1,0.2]]];
-      fb.forEach(s => {
-        const segments = buildStrokeSegments(s, startX, startY, w, h);
-        animateStroke(segments);
-      });
+      setTimeout(clearFinaleLetters, 500 + finaleLetters.length * 8);
     }
-
-    history.push({type:'char', x: startX - 4, y: startY - 6, w: w + space + 8, h: h * 1.5});
-    cursor.x += w + space;
+    
+    const len = dominos.length;
+    dominos.forEach((d, i) => {
+      setTimeout(() => {
+        d.svg.style.transition = 'opacity 0.3s, transform 0.3s';
+        d.svg.style.opacity = '0';
+      }, i * 10);
+    });
+    setTimeout(() => {
+      dominos.forEach(d => d.svg.remove());
+      dominos = [];
+      pathCache = []; // 경로 캐시 초기화 → 다음 입력 시 새 경로 시작
+      updateStone();
+      stage.style.transform = '';
+    }, 400 + len * 10);
   }
-
-  function backspace(){
-    if (!history.length) return;
-    strokeQueue.length = 0;
-    if (rafId){ cancelAnimationFrame(rafId); rafId = null; }
-    const last = history.pop();
-    if (last.type === 'newline'){
-      cursor.y -= scale + Math.round(scale * 0.35);
-      let x = 12;
-      for (let i = history.length - 1; i >= 0; i--){
-        if (history[i].type === 'newline') break;
-        if (history[i].type === 'char'){ x = history[i].x + history[i].w - 4; }
-      }
-      cursor.x = Math.max(12, x);
-      return;
-    }
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(last.x, last.y, last.w, last.h);
-    cursor.x = last.x + 4;
-    cursor.y = last.y + 6;
+  
+  function updateStone() {
+    stoneCount.textContent = dominos.length;
+    const hasStanding = dominos.some(d => !d.fallen && !d.falling);
+    if (hasStanding) hint.classList.remove('hidden');
+    else hint.classList.add('hidden');
   }
-
-  canvas.addEventListener('click', (e) => {
-    const rect = canvas.getBoundingClientRect();
-    const sx = W / rect.width;
-    const sy = H / rect.height;
-    cursor.x = Math.max(12, Math.floor((e.clientX - rect.left) * sx));
-    cursor.y = Math.max(12, Math.floor((e.clientY - rect.top) * sy));
-    input.focus();
+  
+  // ========== 키보드 입력 처리 ==========
+  // 한글 IME 처리:
+  //   - composition 중인 글자는 hiddenInput.value에 미리보기로 들어가지만
+  //     compositionend 시점에 최종 글자가 확정됨
+  //   - 영문/숫자/특수문자는 IME 거치지 않고 곧바로 input 이벤트로 들어옴
+  //   - 우리는 한 글자 단위로 도미노 생성해야 하므로:
+  //     1) compositionend → 확정된 한글 글자(들)를 도미노화
+  //     2) 일반 input (composition 아닌 경우) → 추가된 글자(들)를 도미노화
+  //   - hiddenInput을 처리 후 항상 비워서 동일 시퀀스 재처리 방지
+  
+  let isComposing = false;
+  let lastInputValue = ''; // 일반 input 이벤트의 변화량 추적용
+  
+  hiddenInput.addEventListener('compositionstart', () => {
+    isComposing = true;
   });
-
-  let composing = false;
-  input.addEventListener('compositionstart', () => { composing = true; });
-  input.addEventListener('compositionend', (e) => {
-    composing = false;
-    for (const ch of e.data) drawChar(ch);
-    e.target.value = '';
-  });
-  input.addEventListener('input', (e) => {
-    if (composing) return; // IME 조합 중에는 무시
-    for (const ch of e.target.value) drawChar(ch);
-    e.target.value = '';
-  });
-  input.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter'){ e.preventDefault(); drawChar('\n'); }
-    else if (e.key === 'Backspace'){ e.preventDefault(); backspace(); }
-  });
-
-  function drawDemo(){
-    strokeQueue.length = 0;
-    if (rafId){ cancelAnimationFrame(rafId); rafId = null; }
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, W, H);
-    cursor = { x: 12, y: 12 };
-    history = [];
-    if (drawStyle === 1){
-      ['안','녕','하','세','요',' ','H','e','l','l','o','!'].forEach(drawChar);
-    } else {
-      ['구','슬',' ','B','e','a','d','s'].forEach(drawChar);
+  
+  hiddenInput.addEventListener('compositionend', (e) => {
+    isComposing = false;
+    // e.data: 확정된 조합 결과 (예: "한")
+    if (e.data) {
+      for (const ch of e.data) addChar(ch);
     }
-    drawChar('\n');
+    hiddenInput.value = '';
+    lastInputValue = '';
+  });
+  
+  hiddenInput.addEventListener('input', (e) => {
+    // composition 중에는 처리하지 않음 (compositionend에서 처리)
+    if (isComposing) return;
+    
+    const cur = hiddenInput.value;
+    // 새로 추가된 글자만 도미노화 (이전 값 대비 추가분)
+    if (cur.length > lastInputValue.length) {
+      const added = cur.slice(lastInputValue.length);
+      for (const ch of added) addChar(ch);
+    }
+    
+    hiddenInput.value = '';
+    lastInputValue = '';
+  });
+  
+  // Backspace, Enter 등 특수키 처리
+  document.addEventListener('keydown', (e) => {
+    // 입력 도중 IME 조합 중이면 특수키도 IME가 처리할 수 있으니 양보
+    if (e.isComposing || isComposing) return;
+    
+    // clear 버튼 등 다른 input/button에 포커스 있을 때는 처리 양보 가능하지만
+    // hiddenInput이 항상 포커스를 가지므로 사실상 모든 키가 여기로 옴
+    if (e.key === 'Backspace') {
+      e.preventDefault();
+      removeLastDomino();
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      toppleAll();
+    }
+  });
+  
+  // hiddenInput이 포커스를 잃지 않도록 - 다른 곳 클릭해도 다시 포커스
+  function refocusHidden() {
+    setTimeout(() => hiddenInput.focus(), 0);
   }
-
-  styleEl.addEventListener('change', () => {
-    drawStyle = parseInt(styleEl.value, 10);
-    if (drawStyle === 2){
-      breakFreq = 100; breakEl.value = 100; breakOut.textContent = '100%';
-    } else {
-      breakFreq = 2; breakEl.value = 2; breakOut.textContent = '2%';
-    }
-    drawDemo();
-  });
-  thickEl.addEventListener('input', () => { thick = parseInt(thickEl.value,10); thickOut.textContent = thick; });
-  scaleEl.addEventListener('input', () => { scale = parseInt(scaleEl.value,10); scaleOut.textContent = scale; });
-  breakEl.addEventListener('input', () => { breakFreq = parseInt(breakEl.value,10); breakOut.textContent = breakFreq + '%'; });
-  jitterEl.addEventListener('input', () => { jitter = parseInt(jitterEl.value,10); jitterOut.textContent = jitter; });
-  clearBtn.addEventListener('click', () => {
-    strokeQueue.length = 0;
-    if (rafId){ cancelAnimationFrame(rafId); rafId = null; }
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, W, H);
-    cursor = { x: 12, y: 12 };
-    history = [];
-    input.focus();
-  });
-
-  ctx.fillStyle = '#ffffff';
-  ctx.fillRect(0, 0, W, H);
-  ['안','녕','하','세','요',' ','H','e','l','l','o','!'].forEach(drawChar);
-  drawChar('\n');
-
-  setTimeout(() => input.focus(), 100);
-})();
+  document.addEventListener('click', refocusHidden);
+  document.addEventListener('touchend', refocusHidden);
+  
+  window.addEventListener('resize', updateLayout);
+  document.addEventListener('click', () => { getAudio(); }, { once: true });
+  
+  hiddenInput.focus();
+  updateStone();
 </script>
+
+</body>
+</html>
