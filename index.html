@@ -51,6 +51,7 @@ body{background:#0a0a0a;font-family:'Noto Sans KR',sans-serif;color:#fff;min-hei
   <div class="ticker-label">속보</div>
   <div class="ticker-track">
     <div class="ticker-text">
+      Letter Domino — 타이핑한 글자가 도미노가 되어 쓰러지는 아이소메트릭 실험 &nbsp;│&nbsp;
       The Ocean Doesn't Stop — 끝없는 파도 위 서핑 인터랙티브 실험 &nbsp;│&nbsp;
       Living Grid — 타이핑하면 격자가 글자를 피해 출렁이는 타이포 실험 &nbsp;│&nbsp;
       지피티쨩 VS 잼민이 — 10라운드 끝장토론 오픈 &nbsp;│&nbsp;
@@ -70,21 +71,29 @@ body{background:#0a0a0a;font-family:'Noto Sans KR',sans-serif;color:#fff;min-hei
 
 <div class="main">
 
-  <!-- 히어로: 최신 기사 (5/6) Infinite Surf -->
-  <a class="hero" href="2026-05-06/20260506.html">
+  <!-- 히어로: 최신 기사 (5/7) Letter Domino -->
+  <a class="hero" href="2026-05-07/20260507.html">
     <div class="hero-visual">
-      <canvas id="hero-surf"></canvas>
+      <canvas id="hero-domino"></canvas>
     </div>
     <div class="hero-body">
       <div class="hero-tag">실험·인터랙티브</div>
-      <div class="hero-title">The Ocean Doesn't Stop — 끝없는 파도 위에서 서핑하는 인터랙티브 실험</div>
-      <div class="hero-meta">2026.05.06 · 인터랙티브 · INFINITE SURF</div>
+      <div class="hero-title">Letter Domino — 타이핑한 글자가 도미노가 되어 쓰러지는 아이소메트릭 실험</div>
+      <div class="hero-meta">2026.05.07 · 인터랙티브 · LETTER DOMINO</div>
     </div>
   </a>
 
   <!-- 이전 기사 -->
   <div class="section-label">이전 기사</div>
   <div class="grid">
+    <a class="card" href="2026-05-06/20260506.html">
+      <div class="card-body">
+        <div class="card-tag">실험·인터랙티브</div>
+        <div class="card-title">The Ocean Doesn't Stop — 끝없는 파도 위에서 서핑하는 인터랙티브 실험</div>
+        <div class="card-date">2026.05.06</div>
+      </div>
+      <div class="card-thumb"><canvas id="thumb-surf" width="100" height="72"></canvas></div>
+    </a>
     <a class="card" href="2026-05-04/20260504.html">
       <div class="card-body">
         <div class="card-tag">실험·타이포그래피</div>
@@ -180,9 +189,9 @@ body{background:#0a0a0a;font-family:'Noto Sans KR',sans-serif;color:#fff;min-hei
 <div class="footer">NEWSROOM — This is fiction. 실제 뉴스가 아닙니다.</div>
 
 <script>
-// ── 히어로: Infinite Surf (파도 레이어) ──
+// ── 히어로: Letter Domino (아이소메트릭 도미노 쓰러지는 루프) ──
 (function(){
-  const cv = document.getElementById('hero-surf');
+  const cv = document.getElementById('hero-domino');
   if (!cv) return;
   const rect = cv.parentElement.getBoundingClientRect();
   const DPR = Math.min(devicePixelRatio||1, 2);
@@ -190,47 +199,144 @@ body{background:#0a0a0a;font-family:'Noto Sans KR',sans-serif;color:#fff;min-hei
   const ctx = cv.getContext('2d');
   const W = cv.width, H = cv.height;
 
-  const NUM = 10;
-  const waves = [];
-  for (let i = 0; i < NUM; i++){
-    const d = i / (NUM - 1);
-    waves.push({
-      y: H * (0.1 + d * 0.85),
-      amp: 3 + d * 12,
-      freq: 1.5 + Math.random() * 2,
-      speed: 0.3 + d * 0.8,
-      phase: Math.random() * Math.PI * 2,
+  const NUM = 14;
+  const dominoes = [];
+  const SPACING = W / (NUM + 3);
+  for (let i = 0; i < NUM; i++) {
+    dominoes.push({
+      x: SPACING * (i + 2),
+      baseY: H * 0.75,
+      w: SPACING * 0.28,
+      h: SPACING * 1.4,
+      angle: 0,
+      targetAngle: 0,
+      char: 'LETTERDOMINO!'[i % 13]
     });
   }
 
+  let phase = 0;
   function loop(){
     const t = performance.now() * 0.001;
     ctx.clearRect(0, 0, W, H);
-    // Sky gradient
-    const sky = ctx.createLinearGradient(0, 0, 0, H * 0.3);
-    sky.addColorStop(0, '#1a3050');
-    sky.addColorStop(1, '#0a1a2a');
-    ctx.fillStyle = sky;
-    ctx.fillRect(0, 0, W, H);
-    ctx.fillStyle = '#0a1a2a';
-    ctx.fillRect(0, H * 0.3, W, H * 0.7);
 
-    for (const w of waves){
-      const d = (w.y - H * 0.1) / (H * 0.85);
-      const r = Math.round(120 - d * 112);
-      const g = Math.round(155 - d * 125);
-      const b = Math.round(180 - d * 130);
-      ctx.beginPath();
-      ctx.moveTo(0, H);
-      for (let x = 0; x <= W; x += 4){
-        const nx = x / W;
-        const y = w.y + Math.sin(nx * Math.PI * w.freq + t * w.speed + w.phase) * w.amp;
-        ctx.lineTo(x, y);
+    // Background - warm paper
+    ctx.fillStyle = '#efe9d8';
+    ctx.fillRect(0, 0, W, H);
+    // Grid lines
+    ctx.strokeStyle = 'rgba(120,100,70,0.06)';
+    ctx.lineWidth = 1;
+    for (let x = 0; x < W; x += 24*DPR) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); }
+    for (let y = 0; y < H; y += 24*DPR) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
+
+    // Cascade animation - looping
+    phase = (t * 0.7) % (NUM + 4);
+
+    for (let i = 0; i < NUM; i++) {
+      const d = dominoes[i];
+      const fallDelay = i;
+      const progress = Math.max(0, Math.min(1, (phase - fallDelay) * 1.2));
+      // Ease out bounce
+      const eased = progress < 1 ? 1 - Math.pow(1 - progress, 3) : 1;
+      d.angle = eased * 80 * Math.PI / 180;
+
+      ctx.save();
+      ctx.translate(d.x, d.baseY);
+      ctx.rotate(-d.angle);
+
+      // Shadow
+      ctx.fillStyle = 'rgba(42,38,32,0.1)';
+      ctx.fillRect(-d.w/2 + 3, -d.h + 3, d.w, d.h);
+
+      // Domino body
+      ctx.fillStyle = '#fbf8ee';
+      ctx.strokeStyle = '#2a2620';
+      ctx.lineWidth = 1.5 * DPR;
+      ctx.fillRect(-d.w/2, -d.h, d.w, d.h);
+      ctx.strokeRect(-d.w/2, -d.h, d.w, d.h);
+
+      // Letter
+      ctx.fillStyle = '#2a2620';
+      ctx.font = `italic 600 ${d.w * 0.7}px "Georgia", serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(d.char, 0, -d.h/2);
+
+      ctx.restore();
+    }
+
+    // Dust particles at fallen dominos
+    for (let i = 0; i < NUM; i++) {
+      const fallProgress = Math.max(0, Math.min(1, (phase - i) * 1.2));
+      if (fallProgress > 0.8 && fallProgress < 1.0) {
+        const d = dominoes[i];
+        for (let p = 0; p < 3; p++) {
+          const px = d.x + d.h * 0.8 + Math.random() * 10;
+          const py = d.baseY - Math.random() * 20;
+          ctx.beginPath();
+          ctx.arc(px, py, 1.5 * DPR, 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(90,82,71,${0.3 * (1 - fallProgress)})`;
+          ctx.fill();
+        }
       }
-      ctx.lineTo(W, H);
-      ctx.closePath();
-      ctx.fillStyle = `rgb(${r},${g},${b})`;
+    }
+
+    requestAnimationFrame(loop);
+  }
+  loop();
+})();
+
+// ── 썸네일: Infinite Surf (파도) ──
+(function(){
+  const cv = document.getElementById('thumb-surf');
+  if (!cv) return;
+  cv.width = 200; cv.height = 144;
+  const ctx = cv.getContext('2d');
+  const W = 200, H = 144;
+  const NUM = 8;
+  const waves = [];
+  for (let i = 0; i < NUM; i++){
+    const d = i / (NUM - 1);
+    waves.push({ y: H*(0.1+d*0.85), amp: 2+d*8, freq: 1.5+Math.random()*2, speed: 0.3+d*0.8, phase: Math.random()*Math.PI*2 });
+  }
+  function loop(){
+    const t = performance.now()*0.001;
+    ctx.clearRect(0,0,W,H);
+    ctx.fillStyle='#0a1a2a'; ctx.fillRect(0,0,W,H);
+    for(const w of waves){
+      const d=(w.y-H*0.1)/(H*0.85);
+      ctx.beginPath(); ctx.moveTo(0,H);
+      for(let x=0;x<=W;x+=4){ ctx.lineTo(x, w.y+Math.sin(x/W*Math.PI*w.freq+t*w.speed+w.phase)*w.amp); }
+      ctx.lineTo(W,H); ctx.closePath();
+      ctx.fillStyle=`rgb(${Math.round(120-d*112)},${Math.round(155-d*125)},${Math.round(180-d*130)})`;
       ctx.fill();
+    }
+    requestAnimationFrame(loop);
+  }
+  loop();
+})();
+
+// ── 썸네일: Living Grid ──
+(function(){
+  const cv = document.getElementById('thumb-grid');
+  if (!cv) return;
+  cv.width = 200; cv.height = 144;
+  const ctx = cv.getContext('2d');
+  const W = 200, H = 144;
+  const COLS = 16, ROWS = 12;
+  const CW = W/COLS, CH = H/ROWS;
+  function loop(){
+    const t = performance.now()*0.001;
+    ctx.clearRect(0,0,W,H);
+    ctx.fillStyle='#0a0a0a'; ctx.fillRect(0,0,W,H);
+    for(let r=0;r<ROWS;r++){
+      for(let c=0;c<COLS;c++){
+        const cx2=c*CW+CW/2, cy2=r*CH+CH/2;
+        const dist=Math.hypot(cx2-W/2, cy2-H/2);
+        const wave=Math.sin(dist*0.08-t*2)*3;
+        const op=0.2+Math.sin(t+c*0.5+r*0.3)*0.15;
+        ctx.fillStyle=`rgba(255,255,255,${op})`;
+        ctx.fillRect(cx2+wave-1.5, cy2+wave-1.5, 3, 3);
+      }
     }
     requestAnimationFrame(loop);
   }
