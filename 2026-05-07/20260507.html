@@ -6,40 +6,43 @@
     <span style="margin-left: 8px;">untitled — Paint</span>
   </div>
 
-  <div style="display: flex; gap: 14px; margin-bottom: 12px; align-items: center; flex-wrap: wrap;">
-    <label style="font-size: 13px; color: var(--color-text-secondary);">굵기</label>
-    <input type="range" id="ms-thick" min="1" max="3" value="1" step="1" style="width: 60px;">
-    <span id="ms-thick-out" style="font-size: 13px; min-width: 14px;">1</span>
+  <div style="display: flex; gap: 16px;">
+    <!-- 좌측: 파라미터 -->
+    <div style="display: flex; flex-direction: column; gap: 12px; min-width: 130px;">
+      <div>
+        <label style="font-size: 12px; color: var(--color-text-secondary); display: block; margin-bottom: 4px;">굵기</label>
+        <input type="range" id="ms-thick" min="1" max="3" value="1" step="1" style="width: 100%;">
+        <span id="ms-thick-out" style="font-size: 11px; color: var(--color-text-tertiary);">1</span>
+      </div>
+      <div>
+        <label style="font-size: 12px; color: var(--color-text-secondary); display: block; margin-bottom: 4px;">글자크기</label>
+        <input type="range" id="ms-scale" min="20" max="70" value="44" step="2" style="width: 100%;">
+        <span id="ms-scale-out" style="font-size: 11px; color: var(--color-text-tertiary);">44</span>
+      </div>
+      <div>
+        <label style="font-size: 12px; color: var(--color-text-secondary); display: block; margin-bottom: 4px;">끊김</label>
+        <input type="range" id="ms-break" min="0" max="40" value="2" step="1" style="width: 100%;">
+        <span id="ms-break-out" style="font-size: 11px; color: var(--color-text-tertiary);">2%</span>
+      </div>
+      <div>
+        <label style="font-size: 12px; color: var(--color-text-secondary); display: block; margin-bottom: 4px;">떨림</label>
+        <input type="range" id="ms-jitter" min="0" max="3" value="1" step="1" style="width: 100%;">
+        <span id="ms-jitter-out" style="font-size: 11px; color: var(--color-text-tertiary);">1</span>
+      </div>
+      <div>
+        <label style="font-size: 12px; color: var(--color-text-secondary);"><input type="checkbox" id="ms-anim" checked> 애니메이션</label>
+      </div>
+      <button id="ms-clear" style="font-size: 12px; margin-top: 8px;">지우기</button>
+    </div>
 
-    <label style="font-size: 13px; color: var(--color-text-secondary);">글자크기</label>
-    <input type="range" id="ms-scale" min="20" max="70" value="44" step="2" style="width: 80px;">
-    <span id="ms-scale-out" style="font-size: 13px; min-width: 22px;">44</span>
-
-    <label style="font-size: 13px; color: var(--color-text-secondary);">끊김</label>
-    <input type="range" id="ms-break" min="0" max="40" value="0" step="1" style="width: 80px;">
-    <span id="ms-break-out" style="font-size: 13px; min-width: 22px;">0%</span>
-
-    <label style="font-size: 13px; color: var(--color-text-secondary);">떨림</label>
-    <input type="range" id="ms-jitter" min="0" max="3" value="1" step="1" style="width: 60px;">
-    <span id="ms-jitter-out" style="font-size: 13px; min-width: 14px;">1</span>
-
-    <label style="font-size: 13px; color: var(--color-text-secondary);"><input type="checkbox" id="ms-anim" checked> 애니메이션</label>
-
-    <div id="ms-palette" style="display: flex; gap: 4px;"></div>
-
-    <button id="ms-clear" style="margin-left: auto; font-size: 12px;">지우기</button>
-  </div>
-
-  <div style="background: white; border: 1px solid var(--color-border-secondary); border-radius: 4px; overflow: hidden;">
-    <canvas id="ms-canvas" width="660" height="320" style="display: block; width: 660px; max-width: 100%; height: 320px; cursor: text;"></canvas>
+    <!-- 우측: 캔버스 -->
+    <div style="flex: 1; background: white; border: 1px solid var(--color-border-secondary); border-radius: 4px; overflow: hidden;">
+      <canvas id="ms-canvas" width="660" height="400" style="display: block; width: 100%; height: 400px; cursor: text;"></canvas>
+    </div>
   </div>
 
   <input id="ms-input" type="text" autocomplete="off" autocapitalize="off" spellcheck="false"
     style="position: absolute; opacity: 0; pointer-events: none; width: 1px; height: 1px;">
-
-  <p style="font-size: 12px; color: var(--color-text-tertiary); margin: 10px 0 0;">
-    끊김 0% = 완전 연속선 · 올리면 마우스 떼는 자국 추가
-  </p>
 </div>
 
 <script>
@@ -57,13 +60,12 @@
   const jitterOut = document.getElementById('ms-jitter-out');
   const animEl = document.getElementById('ms-anim');
   const clearBtn = document.getElementById('ms-clear');
-  const paletteEl = document.getElementById('ms-palette');
 
-  const W = 660, H = 320;
+  const W = 660, H = 400;
   canvas.width = W; canvas.height = H;
   ctx.imageSmoothingEnabled = false;
 
-  let thick = 1, scale = 44, breakFreq = 0, jitter = 1;
+  let thick = 1, scale = 44, breakFreq = 2, jitter = 1;
   let color = '#000000';
   let cursor = { x: 12, y: 12 };
   let history = [];
@@ -150,21 +152,6 @@
     ')': [[[0.3,0],[0.7,0.3],[0.7,0.7],[0.3,1]]],
     ' ': []
   };
-
-  const PALETTE = ['#000000','#7f7f7f','#c00000','#0066cc','#1a9e2c','#e09a00','#7a3fa0','#a0522d'];
-  PALETTE.forEach((c, i) => {
-    const sw = document.createElement('button');
-    sw.style.cssText = `width:18px;height:18px;background:${c};border:1px solid var(--color-border-secondary);border-radius:2px;padding:0;cursor:pointer;`;
-    sw.setAttribute('aria-label','color '+c);
-    if (i === 0) sw.style.outline = '2px solid var(--color-text-primary)';
-    sw.addEventListener('click', () => {
-      color = c;
-      [...paletteEl.children].forEach(b => b.style.outline = 'none');
-      sw.style.outline = '2px solid var(--color-text-primary)';
-      input.focus();
-    });
-    paletteEl.appendChild(sw);
-  });
 
   function rand(n){ return (Math.random() * 2 - 1) * n; }
 
