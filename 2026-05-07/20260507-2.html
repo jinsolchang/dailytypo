@@ -197,16 +197,35 @@ function buildStrokeSegments(stroke,ox,oy,w,h){
 }
 
 function animateStroke(segments){
-  ctx.fillStyle=color;
-  segments.forEach(seg=>{
-    if(seg.length===1){
-      const p=seg[0];
-      if(thick===1)ctx.fillRect(Math.round(p[0]),Math.round(p[1]),1,1);
-      else ctx.fillRect(Math.round(p[0]-thick/2),Math.round(p[1]-thick/2),thick,thick);
-    } else {
-      for(let i=0;i<seg.length-1;i++) plotLine(seg[i][0],seg[i][1],seg[i+1][0],seg[i+1][1]);
-    }
+  const totalPoints = segments.reduce((a,s) => a + s.length, 0);
+  const duration = Math.max(80, Math.min(250, totalPoints * 4));
+  strokeQueue.push({
+    segments, segIdx:0, pointIdx:0, totalPoints, drawnPoints:0,
+    start: performance.now(), duration
   });
+  if (!rafId) rafId = requestAnimationFrame(tick);
+}
+
+function tick(now){
+  if (strokeQueue.length === 0){ rafId = null; return; }
+  const job = strokeQueue[0];
+  const elapsed = now - job.start;
+  const targetPoints = Math.min(job.totalPoints, Math.floor((elapsed / job.duration) * job.totalPoints));
+  ctx.fillStyle = color;
+  while (job.drawnPoints < targetPoints && job.segIdx < job.segments.length){
+    const seg = job.segments[job.segIdx];
+    if (job.pointIdx === 0){
+      const p = seg[0];
+      if (thick===1) ctx.fillRect(Math.round(p[0]),Math.round(p[1]),1,1);
+      else ctx.fillRect(Math.round(p[0]-thick/2),Math.round(p[1]-thick/2),thick,thick);
+      job.pointIdx = 1; job.drawnPoints++;
+    } else if (job.pointIdx < seg.length){
+      plotLine(seg[job.pointIdx-1][0],seg[job.pointIdx-1][1],seg[job.pointIdx][0],seg[job.pointIdx][1]);
+      job.pointIdx++; job.drawnPoints++;
+    } else { job.segIdx++; job.pointIdx = 0; }
+  }
+  if (job.drawnPoints >= job.totalPoints) strokeQueue.shift();
+  rafId = requestAnimationFrame(tick);
 }
 
 function decomposeHangul(ch){
