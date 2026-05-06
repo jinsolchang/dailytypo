@@ -271,41 +271,31 @@
     }
   }
 
+  // 스타일 2 전용: 한 글자의 모든 원을 모아서 한번에 윤곽 그리기
+  let pendingCircles = [];
+
+  function flushTubeCircles(){
+    if (pendingCircles.length === 0) return;
+    // 겹치는 원들을 그룹으로 묶기
+    const circles = pendingCircles;
+    pendingCircles = [];
+    // 모든 원을 한번에 합집합 윤곽으로 그리기
+    drawTubeOutline(circles);
+  }
+
   function plotTube(x0, y0, x1, y1){
     const dx = x1 - x0, dy = y1 - y0;
     const dist = Math.sqrt(dx*dx + dy*dy);
-    if (dist < 1){ drawCircleAt(x0, y0, TUBE_RADIUS); return; }
-    // 끊김이 높을수록 원 간격이 넓어짐
+    if (dist < 1){ pendingCircles.push([x0, y0, TUBE_RADIUS]); return; }
     const gap = TUBE_STEP + (breakFreq / 100) * (TUBE_RADIUS * 3);
     const steps = Math.max(1, Math.floor(dist / gap));
-    const circles = [];
     for (let i = 0; i <= steps; i++){
       const t = i / steps;
       if (breakFreq > 0 && Math.random() * 100 < breakFreq * 0.3) continue;
       const cx = x0 + dx * t + rand(jitter * 0.3);
       const cy = y0 + dy * t + rand(jitter * 0.3);
       const r = TUBE_RADIUS + rand(jitter * 0.3);
-      circles.push([cx, cy, r]);
-    }
-    // 겹치는 원들을 그룹으로 묶어서 합집합 윤곽 그리기
-    if (circles.length === 0) return;
-    // 인접한 원들끼리 그룹화 (거리 < 두 반지름 합이면 같은 그룹)
-    const groups = [];
-    let currentGroup = [circles[0]];
-    for (let i = 1; i < circles.length; i++){
-      const prev = circles[i-1], cur = circles[i];
-      const d = Math.sqrt((cur[0]-prev[0])**2 + (cur[1]-prev[1])**2);
-      if (d < prev[2] + cur[2]){
-        currentGroup.push(cur);
-      } else {
-        groups.push(currentGroup);
-        currentGroup = [cur];
-      }
-    }
-    groups.push(currentGroup);
-    // 각 그룹을 합집합 윤곽으로 그리기
-    for (const group of groups){
-      drawTubeOutline(group);
+      pendingCircles.push([cx, cy, r]);
     }
   }
 
@@ -366,7 +356,7 @@
       segments.forEach(seg => {
         if (seg.length === 1){
           const p = seg[0];
-          if (drawStyle === 2) drawCircleAt(Math.round(p[0]), Math.round(p[1]), TUBE_RADIUS);
+          if (drawStyle === 2) pendingCircles.push([Math.round(p[0]), Math.round(p[1]), TUBE_RADIUS]);
           else if (thick === 1) ctx.fillRect(Math.round(p[0]), Math.round(p[1]), 1, 1);
           else ctx.fillRect(Math.round(p[0]-thick/2), Math.round(p[1]-thick/2), thick, thick);
         } else {
@@ -376,13 +366,14 @@
           }
         }
       });
+      // flush는 drawChar에서 글자 단위로 처리
       return;
     }
     const totalPoints = segments.reduce((a, s) => a + s.length, 0);
     const duration = Math.max(80, Math.min(drawStyle === 2 ? 500 : 250, totalPoints * (drawStyle === 2 ? 8 : 4)));
     strokeQueue.push({
       segments, segIdx: 0, pointIdx: 0, totalPoints, drawnPoints: 0,
-      start: performance.now(), duration
+      start: performance.now(), duration, isLast: true
     });
     if (!rafId) rafId = requestAnimationFrame(tick);
   }
@@ -398,7 +389,7 @@
       const seg = job.segments[job.segIdx];
       if (job.pointIdx === 0){
         const p = seg[0];
-        if (drawStyle === 2) drawCircleAt(Math.round(p[0]), Math.round(p[1]), TUBE_RADIUS);
+        if (drawStyle === 2) pendingCircles.push([Math.round(p[0]), Math.round(p[1]), TUBE_RADIUS]);
         else if (thick === 1) ctx.fillRect(Math.round(p[0]), Math.round(p[1]), 1, 1);
         else ctx.fillRect(Math.round(p[0]-thick/2), Math.round(p[1]-thick/2), thick, thick);
         job.pointIdx = 1;
@@ -414,7 +405,10 @@
       }
     }
 
-    if (job.drawnPoints >= job.totalPoints) strokeQueue.shift();
+    if (job.drawnPoints >= job.totalPoints){
+      if (drawStyle === 2) flushTubeCircles();
+      strokeQueue.shift();
+    }
     rafId = requestAnimationFrame(tick);
   }
 
@@ -613,6 +607,9 @@
         animateStroke(segments);
       });
     }
+
+    // 스타일 2: 글자의 모든 원을 모은 후 합집합 윤곽 그리기
+    if (drawStyle === 2 && !animEl.checked) flushTubeCircles();
 
     history.push({type:'char', x: startX - 4, y: startY - 6, w: w + space + 8, h: h * 1.5});
     cursor.x += w + space;
