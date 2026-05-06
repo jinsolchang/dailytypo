@@ -293,165 +293,41 @@
     rafId = requestAnimationFrame(tick);
   }
 
-  // 오프스크린 캔버스로 한글 등 미등록 글자의 스켈레톤(중심선) 추출
+  // 한글 등 미등록 글자: 캔버스 폰트 렌더링으로 직접 그리기
   const offCanvas = document.createElement('canvas');
   const offCtx = offCanvas.getContext('2d', {willReadFrequently: true});
 
-  function extractSkeletonStrokes(ch, w, h){
-    offCanvas.width = w; offCanvas.height = h;
-    offCtx.clearRect(0, 0, w, h);
+  function drawFontChar(ch, startX, startY, w, h){
+    const renderScale = 2; // 고해상도 렌더링 후 축소
+    const rw = w * renderScale, rh = h * renderScale;
+    offCanvas.width = rw; offCanvas.height = rh;
+    offCtx.clearRect(0, 0, rw, rh);
     offCtx.fillStyle = '#000';
-    offCtx.font = `900 ${Math.round(h * 0.75)}px "Noto Sans KR", sans-serif`;
+    offCtx.font = `900 ${Math.round(rh * 0.78)}px "Noto Sans KR", sans-serif`;
     offCtx.textBaseline = 'top';
     offCtx.textAlign = 'center';
-    offCtx.fillText(ch, w / 2, Math.round(h * 0.12));
+    offCtx.fillText(ch, rw / 2, Math.round(rh * 0.1));
 
-    const imgData = offCtx.getImageData(0, 0, w, h);
+    const imgData = offCtx.getImageData(0, 0, rw, rh);
     const d = imgData.data;
 
-    // 이진화: 알파 > 100 → 1
-    const bin = new Uint8Array(w * h);
-    for (let i = 0; i < w * h; i++) bin[i] = d[i * 4 + 3] > 100 ? 1 : 0;
-
-    // 거리 변환 (각 전경 픽셀에서 가장 가까운 배경까지의 거리)
-    const dist = new Float32Array(w * h);
-    const INF = w + h;
-    // 초기화
-    for (let i = 0; i < w * h; i++) dist[i] = bin[i] ? INF : 0;
-    // 좌→우, 위→아래
-    for (let y = 0; y < h; y++){
-      for (let x = 0; x < w; x++){
-        const i = y * w + x;
-        if (dist[i] === 0) continue;
-        if (x > 0) dist[i] = Math.min(dist[i], dist[i - 1] + 1);
-        if (y > 0) dist[i] = Math.min(dist[i], dist[i - w] + 1);
-      }
-    }
-    // 우→좌, 아래→위
-    for (let y = h - 1; y >= 0; y--){
-      for (let x = w - 1; x >= 0; x--){
-        const i = y * w + x;
-        if (dist[i] === 0) continue;
-        if (x < w - 1) dist[i] = Math.min(dist[i], dist[i + 1] + 1);
-        if (y < h - 1) dist[i] = Math.min(dist[i], dist[i + w] + 1);
-      }
-    }
-
-    // 스켈레톤: 로컬 최대값 (이웃보다 거리가 크거나 같은 전경 픽셀)
-    const skel = [];
-    for (let y = 1; y < h - 1; y++){
-      for (let x = 1; x < w - 1; x++){
-        const i = y * w + x;
-        if (dist[i] < 1.5) continue;
-        const v = dist[i];
-        let isRidge = true;
-        // 4방향 중 2방향 이상에서 로컬 최대여야 함
-        let higherCount = 0;
-        const neighbors = [[-1,0],[1,0],[0,-1],[0,1],[-1,-1],[1,-1],[-1,1],[1,1]];
-        for (const [dx, dy] of neighbors){
-          if (dist[(y+dy)*w+(x+dx)] > v){ higherCount++; }
-        }
-        if (higherCount > 3) isRidge = false;
-        if (isRidge) skel.push([x, y]);
-      }
-    }
-
-    if (skel.length === 0) return [];
-
-    // 스켈레톤 픽셀을 연결된 스트로크로 그룹화
-    // 그리드 기반 빠른 이웃 탐색
-    const grid = new Map();
-    skel.forEach((p, i) => {
-      const key = `${p[0]},${p[1]}`;
-      grid.set(key, i);
-    });
-
-    const used = new Uint8Array(skel.length);
-    const strokes = [];
-
-    // 끝점(이웃이 적은 점)부터 시작하여 체인 구성
-    function countNeighbors(idx){
-      const [x, y] = skel[idx];
-      let cnt = 0;
-      for (let dy = -1; dy <= 1; dy++){
-        for (let dx = -1; dx <= 1; dx++){
-          if (dx === 0 && dy === 0) continue;
-          const ni = grid.get(`${x+dx},${y+dy}`);
-          if (ni !== undefined && !used[ni]) cnt++;
+    // 메인 캔버스에 픽셀 단위로 전사 (떨림 적용)
+    ctx.fillStyle = color;
+    const stepX = renderScale;
+    const stepY = renderScale;
+    for (let sy = 0; sy < rh; sy += stepY){
+      for (let sx = 0; sx < rw; sx += stepX){
+        const idx = (sy * rw + sx) * 4;
+        if (d[idx + 3] < 128) continue;
+        const px = startX + Math.round(sx / renderScale) + rand(jitter * 0.3);
+        const py = startY + Math.round(sy / renderScale) + rand(jitter * 0.3);
+        if (thick === 1){
+          ctx.fillRect(px, py, 1, 1);
+        } else {
+          ctx.fillRect(px, py, thick, thick);
         }
       }
-      return cnt;
     }
-
-    function traceChain(startIdx){
-      const chain = [skel[startIdx]];
-      used[startIdx] = 1;
-      let cur = startIdx;
-      for (let iter = 0; iter < 500; iter++){
-        const [cx, cy] = skel[cur];
-        let bestIdx = -1, bestDist = 999;
-        // 먼저 인접 8방향
-        for (let dy = -1; dy <= 1; dy++){
-          for (let dx = -1; dx <= 1; dx++){
-            if (dx === 0 && dy === 0) continue;
-            const ni = grid.get(`${cx+dx},${cy+dy}`);
-            if (ni !== undefined && !used[ni]){
-              const d2 = dx*dx + dy*dy;
-              if (d2 < bestDist){ bestDist = d2; bestIdx = ni; }
-            }
-          }
-        }
-        // 인접에 없으면 2px 범위
-        if (bestIdx === -1){
-          for (let dy = -2; dy <= 2; dy++){
-            for (let dx = -2; dx <= 2; dx++){
-              if (Math.abs(dx) <= 1 && Math.abs(dy) <= 1) continue;
-              const ni = grid.get(`${cx+dx},${cy+dy}`);
-              if (ni !== undefined && !used[ni]){
-                const d2 = dx*dx + dy*dy;
-                if (d2 < bestDist){ bestDist = d2; bestIdx = ni; }
-              }
-            }
-          }
-        }
-        if (bestIdx === -1) break;
-        used[bestIdx] = 1;
-        cur = bestIdx;
-        chain.push(skel[cur]);
-      }
-      return chain;
-    }
-
-    // 끝점 우선 탐색
-    const endpoints = [];
-    for (let i = 0; i < skel.length; i++){
-      if (countNeighbors(i) <= 1) endpoints.push(i);
-    }
-    // 끝점부터 체인 시작
-    for (const ep of endpoints){
-      if (used[ep]) continue;
-      const chain = traceChain(ep);
-      if (chain.length >= 4) strokes.push(chain);
-    }
-    // 남은 픽셀 처리
-    for (let i = 0; i < skel.length; i++){
-      if (used[i]) continue;
-      const chain = traceChain(i);
-      if (chain.length >= 4) strokes.push(chain);
-    }
-
-    // 포인트 간소화 (매 2~3px마다 샘플링)
-    const simplified = strokes.map(chain => {
-      if (chain.length <= 6) return chain;
-      const step = Math.max(2, Math.floor(chain.length / 30));
-      const result = [chain[0]];
-      for (let i = step; i < chain.length - 1; i += step) result.push(chain[i]);
-      result.push(chain[chain.length - 1]);
-      return result;
-    });
-
-    // 정규화 (0~1 범위)
-    return simplified.map(s => s.map(p => [p[0] / w, p[1] / h]));
   }
 
   function drawChar(ch){
@@ -477,15 +353,14 @@
     const startY = cursor.y;
 
     if (!strokes){
-      // 한글 등 미등록 글자: 스켈레톤(중심선) 추출 방식
-      strokes = extractSkeletonStrokes(ch, Math.round(w * 1.5), Math.round(h * 1.5));
-      if (strokes.length === 0) strokes = [[[0.1,0.2],[0.9,0.2],[0.9,0.9],[0.1,0.9],[0.1,0.2]]];
+      // 한글 등 미등록 글자: 폰트 직접 렌더링
+      drawFontChar(ch, startX, startY, w, h);
+    } else {
+      strokes.forEach(s => {
+        const segments = buildStrokeSegments(s, startX, startY, w, h);
+        animateStroke(segments);
+      });
     }
-
-    strokes.forEach(s => {
-      const segments = buildStrokeSegments(s, startX, startY, w, h);
-      animateStroke(segments);
-    });
 
     history.push({type:'char', x: startX - 4, y: startY - 6, w: w + space + 8, h: h * 1.5});
     cursor.x += w + space;
