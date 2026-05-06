@@ -51,6 +51,7 @@ body{background:#0a0a0a;font-family:'Noto Sans KR',sans-serif;color:#fff;min-hei
   <div class="ticker-label">속보</div>
   <div class="ticker-track">
     <div class="ticker-text">
+      The Ocean Doesn't Stop — 끝없는 파도 위 서핑 인터랙티브 실험 &nbsp;│&nbsp;
       Living Grid — 타이핑하면 격자가 글자를 피해 출렁이는 타이포 실험 &nbsp;│&nbsp;
       지피티쨩 VS 잼민이 — 10라운드 끝장토론 오픈 &nbsp;│&nbsp;
       Cable Lab 오픈 — 네 개의 하이파이 케이블을 직접 꽂아 소리의 차이를 듣다 &nbsp;│&nbsp;
@@ -69,21 +70,29 @@ body{background:#0a0a0a;font-family:'Noto Sans KR',sans-serif;color:#fff;min-hei
 
 <div class="main">
 
-  <!-- 히어로: 최신 기사 (5/4) Grid Distortion Typography -->
-  <a class="hero" href="2026-05-04/20260504.html">
+  <!-- 히어로: 최신 기사 (5/6) Infinite Surf -->
+  <a class="hero" href="2026-05-06/20260506.html">
     <div class="hero-visual">
-      <canvas id="hero-grid"></canvas>
+      <canvas id="hero-surf"></canvas>
     </div>
     <div class="hero-body">
-      <div class="hero-tag">실험·타이포그래피</div>
-      <div class="hero-title">Living Grid — 입력한 글자가 격자를 밀어내고 출렁이게 만드는 타이포 실험</div>
-      <div class="hero-meta">2026.05.04 · 인터랙티브 · GRID DISTORTION</div>
+      <div class="hero-tag">실험·인터랙티브</div>
+      <div class="hero-title">The Ocean Doesn't Stop — 끝없는 파도 위에서 서핑하는 인터랙티브 실험</div>
+      <div class="hero-meta">2026.05.06 · 인터랙티브 · INFINITE SURF</div>
     </div>
   </a>
 
   <!-- 이전 기사 -->
   <div class="section-label">이전 기사</div>
   <div class="grid">
+    <a class="card" href="2026-05-04/20260504.html">
+      <div class="card-body">
+        <div class="card-tag">실험·타이포그래피</div>
+        <div class="card-title">Living Grid — 입력한 글자가 격자를 밀어내고 출렁이게 만드는 타이포 실험</div>
+        <div class="card-date">2026.05.04</div>
+      </div>
+      <div class="card-thumb"><canvas id="thumb-grid" width="100" height="72"></canvas></div>
+    </a>
     <a class="card" href="2026-04-28/20260428.html">
       <div class="card-body">
         <div class="card-tag">실험·오디오</div>
@@ -171,9 +180,9 @@ body{background:#0a0a0a;font-family:'Noto Sans KR',sans-serif;color:#fff;min-hei
 <div class="footer">NEWSROOM — This is fiction. 실제 뉴스가 아닙니다.</div>
 
 <script>
-// ── 히어로: Living Grid (격자가 글자를 피해 출렁) ──
+// ── 히어로: Infinite Surf (파도 레이어) ──
 (function(){
-  const cv = document.getElementById('hero-grid');
+  const cv = document.getElementById('hero-surf');
   if (!cv) return;
   const rect = cv.parentElement.getBoundingClientRect();
   const DPR = Math.min(devicePixelRatio||1, 2);
@@ -181,125 +190,47 @@ body{background:#0a0a0a;font-family:'Noto Sans KR',sans-serif;color:#fff;min-hei
   const ctx = cv.getContext('2d');
   const W = cv.width, H = cv.height;
 
-  // Build simple text mask for the word "LIVING"
-  const mask = document.createElement('canvas');
-  mask.width = W; mask.height = H;
-  const mctx = mask.getContext('2d');
-  function buildMask(){
-    mctx.clearRect(0,0,W,H);
-    mctx.fillStyle = '#fff';
-    mctx.textBaseline = 'middle';
-    mctx.textAlign = 'center';
-    const fs = H * 0.55;
-    mctx.font = `900 ${fs}px "Helvetica Neue", "Arial Black", sans-serif`;
-    mctx.fillText('LIVING', W/2, H/2);
-  }
-  buildMask();
-  const md = mctx.getImageData(0,0,W,H).data;
-  const mBytes = new Uint8Array(W*H);
-  for (let i=0, j=3; i<mBytes.length; i++, j+=4) mBytes[i] = md[j] > 128 ? 1 : 0;
-
-  // escape distance lookup
-  function maskAt(x,y){ if(x<0||y<0||x>=W||y>=H) return 0; return mBytes[(y|0)*W+(x|0)]; }
-
-  // Build grid lines (horizontal + vertical)
-  const GRID = 18 * DPR;
-  const PAD = 20 * DPR;
-  const hLines = [], vLines = [];
-  const sampleStep = GRID * 0.4;
-
-  function buildTargets(pts, horizontal){
-    // For each point inside a letter, push it out along perpendicular direction
-    // to the nearest free pixel, with random side choice.
-    for (const p of pts){
-      let tx = p.ox, ty = p.oy;
-      if (maskAt(tx, ty)){
-        const step = 2 * DPR;
-        if (horizontal){
-          // push up or down
-          let up = 0, down = 0;
-          let cy = ty;
-          while(cy > 0 && maskAt(tx, cy)){ cy -= step; up += step; }
-          let cy2 = ty;
-          while(cy2 < H && maskAt(tx, cy2)){ cy2 += step; down += step; }
-          const pickUp = (up < down) ^ (Math.random() < 0.3);
-          ty += pickUp ? -up - 3*DPR : down + 3*DPR;
-        } else {
-          let left = 0, right = 0;
-          let cx = tx;
-          while(cx > 0 && maskAt(cx, ty)){ cx -= step; left += step; }
-          let cx2 = tx;
-          while(cx2 < W && maskAt(cx2, ty)){ cx2 += step; right += step; }
-          const pickLeft = (left < right) ^ (Math.random() < 0.3);
-          tx += pickLeft ? -left - 3*DPR : right + 3*DPR;
-        }
-      }
-      p.tx = tx; p.ty = ty;
-      p.x = tx; p.y = ty;
-      p.phase = Math.random() * Math.PI * 2;
-    }
-  }
-
-  for (let y = PAD; y <= H - PAD; y += GRID){
-    const pts = [];
-    for (let x = PAD; x <= W - PAD; x += sampleStep){
-      pts.push({ox: x, oy: y, tx: x, ty: y, x, y, phase: 0});
-    }
-    hLines.push(pts);
-  }
-  for (let x = PAD; x <= W - PAD; x += GRID){
-    const pts = [];
-    for (let y = PAD; y <= H - PAD; y += sampleStep){
-      pts.push({ox: x, oy: y, tx: x, ty: y, x, y, phase: 0});
-    }
-    vLines.push(pts);
-  }
-  for (const l of hLines) buildTargets(l, true);
-  for (const l of vLines) buildTargets(l, false);
-
-  function strokeCurve(pts, dx, dy, color, alpha){
-    if (pts.length < 2) return;
-    ctx.strokeStyle = color;
-    ctx.globalAlpha = alpha;
-    ctx.lineWidth = 1 * DPR;
-    ctx.lineCap = 'round';
-    ctx.beginPath();
-    ctx.moveTo(pts[0].x + dx, pts[0].y + dy);
-    for (let i = 1; i < pts.length - 1; i++){
-      const p = pts[i], n = pts[i+1];
-      const mx = (p.x + n.x) * 0.5, my = (p.y + n.y) * 0.5;
-      ctx.quadraticCurveTo(p.x + dx, p.y + dy, mx + dx, my + dy);
-    }
-    const last = pts[pts.length-1];
-    ctx.lineTo(last.x + dx, last.y + dy);
-    ctx.stroke();
+  const NUM = 10;
+  const waves = [];
+  for (let i = 0; i < NUM; i++){
+    const d = i / (NUM - 1);
+    waves.push({
+      y: H * (0.1 + d * 0.85),
+      amp: 3 + d * 12,
+      freq: 1.5 + Math.random() * 2,
+      speed: 0.3 + d * 0.8,
+      phase: Math.random() * Math.PI * 2,
+    });
   }
 
   function loop(){
     const t = performance.now() * 0.001;
-    // gentle idle drift
-    for (const ln of hLines) for (const p of ln){
-      p.x = p.tx + Math.sin(t * 0.8 + p.phase) * 1.5 * DPR;
-      p.y = p.ty + Math.cos(t * 0.6 + p.phase * 1.3) * 1.2 * DPR;
-    }
-    for (const ln of vLines) for (const p of ln){
-      p.x = p.tx + Math.sin(t * 0.7 + p.phase * 0.9) * 1.5 * DPR;
-      p.y = p.ty + Math.cos(t * 0.9 + p.phase) * 1.2 * DPR;
-    }
+    ctx.clearRect(0, 0, W, H);
+    // Sky gradient
+    const sky = ctx.createLinearGradient(0, 0, 0, H * 0.3);
+    sky.addColorStop(0, '#1a3050');
+    sky.addColorStop(1, '#0a1a2a');
+    ctx.fillStyle = sky;
+    ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = '#0a1a2a';
+    ctx.fillRect(0, H * 0.3, W, H * 0.7);
 
-    ctx.globalAlpha = 1;
-    ctx.fillStyle = '#f4f6f3';
-    ctx.fillRect(0,0,W,H);
-
-    const wob = Math.sin(t*0.5) * 0.5 * DPR;
-    const layers = [
-      { dx:  1.6*DPR + wob, dy: -0.8*DPR, color: '#d96cc4', alpha: 0.7 },
-      { dx: -1.2*DPR - wob, dy:  1.4*DPR, color: '#5fc77f', alpha: 0.7 },
-      { dx:  0.2*DPR,       dy: -1.6*DPR, color: '#5e9ee8', alpha: 0.7 },
-    ];
-    for (const L of layers){
-      for (const ln of hLines) strokeCurve(ln, L.dx, L.dy, L.color, L.alpha);
-      for (const ln of vLines) strokeCurve(ln, L.dx, L.dy, L.color, L.alpha);
+    for (const w of waves){
+      const d = (w.y - H * 0.1) / (H * 0.85);
+      const r = Math.round(120 - d * 112);
+      const g = Math.round(155 - d * 125);
+      const b = Math.round(180 - d * 130);
+      ctx.beginPath();
+      ctx.moveTo(0, H);
+      for (let x = 0; x <= W; x += 4){
+        const nx = x / W;
+        const y = w.y + Math.sin(nx * Math.PI * w.freq + t * w.speed + w.phase) * w.amp;
+        ctx.lineTo(x, y);
+      }
+      ctx.lineTo(W, H);
+      ctx.closePath();
+      ctx.fillStyle = `rgb(${r},${g},${b})`;
+      ctx.fill();
     }
     requestAnimationFrame(loop);
   }

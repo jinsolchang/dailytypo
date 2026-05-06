@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>끝없는 파도 — NEWSROOM</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&display=swap');
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body {
+  width: 100%; height: 100%;
+  overflow: hidden;
+  background: #0a1a2a;
+  cursor: default;
+}
+
+canvas {
+  position: fixed;
+  inset: 0;
+  width: 100%; height: 100%;
+}
+
+.headline {
+  position: fixed;
+  bottom: 8vh;
+  right: 6vw;
+  z-index: 10;
+  text-align: right;
+  pointer-events: none;
+}
+
+.headline h1 {
+  font-family: 'Cormorant Garamond', serif;
+  font-weight: 300;
+  font-size: clamp(2rem, 5.5vw, 4.5rem);
+  color: rgba(255, 252, 245, 0.92);
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+}
+
+.headline p {
+  font-family: 'Cormorant Garamond', serif;
+  font-weight: 300;
+  font-style: italic;
+  font-size: clamp(0.85rem, 1.8vw, 1.3rem);
+  color: rgba(255, 252, 245, 0.5);
+  margin-top: 0.6em;
+}
+
+.auto-btn {
+  position: fixed;
+  bottom: 3vh;
+  right: 6vw;
+  z-index: 20;
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 0.75rem;
+  letter-spacing: 0.2em;
+  color: rgba(255, 252, 245, 0.4);
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.15);
+  padding: 6px 16px;
+  border-radius: 20px;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.auto-btn:hover {
+  background: rgba(255,255,255,0.1);
+  color: rgba(255, 252, 245, 0.7);
+}
+
+.auto-btn.active {
+  background: rgba(100, 200, 255, 0.15);
+  border-color: rgba(100, 200, 255, 0.4);
+  color: rgba(180, 230, 255, 0.9);
+}
+</style>
+</head>
+<body>
+
+<canvas id="scene"></canvas>
+
+<div class="headline">
+  <h1>The Ocean Doesn't Stop</h1>
+  <p>You just learn where to stand on the board</p>
+</div>
+
+<button class="auto-btn" id="autoBtn">AUTO</button>
+
+<script>
+(function(){
+  const canvas = document.getElementById('scene');
+  const ctx = canvas.getContext('2d');
+  const DPR = Math.min(devicePixelRatio || 1, 2);
+  let W, H;
+
+  function resize(){
+    W = window.innerWidth * DPR;
+    H = window.innerHeight * DPR;
+    canvas.width = W;
+    canvas.height = H;
+  }
+  resize();
+  window.addEventListener('resize', resize);
+
+  // ── Auto mode ──
+  let autoMode = true;
+  const autoBtn = document.getElementById('autoBtn');
+  autoBtn.classList.add('active');
+  autoBtn.textContent = 'AUTO ●';
+  autoBtn.addEventListener('click', () => {
+    autoMode = !autoMode;
+    autoBtn.classList.toggle('active', autoMode);
+    autoBtn.textContent = autoMode ? 'AUTO ●' : 'AUTO';
+  });
+
+  // ── Scroll with inertia (#5) ──
+  let scrollVal = 0;
+  let scrollDelta = 0;
+  let scrollVelocity = 0; // inertia
+
+  window.addEventListener('wheel', e => {
+    if (e.deltaY > 0) { // only forward scroll allowed
+      scrollVelocity += e.deltaY * 0.00004;
+      scrollDelta += e.deltaY * 0.0003;
+    }
+    if (autoMode) { autoMode = false; autoBtn.classList.remove('active'); autoBtn.textContent = 'AUTO'; }
+  }, { passive: true });
+
+  let touchY = 0;
+  window.addEventListener('touchstart', e => { touchY = e.touches[0].clientY; });
+  window.addEventListener('touchmove', e => {
+    const dy = touchY - e.touches[0].clientY;
+    touchY = e.touches[0].clientY;
+    if (dy > 0) { // only forward (swipe up) allowed
+      scrollVelocity += dy * 0.00015;
+      scrollDelta += dy * 0.001;
+    }
+    if (autoMode) { autoMode = false; autoBtn.classList.remove('active'); autoBtn.textContent = 'AUTO'; }
+  }, { passive: true });
+
+  // ── Mouse tracking ──
+  let mouseX = 0.5, mouseY = 0.5;
+  let surferX = 0.5, surferY = 0.5;
+  
+  window.addEventListener('mousemove', e => {
+    mouseX = e.clientX / window.innerWidth;
+    mouseY = e.clientY / window.innerHeight;
+  });
+
+  // ── Seeded random ──
+  function makeRand(seed){
+    let s = seed;
+    return function(){ s = (s * 16807 + 11) % 2147483647; return s / 2147483647; };
+  }
+
+  // ── Wave parameters ──
+  const NUM_WAVES = 26;
+
+  const waves = [];
+  for (let i = 0; i < NUM_WAVES; i++){
+    const rand = makeRand(i * 997 + 42);
+    const depth = i / (NUM_WAVES - 1);
+    const yBase = -0.08 + depth * 1.12;
+    
+    const isRogue = rand() < 0.1;
+    const rogueMultiplier = isRogue ? 2.8 : 1.0;
+    const baseAmp = (0.008 + depth * 0.025) * rogueMultiplier;
+    
+    waves.push({
+      depth,
+      yBase,
+      amplitude: baseAmp,
+      frequency: 1.0 + rand() * 2.2,
+      speed: 0.5 + depth * 1.0,
+      phase: rand() * Math.PI * 2,
+      amp2: (0.004 + rand() * 0.012) * rogueMultiplier,
+      freq2: 3 + rand() * 4,
+      speed2: 0.8 + rand() * 1.0,
+      phase2: rand() * Math.PI * 2,
+      amp3: 0.002 + rand() * 0.005,
+      freq3: 7 + rand() * 8,
+      speed3: 1.2 + rand() * 1.5,
+      phase3: rand() * Math.PI * 2,
+      surgePhase: rand() * Math.PI * 2,
+      surgeSpeed: 0.03 + rand() * 0.05,
+      isRogue,
+      chopAmount: 0.3 + rand() * 0.7,
+      swellPhase: rand() * Math.PI * 2,
+      swellSpeed: 0.08 + rand() * 0.12,
+      swellAmp: 0.02 + rand() * 0.04,
+    });
+  }
+
+  // ── Colors with time-of-day (#9) ──
+  // timeOfDay cycles: 0=dawn, 0.25=day, 0.5=sunset, 0.75=night
+  // Starts at dawn, progresses with scroll distance
+  let timeOfDay = 0.15; // start at morning
+
+  function getTimeColors(){
+    const t = timeOfDay;
+    // Interpolate between palettes
+    const palettes = [
+      // dawn (0)
+      { far: [180, 140, 160], near: [40, 20, 50], bg: [30, 15, 40], sky: [200, 150, 170] },
+      // day (0.25)
+      { far: [100, 170, 200], near: [5, 40, 70], bg: [8, 30, 55], sky: [140, 200, 230] },
+      // sunset (0.5)
+      { far: [180, 130, 100], near: [15, 20, 40], bg: [10, 15, 30], sky: [220, 140, 80] },
+      // night (0.75)
+      { far: [60, 80, 110], near: [5, 12, 25], bg: [3, 8, 18], sky: [30, 50, 80] },
+    ];
+    
+    const idx = t * 4;
+    const i0 = Math.floor(idx) % 4;
+    const i1 = (i0 + 1) % 4;
+    const frac = idx - Math.floor(idx);
+    
+    function lerp3(a, b, f){ return a.map((v, i) => Math.round(v + (b[i] - v) * f)); }
+    
+    return {
+      far: lerp3(palettes[i0].far, palettes[i1].far, frac),
+      near: lerp3(palettes[i0].near, palettes[i1].near, frac),
+      bg: lerp3(palettes[i0].bg, palettes[i1].bg, frac),
+      sky: lerp3(palettes[i0].sky, palettes[i1].sky, frac),
+    };
+  }
+
+  function getWaveColor(depth, colors){
+    const t = Math.pow(depth, 0.65);
+    const r = Math.round(colors.far[0] + (colors.near[0] - colors.far[0]) * t);
+    const g = Math.round(colors.far[1] + (colors.near[1] - colors.far[1]) * t);
+    const b = Math.round(colors.far[2] + (colors.near[2] - colors.far[2]) * t);
+    return [r, g, b];
+  }
+
+  // ── Get wave Y ──
+  function getWaveY(wave, xNorm, t){
+    const scrollPhase = scrollVal * wave.speed * 3;
+    const timePhase = t * wave.speed * 0.5;
+    const totalPhase = scrollPhase + timePhase + wave.phase;
+    const totalPhase2 = scrollVal * wave.speed2 * 2 + t * wave.speed2 * 0.35 + wave.phase2;
+    const totalPhase3 = scrollVal * wave.speed3 * 1.5 + t * wave.speed3 * 0.25 + wave.phase3;
+
+    const swell = Math.sin(t * wave.swellSpeed + wave.swellPhase) * wave.swellAmp;
+    const chop = wave.chopAmount;
+    let raw1 = Math.sin(xNorm * Math.PI * wave.frequency + totalPhase);
+    raw1 = raw1 - chop * Math.sin(2 * (xNorm * Math.PI * wave.frequency + totalPhase)) * 0.3;
+    const y1 = raw1 * wave.amplitude;
+    
+    let raw2 = Math.sin(xNorm * Math.PI * wave.freq2 + totalPhase2);
+    raw2 = raw2 - chop * 0.5 * Math.sin(2 * (xNorm * Math.PI * wave.freq2 + totalPhase2)) * 0.25;
+    const y2 = raw2 * wave.amp2;
+    const y3 = Math.sin(xNorm * Math.PI * wave.freq3 + totalPhase3) * wave.amp3;
+    
+    const surgeT = t * wave.surgeSpeed + wave.surgePhase;
+    const surge = Math.pow(Math.max(0, Math.sin(surgeT)), 4) * wave.amplitude * 2.5;
+
+    return (wave.yBase + swell + y1 + y2 + y3 - surge) * H;
+  }
+
+  // ── Draw wave with gradient (#1) and crest foam (#2) ──
+  function drawWave(wave, t, colors){
+    const scrollPhase = scrollVal * wave.speed * 3;
+    const timePhase = t * wave.speed * 0.5;
+    const totalPhase = scrollPhase + timePhase + wave.phase;
+    const totalPhase2 = scrollVal * wave.speed2 * 2 + t * wave.speed2 * 0.35 + wave.phase2;
+    const totalPhase3 = scrollVal * wave.speed3 * 1.5 + t * wave.speed3 * 0.25 + wave.phase3;
+
+    const swell = Math.sin(t * wave.swellSpeed + wave.swellPhase) * wave.swellAmp;
+    const surgeT = t * wave.surgeSpeed + wave.surgePhase;
+    const surge = Math.pow(Math.max(0, Math.sin(surgeT)), 4) * wave.amplitude * 2.5;
+
+    const amp = wave.amplitude * H;
+    const amp2 = wave.amp2 * H;
+    const amp3 = wave.amp3 * H;
+    const surgeH = surge * H;
+    const swellH = swell * H;
+    const yBase = wave.yBase * H;
+    const chop = wave.chopAmount;
+
+    const points = [];
+    const STEPS = 120;
+    for (let i = 0; i <= STEPS; i++){
+      const nx = i / STEPS;
+      const x = nx * W;
+      let raw1 = Math.sin(nx * Math.PI * wave.frequency + totalPhase);
+      raw1 = raw1 - chop * Math.sin(2 * (nx * Math.PI * wave.frequency + totalPhase)) * 0.3;
+      const y1 = raw1 * amp;
+      let raw2 = Math.sin(nx * Math.PI * wave.freq2 + totalPhase2);
+      raw2 = raw2 - chop * 0.5 * Math.sin(2 * (nx * Math.PI * wave.freq2 + totalPhase2)) * 0.25;
+      const y2 = raw2 * amp2;
+      const y3 = Math.sin(nx * Math.PI * wave.freq3 + totalPhase3) * amp3;
+      points.push({ x, y: yBase + swellH + y1 + y2 + y3 - surgeH });
+    }
+
+    // (#1) Gradient fill: lighter at crest, darker below
+    const [cr, cg, cb] = getWaveColor(wave.depth, colors);
+    const minY = Math.min(...points.map(p => p.y));
+    const grad = ctx.createLinearGradient(0, minY, 0, minY + H * 0.08);
+    grad.addColorStop(0, `rgb(${cr + 25},${cg + 20},${cb + 15})`); // lighter top
+    grad.addColorStop(1, `rgb(${cr},${cg},${cb})`); // base color below
+
+    ctx.beginPath();
+    ctx.moveTo(0, H + 10);
+    for (const p of points) ctx.lineTo(p.x, p.y);
+    ctx.lineTo(W, H + 10);
+    ctx.closePath();
+    ctx.fillStyle = grad;
+    ctx.fill();
+
+    // (#2) White foam line on crest for closer waves
+    if (wave.depth > 0.3){
+      ctx.beginPath();
+      let started = false;
+      for (let i = 1; i < points.length - 1; i++){
+        const slope = points[i+1].y - points[i-1].y;
+        // Only draw on downward slopes (after crest peak)
+        if (slope > 0 && points[i].y < yBase + swellH - surgeH){
+          if (!started){ ctx.moveTo(points[i].x, points[i].y); started = true; }
+          else ctx.lineTo(points[i].x, points[i].y);
+        } else {
+          if (started){ ctx.stroke(); ctx.beginPath(); started = false; }
+        }
+      }
+      if (started) ctx.stroke();
+      ctx.strokeStyle = `rgba(255,255,255,${0.08 + wave.depth * 0.15})`;
+      ctx.lineWidth = 1 + wave.depth * 1.5;
+      ctx.stroke();
+    }
+  }
+
+  // ── Surfer (PNG image) ──
+  const surferImg = new Image();
+  surferImg.src = 'surfer.png';
+  let surferBounce = 0; // (#7) jump on rogue waves
+  
+  // Offscreen canvas for surfer tinting
+  const surferCanvas = document.createElement('canvas');
+  const surferCtx = surferCanvas.getContext('2d');
+
+  function drawSurfer(t){
+    if (!surferImg.complete) return;
+    const sx = surferX * W;
+    const sy = (surferY * H) - surferBounce;
+
+    const dx = mouseX - surferX;
+    const lean = Math.max(-0.2, Math.min(0.2, dx * 0.6));
+    
+    const imgH = H * 0.14;
+    const imgW = imgH * (surferImg.width / surferImg.height);
+
+    // Draw surfer with color tint on offscreen canvas
+    surferCanvas.width = Math.ceil(imgW);
+    surferCanvas.height = Math.ceil(imgH);
+    surferCtx.clearRect(0, 0, surferCanvas.width, surferCanvas.height);
+    surferCtx.drawImage(surferImg, 0, 0, surferCanvas.width, surferCanvas.height);
+    
+    // Apply time-of-day color overlay (only on opaque pixels)
+    const colors = getTimeColors();
+    const [sr, sg, sb] = colors.sky;
+    surferCtx.globalCompositeOperation = 'source-atop';
+    surferCtx.fillStyle = `rgba(${sr},${sg},${sb},0.2)`;
+    surferCtx.fillRect(0, 0, surferCanvas.width, surferCanvas.height);
+    surferCtx.globalCompositeOperation = 'source-over';
+    
+    // Edge rim light: draw slightly expanded bright version behind, then overlay original
+    // This creates a thin bright edge visible only at the silhouette border
+    const edgeCanvas = document.createElement('canvas');
+    edgeCanvas.width = surferCanvas.width;
+    edgeCanvas.height = surferCanvas.height;
+    const edgeCtx = edgeCanvas.getContext('2d');
+    
+    // Draw the silhouette shape
+    edgeCtx.drawImage(surferImg, 0, 0, edgeCanvas.width, edgeCanvas.height);
+    // Color it with rim light color
+    edgeCtx.globalCompositeOperation = 'source-in';
+    edgeCtx.fillStyle = `rgba(180, 220, 245, ${0.4 + Math.sin(t * 2) * 0.1})`;
+    edgeCtx.fillRect(0, 0, edgeCanvas.width, edgeCanvas.height);
+    edgeCtx.globalCompositeOperation = 'source-over';
+    
+    // Draw this rim slightly offset (simulates light from one side)
+    surferCtx.globalAlpha = 0.6;
+    surferCtx.drawImage(edgeCanvas, 1 * DPR, -1 * DPR); // offset right-up = light from top-right
+    surferCtx.globalAlpha = 1;
+    
+    // Redraw original on top so only the edge peeks out
+    surferCtx.drawImage(surferImg, 0, 0, surferCanvas.width, surferCanvas.height);
+    // Re-apply tint
+    surferCtx.globalCompositeOperation = 'source-atop';
+    surferCtx.fillStyle = `rgba(${sr},${sg},${sb},0.15)`;
+    surferCtx.fillRect(0, 0, surferCanvas.width, surferCanvas.height);
+    surferCtx.globalCompositeOperation = 'source-over';
+
+    // Draw tinted surfer onto main canvas
+    ctx.save();
+    ctx.translate(sx, sy);
+    ctx.rotate(lean);
+    ctx.drawImage(surferCanvas, -imgW / 2, -imgH * 0.7, imgW, imgH);
+    ctx.restore();
+  }
+
+  // ── Board foam (particle system) ──
+  const foamParticles = [];
+  const MAX_FOAM = 40;
+
+  function spawnFoamParticle(sx, foamY, boardHalfW){
+    foamParticles.push({
+      x: sx + (Math.random() - 0.5) * boardHalfW * 2.2,
+      y: foamY + (Math.random() - 0.3) * 8 * DPR,
+      vx: (Math.random() - 0.5) * 2 * DPR,
+      vy: -Math.random() * 1.5 * DPR,
+      size: (1 + Math.random() * 2) * DPR,
+      maxSize: (3 + Math.random() * 4) * DPR,
+      maxLife: 0.4 + Math.random() * 0.6,
+      born: performance.now() * 0.001,
+    });
+  }
+
+  function drawBoardFoam(t){
+    const sx = surferX * W;
+    const sy = surferY * H;
+    const foamY = sy + H * 0.015;
+    const boardHalfW = H * 0.05;
+    
+    const intensity = Math.min(1, scrollDelta * 15);
+    if (intensity > 0.05){
+      const spawnCount = Math.floor(intensity * 4) + 1;
+      for (let i = 0; i < spawnCount && foamParticles.length < MAX_FOAM; i++){
+        spawnFoamParticle(sx, foamY, boardHalfW);
+      }
+    }
+
+    ctx.save();
+    for (let i = foamParticles.length - 1; i >= 0; i--){
+      const p = foamParticles[i];
+      const age = t - p.born;
+      const lifeRatio = age / p.maxLife;
+      if (lifeRatio >= 1){ foamParticles.splice(i, 1); continue; }
+
+      p.x += p.vx; p.y += p.vy;
+      p.vx *= 0.96; p.vy *= 0.97;
+
+      const sizeCurve = lifeRatio < 0.3 ? lifeRatio / 0.3 : 1 - (lifeRatio - 0.3) / 0.7;
+      const size = p.size + (p.maxSize - p.size) * sizeCurve;
+      const alpha = (1 - lifeRatio) * 0.5;
+
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = 'rgba(210, 235, 250, 0.9)';
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, size, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  // ── Auto mode logic with time change (#9) ──
+  let autoTargetX = 0.5, autoTargetY = 0.5;
+  let autoTimer = 0;
+
+  function updateAuto(t){
+    if (!autoMode) return;
+
+    // Auto scroll with inertia
+    scrollVelocity += 0.0002;
+
+    // Change target every few seconds
+    if (t - autoTimer > 2.5 + Math.random() * 3){
+      autoTimer = t;
+      autoTargetX = 0.15 + Math.random() * 0.7;
+      autoTargetY = 0.2 + Math.random() * 0.6;
+    }
+
+    mouseX += (autoTargetX - mouseX) * 0.02;
+    mouseY += (autoTargetY - mouseY) * 0.02;
+  }
+
+  // ── Headline wave effect (#10) ──
+  const headlineEl = document.querySelector('.headline h1');
+  const headlinePEl = document.querySelector('.headline p');
+
+  function updateHeadline(t){
+    const wave = Math.sin(t * 0.8) * 2;
+    const opacity = 0.85 + Math.sin(t * 0.5) * 0.07;
+    headlineEl.style.transform = `translateY(${wave}px)`;
+    headlineEl.style.opacity = opacity;
+    headlinePEl.style.transform = `translateY(${wave * 0.5}px)`;
+  }
+
+  // ── Render ──
+  function render(){
+    const t = performance.now() * 0.001;
+    ctx.clearRect(0, 0, W, H);
+
+    // (#5) Inertia: apply velocity, decay (no reverse)
+    if (scrollVelocity < 0) scrollVelocity = 0;
+    scrollVal += scrollVelocity;
+    scrollVelocity *= 0.95; // friction
+    scrollDelta += scrollVelocity * 5;
+
+    // Time of day progresses with scroll distance (full cycle every ~40 scroll units)
+    timeOfDay = (0.15 + scrollVal * 0.025) % 1.0;
+    if (timeOfDay < 0) timeOfDay += 1.0;
+
+    // Get time-based colors (#9)
+    const colors = getTimeColors();
+
+    // Background
+    const [bgR, bgG, bgB] = colors.bg;
+    ctx.fillStyle = `rgb(${bgR},${bgG},${bgB})`;
+    ctx.fillRect(0, 0, W, H);
+
+    // Auto mode
+    updateAuto(t);
+
+    // Move surfer toward mouse only when scrolling
+    const moveAmount = Math.min(scrollDelta, 0.01);
+    scrollDelta *= 0.9;
+    
+    if (moveAmount > 0.0002){
+      surferX += (mouseX - surferX) * moveAmount * 0.3;
+      surferY += (mouseY - surferY) * moveAmount * 0.5;
+    }
+
+    surferX = Math.max(0.1, Math.min(0.9, surferX));
+    surferY = Math.max(0.15, Math.min(0.85, surferY));
+
+    // Find surfer's wave
+    let surferWaveIdx = 0;
+    for (let i = 0; i < NUM_WAVES; i++){
+      const wy = getWaveY(waves[i], surferX, t) / H;
+      if (wy < surferY) surferWaveIdx = i;
+      else break;
+    }
+
+    // Smooth wave snapping
+    const rideWave = waves[Math.min(surferWaveIdx + 1, NUM_WAVES - 1)];
+    const rideY = getWaveY(rideWave, surferX, t);
+    const waveTargetY = rideY / H - 0.015;
+    const snapSpeed = 0.04;
+    surferY += (waveTargetY - surferY) * snapSpeed;
+
+    // (#7) Jump on rogue waves
+    if (rideWave.isRogue){
+      const surgeT = t * rideWave.surgeSpeed + rideWave.surgePhase;
+      const surgeActive = Math.pow(Math.max(0, Math.sin(surgeT)), 4);
+      surferBounce += (surgeActive * 15 * DPR - surferBounce) * 0.1;
+    } else {
+      surferBounce *= 0.9; // decay back to 0
+    }
+
+    // Draw waves behind surfer
+    for (let i = 0; i <= surferWaveIdx; i++){
+      drawWave(waves[i], t, colors);
+    }
+
+    // Surfer + foam
+    drawSurfer(t);
+    drawBoardFoam(t);
+
+    // Waves in front
+    for (let i = surferWaveIdx + 1; i < NUM_WAVES; i++){
+      drawWave(waves[i], t, colors);
+    }
+
+    // (#10) Headline animation
+    updateHeadline(t);
+
+    requestAnimationFrame(render);
+  }
+
+  render();
+})();
+</script>
+
+</body>
+</html>
