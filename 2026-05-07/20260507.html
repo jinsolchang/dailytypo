@@ -81,7 +81,7 @@
   let euljiroFont = null;
 
   // 배민 을지로체 로드
-  opentype.load('https://cdn.jsdelivr.net/npm/@kfonts/bm-euljiro@1.0.2/fonts/BM-EULJIRO-TTF.ttf', function(err, font){
+  opentype.load('BMEULJIROTTF.ttf', function(err, font){
     if (!err) euljiroFont = font;
   });
   let cursor = { x: 12, y: 12 };
@@ -493,20 +493,11 @@
   // 스타일 3: opentype.js 글리프 경로 → 선분 변환 → 렌더링
   function drawEuljiroChar(ch, startX, startY, w, h){
     const glyph = euljiroFont.charToGlyph(ch);
-    if (!glyph || !glyph.path) return;
-    const path = glyph.getPath(0, 0, h * 0.85);
+    if (!glyph) return;
+    const fontSize = h * 0.8;
+    const path = glyph.getPath(startX, startY + fontSize, fontSize);
     const cmds = path.commands;
     if (cmds.length === 0) return;
-
-    // 바운딩 박스 계산 (정규화용)
-    const bb = path.getBoundingBox();
-    const bw = bb.x2 - bb.x1 || 1;
-    const bh = bb.y2 - bb.y1 || 1;
-    const scaleX = w / bw;
-    const scaleY = h / bh;
-    const sc = Math.min(scaleX, scaleY) * 0.85;
-    const offX = startX + (w - bw * sc) / 2 - bb.x1 * sc;
-    const offY = startY + (h - bh * sc) / 2 - bb.y1 * sc;
 
     // path 커맨드를 선분 스트로크로 변환
     let curX = 0, curY = 0;
@@ -516,36 +507,34 @@
     for (const cmd of cmds){
       if (cmd.type === 'M'){
         if (stroke.length > 1) allStrokes.push(stroke);
-        stroke = [[cmd.x * sc + offX, cmd.y * sc + offY]];
+        stroke = [[cmd.x, cmd.y]];
         curX = cmd.x; curY = cmd.y;
       } else if (cmd.type === 'L'){
-        stroke.push([cmd.x * sc + offX, cmd.y * sc + offY]);
+        stroke.push([cmd.x, cmd.y]);
         curX = cmd.x; curY = cmd.y;
       } else if (cmd.type === 'C'){
-        // 3차 베지어 → 선분 근사
         const steps = 8;
         for (let t = 1; t <= steps; t++){
           const tt = t / steps;
           const u = 1 - tt;
           const x = u*u*u*curX + 3*u*u*tt*cmd.x1 + 3*u*tt*tt*cmd.x2 + tt*tt*tt*cmd.x;
           const y = u*u*u*curY + 3*u*u*tt*cmd.y1 + 3*u*tt*tt*cmd.y2 + tt*tt*tt*cmd.y;
-          stroke.push([x * sc + offX, y * sc + offY]);
+          stroke.push([x, y]);
         }
         curX = cmd.x; curY = cmd.y;
       } else if (cmd.type === 'Q'){
-        // 2차 베지어 → 선분 근사
         const steps = 6;
         for (let t = 1; t <= steps; t++){
           const tt = t / steps;
           const u = 1 - tt;
           const x = u*u*curX + 2*u*tt*cmd.x1 + tt*tt*cmd.x;
           const y = u*u*curY + 2*u*tt*cmd.y1 + tt*tt*cmd.y;
-          stroke.push([x * sc + offX, y * sc + offY]);
+          stroke.push([x, y]);
         }
         curX = cmd.x; curY = cmd.y;
       } else if (cmd.type === 'Z'){
         if (stroke.length > 1){
-          stroke.push(stroke[0].slice()); // 닫기
+          stroke.push(stroke[0].slice());
           allStrokes.push(stroke);
         }
         stroke = [];
