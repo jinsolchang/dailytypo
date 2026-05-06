@@ -523,7 +523,15 @@
     input.focus();
   });
 
+  let composing = false;
+  input.addEventListener('compositionstart', () => { composing = true; });
+  input.addEventListener('compositionend', (e) => {
+    composing = false;
+    for (const ch of e.data) drawChar(ch);
+    e.target.value = '';
+  });
   input.addEventListener('input', (e) => {
+    if (composing) return; // IME 조합 중에는 무시
     for (const ch of e.target.value) drawChar(ch);
     e.target.value = '';
   });
