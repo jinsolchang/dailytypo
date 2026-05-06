@@ -219,9 +219,13 @@
     const dx = x1 - x0, dy = y1 - y0;
     const dist = Math.sqrt(dx*dx + dy*dy);
     if (dist < 1){ drawCircleAt(x0, y0, TUBE_RADIUS); return; }
-    const steps = Math.max(1, Math.floor(dist / TUBE_STEP));
+    // 끊김이 높을수록 원 간격이 넓어짐 (띄엄띄엄)
+    const gap = TUBE_STEP + (breakFreq / 100) * (TUBE_RADIUS * 3);
+    const steps = Math.max(1, Math.floor(dist / gap));
     for (let i = 0; i <= steps; i++){
       const t = i / steps;
+      // 끊김이 높으면 일부 원을 건너뜀
+      if (breakFreq > 0 && Math.random() * 100 < breakFreq * 0.3) continue;
       const cx = x0 + dx * t + rand(jitter * 0.3);
       const cy = y0 + dy * t + rand(jitter * 0.3);
       drawCircleAt(cx, cy, TUBE_RADIUS + rand(jitter * 0.3));
