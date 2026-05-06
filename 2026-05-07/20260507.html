@@ -246,25 +246,24 @@
       tubeCtx.arc(cx - minX, cy - minY, r, 0, Math.PI * 2);
       tubeCtx.fill();
     }
-    // 엣지 픽셀 추출 (전경이면서 이웃에 배경이 있는 픽셀)
+    // 외곽선만 그리기 — 내부 구멍은 무시 (외곽만 추출)
     const imgData = tubeCtx.getImageData(0, 0, tw, th);
     const d = imgData.data;
     ctx.fillStyle = color;
     for (let y = 0; y < th; y++){
       for (let x = 0; x < tw; x++){
         if (d[(y * tw + x) * 4 + 3] < 128) continue;
+        // 외곽 = 전경이면서 상하좌우 중 하나라도 배경인 픽셀
         let isEdge = false;
-        for (let dy = -1; dy <= 1 && !isEdge; dy++){
-          for (let dx = -1; dx <= 1 && !isEdge; dx++){
-            if (dx === 0 && dy === 0) continue;
-            const nx = x + dx, ny = y + dy;
-            if (nx < 0 || nx >= tw || ny < 0 || ny >= th){ isEdge = true; break; }
-            if (d[(ny * tw + nx) * 4 + 3] < 128) isEdge = true;
-          }
+        const neighbors = [[0,-1],[0,1],[-1,0],[1,0]];
+        for (const [dx2, dy2] of neighbors){
+          const nx = x + dx2, ny = y + dy2;
+          if (nx < 0 || nx >= tw || ny < 0 || ny >= th){ isEdge = true; break; }
+          if (d[(ny * tw + nx) * 4 + 3] < 128){ isEdge = true; break; }
         }
         if (isEdge){
-          const px = x + minX + rand(jitter * 0.5);
-          const py = y + minY + rand(jitter * 0.5);
+          const px = x + minX + rand(jitter * 0.4);
+          const py = y + minY + rand(jitter * 0.4);
           ctx.fillRect(Math.round(px), Math.round(py), thick, thick);
         }
       }
@@ -427,7 +426,7 @@
     'ㄴ': [[[0.1,0.05],[0.1,0.9],[0.95,0.9]]],
     'ㄷ': [[[0.9,0.1],[0.1,0.1],[0.1,0.9],[0.9,0.9]]],
     'ㄸ': [[[0.45,0.1],[0.05,0.1],[0.05,0.9],[0.45,0.9]], [[0.95,0.1],[0.55,0.1],[0.55,0.9],[0.95,0.9]]],
-    'ㄹ': [[[0.05,0.05],[0.95,0.05],[0.95,0.4],[0.05,0.4],[0.05,0.75],[0.95,0.75]]],
+    'ㄹ': [[[0.05,0.05],[0.95,0.05]], [[0.95,0.05],[0.95,0.4]], [[0.95,0.4],[0.05,0.4]], [[0.05,0.4],[0.05,0.75]], [[0.05,0.75],[0.95,0.75]]],
     'ㅁ': [[[0.1,0.1],[0.1,0.9],[0.9,0.9],[0.9,0.1],[0.1,0.1]]],
     'ㅂ': [[[0.15,0.05],[0.15,0.95]], [[0.85,0.05],[0.85,0.95]], [[0.15,0.5],[0.85,0.5]], [[0.15,0.95],[0.85,0.95]]],
     'ㅃ': [[[0.08,0.05],[0.08,0.95],[0.45,0.95],[0.45,0.05]], [[0.08,0.5],[0.45,0.5]], [[0.55,0.05],[0.55,0.95],[0.92,0.95],[0.92,0.05]], [[0.55,0.5],[0.92,0.5]]],
