@@ -14,6 +14,7 @@
         <select id="ms-style" style="width: 100%; font-size: 12px; padding: 2px;">
           <option value="1">1 — 선</option>
           <option value="2">2 — 구슬</option>
+          <option value="3">3 — 을지로</option>
         </select>
       </div>
       <div>
@@ -52,6 +53,7 @@
     style="position: absolute; opacity: 0; pointer-events: none; width: 1px; height: 1px;">
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/opentype.js@1.3.4/dist/opentype.min.js"></script>
 <script>
 (function(){
   const canvas = document.getElementById('ms-canvas');
@@ -76,6 +78,12 @@
   let thick = 1, scale = 44, breakFreq = 2, jitter = 1;
   let color = '#000000';
   let drawStyle = 1;
+  let euljiroFont = null;
+
+  // 배민 을지로체 로드
+  opentype.load('https://cdn.jsdelivr.net/npm/@kfonts/bm-euljiro@1.0.2/fonts/BM-EULJIRO-TTF.ttf', function(err, font){
+    if (!err) euljiroFont = font;
+  });
   let cursor = { x: 12, y: 12 };
   let history = [];
   let strokeQueue = [];
@@ -482,6 +490,106 @@
     return { cho, jung, jong };
   }
 
+  // 스타일 3: opentype.js 글리프 경로 → 선분 변환 → 렌더링
+  function drawEuljiroChar(ch, startX, startY, w, h){
+    const glyph = euljiroFont.charToGlyph(ch);
+    if (!glyph || !glyph.path) return;
+    const path = glyph.getPath(0, 0, h * 0.85);
+    const cmds = path.commands;
+    if (cmds.length === 0) return;
+
+    // 바운딩 박스 계산 (정규화용)
+    const bb = path.getBoundingBox();
+    const bw = bb.x2 - bb.x1 || 1;
+    const bh = bb.y2 - bb.y1 || 1;
+    const scaleX = w / bw;
+    const scaleY = h / bh;
+    const sc = Math.min(scaleX, scaleY) * 0.85;
+    const offX = startX + (w - bw * sc) / 2 - bb.x1 * sc;
+    const offY = startY + (h - bh * sc) / 2 - bb.y1 * sc;
+
+    // path 커맨드를 선분 스트로크로 변환
+    let curX = 0, curY = 0;
+    let stroke = [];
+    const allStrokes = [];
+
+    for (const cmd of cmds){
+      if (cmd.type === 'M'){
+        if (stroke.length > 1) allStrokes.push(stroke);
+        stroke = [[cmd.x * sc + offX, cmd.y * sc + offY]];
+        curX = cmd.x; curY = cmd.y;
+      } else if (cmd.type === 'L'){
+        stroke.push([cmd.x * sc + offX, cmd.y * sc + offY]);
+        curX = cmd.x; curY = cmd.y;
+      } else if (cmd.type === 'C'){
+        // 3차 베지어 → 선분 근사
+        const steps = 8;
+        for (let t = 1; t <= steps; t++){
+          const tt = t / steps;
+          const u = 1 - tt;
+          const x = u*u*u*curX + 3*u*u*tt*cmd.x1 + 3*u*tt*tt*cmd.x2 + tt*tt*tt*cmd.x;
+          const y = u*u*u*curY + 3*u*u*tt*cmd.y1 + 3*u*tt*tt*cmd.y2 + tt*tt*tt*cmd.y;
+          stroke.push([x * sc + offX, y * sc + offY]);
+        }
+        curX = cmd.x; curY = cmd.y;
+      } else if (cmd.type === 'Q'){
+        // 2차 베지어 → 선분 근사
+        const steps = 6;
+        for (let t = 1; t <= steps; t++){
+          const tt = t / steps;
+          const u = 1 - tt;
+          const x = u*u*curX + 2*u*tt*cmd.x1 + tt*tt*cmd.x;
+          const y = u*u*curY + 2*u*tt*cmd.y1 + tt*tt*cmd.y;
+          stroke.push([x * sc + offX, y * sc + offY]);
+        }
+        curX = cmd.x; curY = cmd.y;
+      } else if (cmd.type === 'Z'){
+        if (stroke.length > 1){
+          stroke.push(stroke[0].slice()); // 닫기
+          allStrokes.push(stroke);
+        }
+        stroke = [];
+      }
+    }
+    if (stroke.length > 1) allStrokes.push(stroke);
+
+    // 각 스트로크를 떨림/끊김 적용하여 렌더링
+    for (const s of allStrokes){
+      // 이미 절대 좌표이므로 buildStrokeSegments 대신 직접 처리
+      const dense = [s[0].slice()];
+      for (let i = 0; i < s.length - 1; i++){
+        const dx = s[i+1][0] - s[i][0];
+        const dy = s[i+1][1] - s[i][1];
+        const L = Math.sqrt(dx*dx + dy*dy);
+        const stepSize = 4 + Math.random() * 3;
+        const n = Math.max(1, Math.ceil(L / stepSize));
+        for (let k = 1; k <= n; k++){
+          const t = k / n;
+          dense.push([
+            s[i][0] + dx * t + rand(jitter),
+            s[i][1] + dy * t + rand(jitter)
+          ]);
+        }
+      }
+      // 끊김 적용
+      const segments = [];
+      if (breakFreq === 0){ segments.push(dense); }
+      else {
+        let current = [dense[0]];
+        for (let i = 1; i < dense.length; i++){
+          if (i > 2 && i < dense.length - 2 && Math.random() * 100 < breakFreq){
+            segments.push(current);
+            current = [dense[i]];
+          } else {
+            current.push(dense[i]);
+          }
+        }
+        if (current.length) segments.push(current);
+      }
+      animateStroke(segments);
+    }
+  }
+
   function drawHangulChar(ch, startX, startY, w, h){
     const decomp = decomposeHangul(ch);
     if (!decomp) return false;
@@ -576,6 +684,25 @@
       history.push({type:'newline'});
       return;
     }
+
+    // 스타일 3: opentype.js로 을지로체 글리프 경로 추출
+    if (drawStyle === 3 && euljiroFont){
+      const w = Math.round(scale * 0.85);
+      const h = scale;
+      const space = Math.round(scale * 0.2);
+      if (cursor.x + w > W - 12){
+        cursor.x = 12;
+        cursor.y += scale + Math.round(scale * 0.35);
+      }
+      if (cursor.y + h > H - 12) return;
+      const startX = cursor.x;
+      const startY = cursor.y;
+      drawEuljiroChar(ch, startX, startY, w, h);
+      history.push({type:'char', x: startX - 4, y: startY - 6, w: w + space + 8, h: h * 1.5});
+      cursor.x += w + space;
+      return;
+    }
+
     let strokes = G[ch] || G[ch.toUpperCase()];
     const code = ch.charCodeAt(0);
     const isHangul = code >= 0xAC00 && code <= 0xD7A3;
@@ -601,7 +728,6 @@
         animateStroke(segments);
       });
     } else {
-      // 기타 미등록 문자: 사각형 fallback
       const fb = [[[0.1,0.2],[0.9,0.2],[0.9,0.9],[0.1,0.9],[0.1,0.2]]];
       fb.forEach(s => {
         const segments = buildStrokeSegments(s, startX, startY, w, h);
@@ -669,8 +795,11 @@
     history = [];
     if (drawStyle === 1){
       ['안','녕','하','세','요',' ','H','e','l','l','o','!'].forEach(drawChar);
-    } else {
+    } else if (drawStyle === 2){
       ['구','슬',' ','B','e','a','d','s'].forEach(drawChar);
+    } else if (drawStyle === 3){
+      if (euljiroFont) ['을','지','로',' ','E','u','l','j','i','r','o'].forEach(drawChar);
+      else ['로','딩','.','.','.','.'].forEach(drawChar);
     }
     drawChar('\n');
   }
