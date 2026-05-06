@@ -10,6 +10,13 @@
     <!-- 좌측: 파라미터 -->
     <div style="display: flex; flex-direction: column; gap: 12px; min-width: 130px;">
       <div>
+        <label style="font-size: 12px; color: var(--color-text-secondary); display: block; margin-bottom: 4px;">스타일</label>
+        <select id="ms-style" style="width: 100%; font-size: 12px; padding: 2px;">
+          <option value="1">1 — 선</option>
+          <option value="2">2 — 구슬</option>
+        </select>
+      </div>
+      <div>
         <label style="font-size: 12px; color: var(--color-text-secondary); display: block; margin-bottom: 4px;">굵기</label>
         <input type="range" id="ms-thick" min="1" max="3" value="1" step="1" style="width: 100%;">
         <span id="ms-thick-out" style="font-size: 11px; color: var(--color-text-tertiary);">1</span>
@@ -60,6 +67,7 @@
   const jitterOut = document.getElementById('ms-jitter-out');
   const animEl = document.getElementById('ms-anim');
   const clearBtn = document.getElementById('ms-clear');
+  const styleEl = document.getElementById('ms-style');
 
   const W = 660, H = 400;
   canvas.width = W; canvas.height = H;
@@ -67,6 +75,7 @@
 
   let thick = 1, scale = 44, breakFreq = 2, jitter = 1;
   let color = '#000000';
+  let drawStyle = 1;
   let cursor = { x: 12, y: 12 };
   let history = [];
   let strokeQueue = [];
@@ -163,15 +172,59 @@
     let err = dx + dy;
     let safety = 0;
     while (safety++ < 5000){
-      if (thick === 1){
-        ctx.fillRect(x0, y0, 1, 1);
-      } else {
-        ctx.fillRect(x0 - Math.floor(thick/2), y0 - Math.floor(thick/2), thick, thick);
+      if (drawStyle === 1){
+        if (thick === 1) ctx.fillRect(x0, y0, 1, 1);
+        else ctx.fillRect(x0 - Math.floor(thick/2), y0 - Math.floor(thick/2), thick, thick);
       }
       if (x0 === x1 && y0 === y1) break;
       const e2 = 2 * err;
       if (e2 >= dy){ err += dy; x0 += sx; }
       if (e2 <= dx){ err += dx; y0 += sy; }
+    }
+  }
+
+  // 스타일 2: 원통(튜브) — 획 경로를 따라 손그림 원을 이어 그림
+  const TUBE_RADIUS = 4; // 원 반지름
+  const TUBE_STEP = 3;   // 원 간격 (작을수록 빽빽 = 매끈한 원통)
+  const CIRCLE_PTS = 10; // 원 하나를 구성하는 점 수
+
+  function drawCircleAt(cx, cy, r){
+    ctx.fillStyle = color;
+    const pts = CIRCLE_PTS;
+    for (let i = 0; i < pts; i++){
+      const a0 = (i / pts) * Math.PI * 2;
+      const a1 = ((i + 1) / pts) * Math.PI * 2;
+      const x0 = cx + Math.cos(a0) * r + rand(jitter * 0.5);
+      const y0 = cy + Math.sin(a0) * r + rand(jitter * 0.5);
+      const x1 = cx + Math.cos(a1) * r + rand(jitter * 0.5);
+      const y1 = cy + Math.sin(a1) * r + rand(jitter * 0.5);
+      // Bresenham으로 원 둘레 선분 그리기
+      let px = Math.round(x0), py = Math.round(y0);
+      const ex = Math.round(x1), ey = Math.round(y1);
+      const ddx = Math.abs(ex - px), ssx = px < ex ? 1 : -1;
+      const ddy = -Math.abs(ey - py), ssy = py < ey ? 1 : -1;
+      let e = ddx + ddy;
+      let s = 0;
+      while (s++ < 200){
+        ctx.fillRect(px, py, thick, thick);
+        if (px === ex && py === ey) break;
+        const e2 = 2 * e;
+        if (e2 >= ddy){ e += ddy; px += ssx; }
+        if (e2 <= ddx){ e += ddx; py += ssy; }
+      }
+    }
+  }
+
+  function plotTube(x0, y0, x1, y1){
+    const dx = x1 - x0, dy = y1 - y0;
+    const dist = Math.sqrt(dx*dx + dy*dy);
+    if (dist < 1){ drawCircleAt(x0, y0, TUBE_RADIUS); return; }
+    const steps = Math.max(1, Math.floor(dist / TUBE_STEP));
+    for (let i = 0; i <= steps; i++){
+      const t = i / steps;
+      const cx = x0 + dx * t + rand(jitter * 0.3);
+      const cy = y0 + dy * t + rand(jitter * 0.3);
+      drawCircleAt(cx, cy, TUBE_RADIUS + rand(jitter * 0.3));
     }
   }
 
@@ -232,18 +285,20 @@
       segments.forEach(seg => {
         if (seg.length === 1){
           const p = seg[0];
-          if (thick === 1) ctx.fillRect(Math.round(p[0]), Math.round(p[1]), 1, 1);
+          if (drawStyle === 2) drawCircleAt(Math.round(p[0]), Math.round(p[1]), TUBE_RADIUS);
+          else if (thick === 1) ctx.fillRect(Math.round(p[0]), Math.round(p[1]), 1, 1);
           else ctx.fillRect(Math.round(p[0]-thick/2), Math.round(p[1]-thick/2), thick, thick);
         } else {
           for (let i = 0; i < seg.length - 1; i++){
-            plotLine(seg[i][0], seg[i][1], seg[i+1][0], seg[i+1][1]);
+            if (drawStyle === 2) plotTube(seg[i][0], seg[i][1], seg[i+1][0], seg[i+1][1]);
+            else plotLine(seg[i][0], seg[i][1], seg[i+1][0], seg[i+1][1]);
           }
         }
       });
       return;
     }
     const totalPoints = segments.reduce((a, s) => a + s.length, 0);
-    const duration = Math.max(80, Math.min(250, totalPoints * 4));
+    const duration = Math.max(80, Math.min(drawStyle === 2 ? 500 : 250, totalPoints * (drawStyle === 2 ? 8 : 4)));
     strokeQueue.push({
       segments, segIdx: 0, pointIdx: 0, totalPoints, drawnPoints: 0,
       start: performance.now(), duration
@@ -262,12 +317,14 @@
       const seg = job.segments[job.segIdx];
       if (job.pointIdx === 0){
         const p = seg[0];
-        if (thick === 1) ctx.fillRect(Math.round(p[0]), Math.round(p[1]), 1, 1);
+        if (drawStyle === 2) drawCircleAt(Math.round(p[0]), Math.round(p[1]), TUBE_RADIUS);
+        else if (thick === 1) ctx.fillRect(Math.round(p[0]), Math.round(p[1]), 1, 1);
         else ctx.fillRect(Math.round(p[0]-thick/2), Math.round(p[1]-thick/2), thick, thick);
         job.pointIdx = 1;
         job.drawnPoints++;
       } else if (job.pointIdx < seg.length){
-        plotLine(seg[job.pointIdx-1][0], seg[job.pointIdx-1][1], seg[job.pointIdx][0], seg[job.pointIdx][1]);
+        if (drawStyle === 2) plotTube(seg[job.pointIdx-1][0], seg[job.pointIdx-1][1], seg[job.pointIdx][0], seg[job.pointIdx][1]);
+        else plotLine(seg[job.pointIdx-1][0], seg[job.pointIdx-1][1], seg[job.pointIdx][0], seg[job.pointIdx][1]);
         job.pointIdx++;
         job.drawnPoints++;
       } else {
@@ -527,6 +584,7 @@
     else if (e.key === 'Backspace'){ e.preventDefault(); backspace(); }
   });
 
+  styleEl.addEventListener('change', () => { drawStyle = parseInt(styleEl.value, 10); });
   thickEl.addEventListener('input', () => { thick = parseInt(thickEl.value,10); thickOut.textContent = thick; });
   scaleEl.addEventListener('input', () => { scale = parseInt(scaleEl.value,10); scaleOut.textContent = scale; });
   breakEl.addEventListener('input', () => { breakFreq = parseInt(breakEl.value,10); breakOut.textContent = breakFreq + '%'; });
