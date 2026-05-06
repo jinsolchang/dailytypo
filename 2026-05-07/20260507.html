@@ -189,22 +189,13 @@
   const CIRCLE_PTS = 10; // 원 하나를 구성하는 점 수
 
   function drawCircleAt(cx, cy, r){
+    // 단독 원 그리기 (윤곽만, 손그림 느낌)
     ctx.fillStyle = color;
-    // 채워진 원 (수평 스캔라인)
-    const ri = Math.round(r);
-    for (let dy = -ri; dy <= ri; dy++){
-      const halfW = Math.round(Math.sqrt(r * r - dy * dy));
-      const y = Math.round(cy) + dy;
-      for (let dx = -halfW; dx <= halfW; dx++){
-        ctx.fillRect(Math.round(cx) + dx, y, 1, 1);
-      }
-    }
-    // 윤곽에 떨림 추가 (손그림 느낌)
     const pts = CIRCLE_PTS;
     for (let i = 0; i < pts; i++){
       const a0 = (i / pts) * Math.PI * 2;
       const a1 = ((i + 1) / pts) * Math.PI * 2;
-      const x0 = cx + Math.cos(a0) * (r + rand(jitter)) ;
+      const x0 = cx + Math.cos(a0) * (r + rand(jitter));
       const y0 = cy + Math.sin(a0) * (r + rand(jitter));
       const x1 = cx + Math.cos(a1) * (r + rand(jitter));
       const y1 = cy + Math.sin(a1) * (r + rand(jitter));
@@ -223,54 +214,98 @@
     }
   }
 
+  // 오프스크린 캔버스로 원들의 합집합 윤곽 추출
+  const tubeOff = document.createElement('canvas');
+  const tubeCtx = tubeOff.getContext('2d', {willReadFrequently: true});
+
+  function drawTubeOutline(circles){
+    if (circles.length === 0) return;
+    if (circles.length === 1){
+      drawCircleAt(circles[0][0], circles[0][1], circles[0][2]);
+      return;
+    }
+    // 바운딩 박스 계산
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const [cx, cy, r] of circles){
+      minX = Math.min(minX, cx - r - 2);
+      minY = Math.min(minY, cy - r - 2);
+      maxX = Math.max(maxX, cx + r + 2);
+      maxY = Math.max(maxY, cy + r + 2);
+    }
+    minX = Math.floor(minX); minY = Math.floor(minY);
+    maxX = Math.ceil(maxX); maxY = Math.ceil(maxY);
+    const tw = maxX - minX + 1, th = maxY - minY + 1;
+    if (tw < 2 || th < 2) return;
+
+    tubeOff.width = tw; tubeOff.height = th;
+    tubeCtx.clearRect(0, 0, tw, th);
+    // 모든 원을 채워서 합집합 영역 생성
+    tubeCtx.fillStyle = '#000';
+    for (const [cx, cy, r] of circles){
+      tubeCtx.beginPath();
+      tubeCtx.arc(cx - minX, cy - minY, r, 0, Math.PI * 2);
+      tubeCtx.fill();
+    }
+    // 엣지 픽셀 추출 (전경이면서 이웃에 배경이 있는 픽셀)
+    const imgData = tubeCtx.getImageData(0, 0, tw, th);
+    const d = imgData.data;
+    ctx.fillStyle = color;
+    for (let y = 0; y < th; y++){
+      for (let x = 0; x < tw; x++){
+        if (d[(y * tw + x) * 4 + 3] < 128) continue;
+        let isEdge = false;
+        for (let dy = -1; dy <= 1 && !isEdge; dy++){
+          for (let dx = -1; dx <= 1 && !isEdge; dx++){
+            if (dx === 0 && dy === 0) continue;
+            const nx = x + dx, ny = y + dy;
+            if (nx < 0 || nx >= tw || ny < 0 || ny >= th){ isEdge = true; break; }
+            if (d[(ny * tw + nx) * 4 + 3] < 128) isEdge = true;
+          }
+        }
+        if (isEdge){
+          const px = x + minX + rand(jitter * 0.5);
+          const py = y + minY + rand(jitter * 0.5);
+          ctx.fillRect(Math.round(px), Math.round(py), thick, thick);
+        }
+      }
+    }
+  }
+
   function plotTube(x0, y0, x1, y1){
     const dx = x1 - x0, dy = y1 - y0;
     const dist = Math.sqrt(dx*dx + dy*dy);
     if (dist < 1){ drawCircleAt(x0, y0, TUBE_RADIUS); return; }
-    // 끊김이 높을수록 원 간격이 넓어짐 (띄엄띄엄)
+    // 끊김이 높을수록 원 간격이 넓어짐
     const gap = TUBE_STEP + (breakFreq / 100) * (TUBE_RADIUS * 3);
     const steps = Math.max(1, Math.floor(dist / gap));
-    // 진행 방향에 수직인 벡터 (원통 윤곽선용)
-    const nx = -dy / dist, ny = dx / dist;
-    let prevCx = null, prevCy = null, prevR = null;
+    const circles = [];
     for (let i = 0; i <= steps; i++){
       const t = i / steps;
-      if (breakFreq > 0 && Math.random() * 100 < breakFreq * 0.3){
-        prevCx = null; // 끊김 시 연결 끊기
-        continue;
-      }
+      if (breakFreq > 0 && Math.random() * 100 < breakFreq * 0.3) continue;
       const cx = x0 + dx * t + rand(jitter * 0.3);
       const cy = y0 + dy * t + rand(jitter * 0.3);
       const r = TUBE_RADIUS + rand(jitter * 0.3);
-      drawCircleAt(cx, cy, r);
-      // 이전 원과 연결 (원통 효과)
-      if (prevCx !== null && gap < TUBE_RADIUS * 2.5){
-        // 윗변 연결
-        const topX0 = prevCx + nx * prevR, topY0 = prevCy + ny * prevR;
-        const topX1 = cx + nx * r, topY1 = cy + ny * r;
-        plotLineDirect(topX0, topY0, topX1, topY1);
-        // 아랫변 연결
-        const botX0 = prevCx - nx * prevR, botY0 = prevCy - ny * prevR;
-        const botX1 = cx - nx * r, botY1 = cy - ny * r;
-        plotLineDirect(botX0, botY0, botX1, botY1);
-      }
-      prevCx = cx; prevCy = cy; prevR = r;
+      circles.push([cx, cy, r]);
     }
-  }
-
-  // 단순 선 그리기 (스타일 무관, 원통 윤곽용)
-  function plotLineDirect(x0, y0, x1, y1){
-    x0 = Math.round(x0); y0 = Math.round(y0);
-    x1 = Math.round(x1); y1 = Math.round(y1);
-    const dx = Math.abs(x1 - x0), sx = x0 < x1 ? 1 : -1;
-    const dy = -Math.abs(y1 - y0), sy = y0 < y1 ? 1 : -1;
-    let err = dx + dy, safety = 0;
-    while (safety++ < 5000){
-      ctx.fillRect(x0, y0, thick, thick);
-      if (x0 === x1 && y0 === y1) break;
-      const e2 = 2 * err;
-      if (e2 >= dy){ err += dy; x0 += sx; }
-      if (e2 <= dx){ err += dx; y0 += sy; }
+    // 겹치는 원들을 그룹으로 묶어서 합집합 윤곽 그리기
+    if (circles.length === 0) return;
+    // 인접한 원들끼리 그룹화 (거리 < 두 반지름 합이면 같은 그룹)
+    const groups = [];
+    let currentGroup = [circles[0]];
+    for (let i = 1; i < circles.length; i++){
+      const prev = circles[i-1], cur = circles[i];
+      const d = Math.sqrt((cur[0]-prev[0])**2 + (cur[1]-prev[1])**2);
+      if (d < prev[2] + cur[2]){
+        currentGroup.push(cur);
+      } else {
+        groups.push(currentGroup);
+        currentGroup = [cur];
+      }
+    }
+    groups.push(currentGroup);
+    // 각 그룹을 합집합 윤곽으로 그리기
+    for (const group of groups){
+      drawTubeOutline(group);
     }
   }
 
