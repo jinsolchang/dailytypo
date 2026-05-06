@@ -293,6 +293,70 @@
     rafId = requestAnimationFrame(tick);
   }
 
+  // 오프스크린 캔버스로 한글 등 미등록 글자의 윤곽 추출
+  const offCanvas = document.createElement('canvas');
+  const offCtx = offCanvas.getContext('2d', {willReadFrequently: true});
+
+  function extractContourStrokes(ch, w, h){
+    offCanvas.width = w; offCanvas.height = h;
+    offCtx.clearRect(0, 0, w, h);
+    offCtx.fillStyle = '#000';
+    offCtx.font = `bold ${Math.round(h * 0.8)}px "Noto Sans KR", sans-serif`;
+    offCtx.textBaseline = 'top';
+    offCtx.textAlign = 'center';
+    offCtx.fillText(ch, w / 2, Math.round(h * 0.1));
+
+    const imgData = offCtx.getImageData(0, 0, w, h);
+    const d = imgData.data;
+    // 엣지 픽셀 수집 (알파 > 128이고 이웃 중 투명이 있는 픽셀)
+    const edge = [];
+    for (let y = 0; y < h; y++){
+      for (let x = 0; x < w; x++){
+        const idx = (y * w + x) * 4;
+        if (d[idx + 3] < 128) continue;
+        let isEdge = false;
+        for (let dy = -1; dy <= 1 && !isEdge; dy++){
+          for (let dx = -1; dx <= 1 && !isEdge; dx++){
+            if (dx === 0 && dy === 0) continue;
+            const nx = x + dx, ny = y + dy;
+            if (nx < 0 || nx >= w || ny < 0 || ny >= h){ isEdge = true; break; }
+            if (d[((ny * w + nx) * 4) + 3] < 128) isEdge = true;
+          }
+        }
+        if (isEdge) edge.push([x, y]);
+      }
+    }
+    if (edge.length === 0) return [];
+
+    // 엣지 픽셀을 연결된 스트로크로 그룹화 (간단한 nearest-neighbor chain)
+    const used = new Uint8Array(edge.length);
+    const strokes = [];
+    const step = Math.max(1, Math.floor(edge.length / 120)); // 포인트 수 제한
+
+    for (let start = 0; start < edge.length; start += step){
+      if (used[start]) continue;
+      const chain = [edge[start]];
+      used[start] = 1;
+      let cur = edge[start];
+      for (let iter = 0; iter < 60; iter++){
+        let bestIdx = -1, bestDist = 25; // max 5px jump
+        for (let j = 0; j < edge.length; j++){
+          if (used[j]) continue;
+          const dx = edge[j][0] - cur[0], dy = edge[j][1] - cur[1];
+          const dist = dx*dx + dy*dy;
+          if (dist < bestDist){ bestDist = dist; bestIdx = j; }
+        }
+        if (bestIdx === -1) break;
+        used[bestIdx] = 1;
+        cur = edge[bestIdx];
+        chain.push(cur);
+      }
+      if (chain.length >= 3) strokes.push(chain);
+    }
+    // 정규화 (0~1 범위)
+    return strokes.map(s => s.map(p => [p[0] / w, p[1] / h]));
+  }
+
   function drawChar(ch){
     if (ch === '\n'){
       cursor.x = 12;
@@ -301,7 +365,8 @@
       return;
     }
     let strokes = G[ch] || G[ch.toUpperCase()];
-    const w = Math.round(scale * 0.6);
+    const isKnown = !!strokes;
+    const w = Math.round(scale * (isKnown ? 0.6 : 0.85));
     const h = scale;
     const space = Math.round(scale * 0.2);
 
@@ -314,7 +379,11 @@
     const startX = cursor.x;
     const startY = cursor.y;
 
-    if (!strokes) strokes = [[[0.1,0.2],[0.9,0.2],[0.9,0.9],[0.1,0.9],[0.1,0.2]]];
+    if (!strokes){
+      // 한글 등 미등록 글자: 윤곽 추출 방식
+      strokes = extractContourStrokes(ch, Math.round(w * 1.5), Math.round(h * 1.5));
+      if (strokes.length === 0) strokes = [[[0.1,0.2],[0.9,0.2],[0.9,0.9],[0.1,0.9],[0.1,0.2]]];
+    }
 
     strokes.forEach(s => {
       const segments = buildStrokeSegments(s, startX, startY, w, h);
@@ -380,7 +449,7 @@
 
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, W, H);
-  ['H','e','l','l','o',' ','1','9','9','5','!'].forEach(drawChar);
+  ['안','녕','하','세','요',' ','H','e','l','l','o','!'].forEach(drawChar);
   drawChar('\n');
 
   setTimeout(() => input.focus(), 100);
