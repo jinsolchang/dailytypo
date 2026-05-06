@@ -1,0 +1,388 @@
+<div style="background: var(--color-background-secondary); border-radius: var(--border-radius-lg); padding: 1rem; border: 0.5px solid var(--color-border-tertiary);">
+  <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px; font-size: 12px; color: var(--color-text-secondary);">
+    <span style="width: 10px; height: 10px; border-radius: 50%; background: #ff5f57;"></span>
+    <span style="width: 10px; height: 10px; border-radius: 50%; background: #febc2e;"></span>
+    <span style="width: 10px; height: 10px; border-radius: 50%; background: #28c840;"></span>
+    <span style="margin-left: 8px;">untitled — Paint</span>
+  </div>
+
+  <div style="display: flex; gap: 14px; margin-bottom: 12px; align-items: center; flex-wrap: wrap;">
+    <label style="font-size: 13px; color: var(--color-text-secondary);">굵기</label>
+    <input type="range" id="ms-thick" min="1" max="3" value="1" step="1" style="width: 60px;">
+    <span id="ms-thick-out" style="font-size: 13px; min-width: 14px;">1</span>
+
+    <label style="font-size: 13px; color: var(--color-text-secondary);">글자크기</label>
+    <input type="range" id="ms-scale" min="20" max="70" value="44" step="2" style="width: 80px;">
+    <span id="ms-scale-out" style="font-size: 13px; min-width: 22px;">44</span>
+
+    <label style="font-size: 13px; color: var(--color-text-secondary);">끊김</label>
+    <input type="range" id="ms-break" min="0" max="40" value="0" step="1" style="width: 80px;">
+    <span id="ms-break-out" style="font-size: 13px; min-width: 22px;">0%</span>
+
+    <label style="font-size: 13px; color: var(--color-text-secondary);">떨림</label>
+    <input type="range" id="ms-jitter" min="0" max="3" value="1" step="1" style="width: 60px;">
+    <span id="ms-jitter-out" style="font-size: 13px; min-width: 14px;">1</span>
+
+    <label style="font-size: 13px; color: var(--color-text-secondary);"><input type="checkbox" id="ms-anim" checked> 애니메이션</label>
+
+    <div id="ms-palette" style="display: flex; gap: 4px;"></div>
+
+    <button id="ms-clear" style="margin-left: auto; font-size: 12px;">지우기</button>
+  </div>
+
+  <div style="background: white; border: 1px solid var(--color-border-secondary); border-radius: 4px; overflow: hidden;">
+    <canvas id="ms-canvas" width="660" height="320" style="display: block; width: 660px; max-width: 100%; height: 320px; cursor: text;"></canvas>
+  </div>
+
+  <input id="ms-input" type="text" autocomplete="off" autocapitalize="off" spellcheck="false"
+    style="position: absolute; opacity: 0; pointer-events: none; width: 1px; height: 1px;">
+
+  <p style="font-size: 12px; color: var(--color-text-tertiary); margin: 10px 0 0;">
+    끊김 0% = 완전 연속선 · 올리면 마우스 떼는 자국 추가
+  </p>
+</div>
+
+<script>
+(function(){
+  const canvas = document.getElementById('ms-canvas');
+  const ctx = canvas.getContext('2d');
+  const input = document.getElementById('ms-input');
+  const thickEl = document.getElementById('ms-thick');
+  const thickOut = document.getElementById('ms-thick-out');
+  const scaleEl = document.getElementById('ms-scale');
+  const scaleOut = document.getElementById('ms-scale-out');
+  const breakEl = document.getElementById('ms-break');
+  const breakOut = document.getElementById('ms-break-out');
+  const jitterEl = document.getElementById('ms-jitter');
+  const jitterOut = document.getElementById('ms-jitter-out');
+  const animEl = document.getElementById('ms-anim');
+  const clearBtn = document.getElementById('ms-clear');
+  const paletteEl = document.getElementById('ms-palette');
+
+  const W = 660, H = 320;
+  canvas.width = W; canvas.height = H;
+  ctx.imageSmoothingEnabled = false;
+
+  let thick = 1, scale = 44, breakFreq = 0, jitter = 1;
+  let color = '#000000';
+  let cursor = { x: 12, y: 12 };
+  let history = [];
+  let strokeQueue = [];
+  let rafId = null;
+
+  const G = {
+    'A': [[[0,1],[0.3,0.5],[0.5,0],[0.7,0.5],[1,1]], [[0.18,0.65],[0.82,0.65]]],
+    'B': [[[0,0],[0,1]], [[0,0],[0.7,0.05],[0.9,0.18],[0.85,0.4],[0.6,0.5],[0,0.5]], [[0,0.5],[0.7,0.55],[0.95,0.7],[0.9,0.9],[0.6,1],[0,1]]],
+    'C': [[[1,0.15],[0.7,0.02],[0.3,0.05],[0.05,0.3],[0,0.6],[0.15,0.85],[0.5,1],[0.85,0.95],[1,0.85]]],
+    'D': [[[0,0],[0,1]], [[0,0],[0.55,0.05],[0.9,0.25],[1,0.5],[0.9,0.75],[0.55,0.95],[0,1]]],
+    'E': [[[1,0],[0,0],[0,1],[1,1]], [[0,0.5],[0.7,0.5]]],
+    'F': [[[1,0],[0,0],[0,1]], [[0,0.5],[0.7,0.5]]],
+    'G': [[[1,0.15],[0.7,0.02],[0.3,0.05],[0.05,0.3],[0,0.6],[0.15,0.85],[0.5,1],[0.85,0.95],[1,0.85],[1,0.55],[0.55,0.55]]],
+    'H': [[[0,0],[0,1]], [[1,0],[1,1]], [[0,0.5],[1,0.5]]],
+    'I': [[[0.15,0],[0.85,0]], [[0.5,0],[0.5,1]], [[0.15,1],[0.85,1]]],
+    'J': [[[0.2,0],[1,0]], [[0.7,0],[0.7,0.85],[0.55,1],[0.3,1],[0.1,0.9]]],
+    'K': [[[0,0],[0,1]], [[1,0],[0.05,0.5],[1,1]]],
+    'L': [[[0,0],[0,1],[1,1]]],
+    'M': [[[0,1],[0,0],[0.5,0.7],[1,0],[1,1]]],
+    'N': [[[0,1],[0,0],[1,1],[1,0]]],
+    'O': [[[0.3,0],[0.7,0],[0.95,0.2],[1,0.5],[0.95,0.8],[0.7,1],[0.3,1],[0.05,0.8],[0,0.5],[0.05,0.2],[0.3,0]]],
+    'P': [[[0,1],[0,0],[0.7,0.05],[0.95,0.2],[1,0.4],[0.7,0.55],[0,0.55]]],
+    'Q': [[[0.3,0],[0.7,0],[0.95,0.2],[1,0.5],[0.95,0.8],[0.7,1],[0.3,1],[0.05,0.8],[0,0.5],[0.05,0.2],[0.3,0]], [[0.55,0.7],[1.05,1.05]]],
+    'R': [[[0,1],[0,0],[0.7,0.05],[0.95,0.2],[1,0.4],[0.7,0.55],[0,0.55]], [[0.4,0.55],[1,1]]],
+    'S': [[[1,0.15],[0.75,0.02],[0.3,0],[0.05,0.15],[0.05,0.4],[0.5,0.5],[0.95,0.6],[1,0.85],[0.7,1],[0.3,1],[0,0.85]]],
+    'T': [[[0,0],[1,0]], [[0.5,0],[0.5,1]]],
+    'U': [[[0,0],[0,0.7],[0.2,0.95],[0.5,1],[0.8,0.95],[1,0.7],[1,0]]],
+    'V': [[[0,0],[0.5,1],[1,0]]],
+    'W': [[[0,0],[0.25,1],[0.5,0.4],[0.75,1],[1,0]]],
+    'X': [[[0,0],[1,1]], [[1,0],[0,1]]],
+    'Y': [[[0,0],[0.5,0.5],[1,0]], [[0.5,0.5],[0.5,1]]],
+    'Z': [[[0,0],[1,0],[0,1],[1,1]]],
+    'a': [[[0.2,0.45],[0.7,0.4],[0.9,0.55],[0.9,1]], [[0.9,0.7],[0.5,0.7],[0.2,0.85],[0.4,1],[0.9,0.95]]],
+    'b': [[[0,0],[0,1]], [[0,0.65],[0.3,0.5],[0.7,0.55],[0.9,0.75],[0.7,0.95],[0.3,1],[0,0.9]]],
+    'c': [[[0.9,0.55],[0.6,0.45],[0.2,0.55],[0.05,0.75],[0.2,0.95],[0.6,1],[0.9,0.9]]],
+    'd': [[[1,0],[1,1]], [[1,0.6],[0.7,0.5],[0.3,0.55],[0.1,0.75],[0.3,0.95],[0.7,1],[1,0.9]]],
+    'e': [[[0.05,0.75],[0.95,0.75],[0.95,0.55],[0.6,0.45],[0.2,0.55],[0.05,0.75],[0.2,0.95],[0.6,1],[0.9,0.9]]],
+    'f': [[[0.4,1],[0.4,0.2],[0.55,0.05],[0.85,0.05]], [[0.1,0.5],[0.7,0.5]]],
+    'g': [[[1,0.55],[0.7,0.45],[0.3,0.5],[0.1,0.7],[0.3,0.9],[0.7,0.95],[1,0.85]], [[1,0.55],[1,1.15],[0.85,1.3],[0.4,1.3],[0.1,1.2]]],
+    'h': [[[0,0],[0,1]], [[0,0.6],[0.3,0.45],[0.7,0.5],[0.9,0.7],[0.9,1]]],
+    'i': [[[0.5,0.2],[0.5,0.28]], [[0.5,0.45],[0.5,1]]],
+    'j': [[[0.6,0.2],[0.6,0.28]], [[0.6,0.45],[0.6,1.1],[0.45,1.25],[0.15,1.25]]],
+    'k': [[[0,0],[0,1]], [[0.85,0.5],[0,0.78]], [[0.3,0.7],[0.85,1]]],
+    'l': [[[0.3,0],[0.5,0],[0.5,1]]],
+    'm': [[[0,1],[0,0.45]], [[0,0.55],[0.2,0.4],[0.4,0.5],[0.5,0.7],[0.5,1]], [[0.5,0.55],[0.7,0.4],[0.9,0.5],[1,0.7],[1,1]]],
+    'n': [[[0,1],[0,0.45]], [[0,0.55],[0.3,0.4],[0.7,0.45],[0.95,0.65],[0.95,1]]],
+    'o': [[[0.3,0.45],[0.7,0.45],[0.95,0.65],[0.95,0.85],[0.7,1],[0.3,1],[0.05,0.85],[0.05,0.65],[0.3,0.45]]],
+    'p': [[[0,1.3],[0,0.45]], [[0,0.55],[0.3,0.4],[0.7,0.45],[0.95,0.65],[0.95,0.85],[0.7,1],[0.3,1],[0,0.9]]],
+    'q': [[[1,1.3],[1,0.45]], [[1,0.55],[0.7,0.4],[0.3,0.45],[0.05,0.65],[0.05,0.85],[0.3,1],[0.7,1],[1,0.9]]],
+    'r': [[[0,1],[0,0.45]], [[0,0.6],[0.3,0.45],[0.7,0.45],[0.9,0.55]]],
+    's': [[[0.85,0.5],[0.5,0.4],[0.2,0.5],[0.1,0.65],[0.4,0.75],[0.7,0.85],[0.85,0.95],[0.6,1],[0.2,1],[0.05,0.9]]],
+    't': [[[0.4,0.15],[0.4,0.85],[0.55,1],[0.85,0.95]], [[0.1,0.4],[0.75,0.4]]],
+    'u': [[[0,0.45],[0,0.85],[0.2,1],[0.5,1],[0.8,0.95],[0.95,0.7]], [[0.95,0.45],[0.95,1]]],
+    'v': [[[0,0.45],[0.5,1],[1,0.45]]],
+    'w': [[[0,0.45],[0.25,1],[0.5,0.6],[0.75,1],[1,0.45]]],
+    'x': [[[0,0.45],[1,1]], [[1,0.45],[0,1]]],
+    'y': [[[0,0.45],[0.5,1]], [[1,0.45],[0.4,1.25],[0.1,1.3]]],
+    'z': [[[0,0.45],[1,0.45],[0,1],[1,1]]],
+    '0': [[[0.3,0],[0.7,0],[0.95,0.2],[1,0.5],[0.95,0.8],[0.7,1],[0.3,1],[0.05,0.8],[0,0.5],[0.05,0.2],[0.3,0]], [[0.85,0.15],[0.15,0.85]]],
+    '1': [[[0.2,0.2],[0.5,0],[0.5,1]], [[0.2,1],[0.85,1]]],
+    '2': [[[0.05,0.2],[0.4,0],[0.7,0],[1,0.2],[1,0.4],[0,1],[1,1]]],
+    '3': [[[0.1,0.1],[0.4,0],[0.8,0.05],[0.95,0.25],[0.7,0.45],[0.4,0.5]], [[0.4,0.5],[0.85,0.55],[1,0.75],[0.85,0.95],[0.4,1],[0.1,0.9]]],
+    '4': [[[0.7,0],[0,0.7],[1,0.7]], [[0.7,0.4],[0.7,1]]],
+    '5': [[[1,0],[0.1,0],[0,0.5],[0.5,0.4],[0.85,0.5],[1,0.7],[0.85,0.95],[0.4,1],[0.1,0.9]]],
+    '6': [[[0.9,0.05],[0.3,0.15],[0.05,0.5],[0,0.8],[0.2,1],[0.6,1],[0.9,0.85],[0.95,0.65],[0.7,0.45],[0.3,0.5],[0.05,0.7]]],
+    '7': [[[0,0],[1,0],[0.3,1]]],
+    '8': [[[0.5,0.45],[0.2,0.3],[0.2,0.15],[0.5,0],[0.8,0.15],[0.8,0.3],[0.5,0.45],[0.15,0.6],[0.05,0.8],[0.3,1],[0.7,1],[0.95,0.8],[0.85,0.6],[0.5,0.45]]],
+    '9': [[[0.95,0.5],[0.7,0.55],[0.3,0.5],[0.05,0.35],[0.05,0.2],[0.3,0.05],[0.7,0],[0.95,0.2],[1,0.5],[0.85,0.85],[0.5,1],[0.15,0.95]]],
+    '.': [[[0.45,0.98],[0.55,0.98]]],
+    ',': [[[0.5,0.92],[0.45,1.1],[0.3,1.2]]],
+    '!': [[[0.5,0],[0.5,0.7]], [[0.5,0.95],[0.5,1]]],
+    '?': [[[0.1,0.2],[0.4,0],[0.8,0.05],[0.95,0.25],[0.7,0.45],[0.5,0.6],[0.5,0.75]], [[0.5,0.95],[0.5,1]]],
+    "'": [[[0.5,0],[0.5,0.2]]],
+    '"': [[[0.3,0],[0.3,0.2]], [[0.7,0],[0.7,0.2]]],
+    ':': [[[0.5,0.4],[0.5,0.42]], [[0.5,0.95],[0.5,1]]],
+    ';': [[[0.5,0.4],[0.5,0.42]], [[0.55,0.95],[0.45,1.1],[0.35,1.2]]],
+    '-': [[[0.1,0.55],[0.9,0.55]]],
+    '_': [[[0,1.05],[1,1.05]]],
+    '+': [[[0.1,0.55],[0.9,0.55]], [[0.5,0.25],[0.5,0.85]]],
+    '=': [[[0.1,0.4],[0.9,0.4]], [[0.1,0.7],[0.9,0.7]]],
+    '/': [[[0.9,0],[0.1,1.05]]],
+    '(': [[[0.7,0],[0.3,0.3],[0.3,0.7],[0.7,1]]],
+    ')': [[[0.3,0],[0.7,0.3],[0.7,0.7],[0.3,1]]],
+    ' ': []
+  };
+
+  const PALETTE = ['#000000','#7f7f7f','#c00000','#0066cc','#1a9e2c','#e09a00','#7a3fa0','#a0522d'];
+  PALETTE.forEach((c, i) => {
+    const sw = document.createElement('button');
+    sw.style.cssText = `width:18px;height:18px;background:${c};border:1px solid var(--color-border-secondary);border-radius:2px;padding:0;cursor:pointer;`;
+    sw.setAttribute('aria-label','color '+c);
+    if (i === 0) sw.style.outline = '2px solid var(--color-text-primary)';
+    sw.addEventListener('click', () => {
+      color = c;
+      [...paletteEl.children].forEach(b => b.style.outline = 'none');
+      sw.style.outline = '2px solid var(--color-text-primary)';
+      input.focus();
+    });
+    paletteEl.appendChild(sw);
+  });
+
+  function rand(n){ return (Math.random() * 2 - 1) * n; }
+
+  function plotLine(x0, y0, x1, y1){
+    x0 = Math.round(x0); y0 = Math.round(y0);
+    x1 = Math.round(x1); y1 = Math.round(y1);
+    const dx = Math.abs(x1 - x0), sx = x0 < x1 ? 1 : -1;
+    const dy = -Math.abs(y1 - y0), sy = y0 < y1 ? 1 : -1;
+    let err = dx + dy;
+    let safety = 0;
+    while (safety++ < 5000){
+      if (thick === 1){
+        ctx.fillRect(x0, y0, 1, 1);
+      } else {
+        ctx.fillRect(x0 - Math.floor(thick/2), y0 - Math.floor(thick/2), thick, thick);
+      }
+      if (x0 === x1 && y0 === y1) break;
+      const e2 = 2 * err;
+      if (e2 >= dy){ err += dy; x0 += sx; }
+      if (e2 <= dx){ err += dx; y0 += sy; }
+    }
+  }
+
+  function buildStrokeSegments(stroke, ox, oy, w, h){
+    if (stroke.length < 2) {
+      if (stroke.length === 1){
+        return [[[ox + stroke[0][0]*w + rand(jitter), oy + stroke[0][1]*h + rand(jitter)]]];
+      }
+      return [];
+    }
+
+    const abs = stroke.map(p => [ox + p[0]*w, oy + p[1]*h]);
+    const dense = [abs[0].slice()];
+    for (let i = 0; i < abs.length - 1; i++){
+      const dx = abs[i+1][0] - abs[i][0];
+      const dy = abs[i+1][1] - abs[i][1];
+      const L = Math.sqrt(dx*dx + dy*dy);
+      const stepSize = 4 + Math.random() * 3;
+      const n = Math.max(1, Math.ceil(L / stepSize));
+      for (let k = 1; k <= n; k++){
+        const t = k / n;
+        dense.push([
+          abs[i][0] + dx * t + rand(jitter),
+          abs[i][1] + dy * t + rand(jitter)
+        ]);
+      }
+    }
+
+    // 끊김 0%면 통째로 한 segment
+    if (breakFreq === 0) return [dense];
+
+    const segments = [];
+    let current = [dense[0]];
+    let breaksUsed = 0;
+    const maxBreaks = Math.max(1, Math.floor(dense.length / 10));
+
+    for (let i = 1; i < dense.length; i++){
+      const canBreak = i > 2 && i < dense.length - 2 && breaksUsed < maxBreaks && Math.random() * 100 < breakFreq;
+      if (canBreak){
+        segments.push(current);
+        breaksUsed++;
+        const skipDist = 1 + Math.random() * 1.5;
+        const dx = dense[i][0] - dense[i-1][0];
+        const dy = dense[i][1] - dense[i-1][1];
+        const L = Math.sqrt(dx*dx + dy*dy) || 1;
+        current = [[dense[i][0] + (dx/L)*skipDist, dense[i][1] + (dy/L)*skipDist]];
+      } else {
+        current.push(dense[i]);
+      }
+    }
+    if (current.length) segments.push(current);
+    return segments;
+  }
+
+  function animateStroke(segments){
+    if (!animEl.checked){
+      ctx.fillStyle = color;
+      segments.forEach(seg => {
+        if (seg.length === 1){
+          const p = seg[0];
+          if (thick === 1) ctx.fillRect(Math.round(p[0]), Math.round(p[1]), 1, 1);
+          else ctx.fillRect(Math.round(p[0]-thick/2), Math.round(p[1]-thick/2), thick, thick);
+        } else {
+          for (let i = 0; i < seg.length - 1; i++){
+            plotLine(seg[i][0], seg[i][1], seg[i+1][0], seg[i+1][1]);
+          }
+        }
+      });
+      return;
+    }
+    const totalPoints = segments.reduce((a, s) => a + s.length, 0);
+    const duration = Math.max(80, Math.min(250, totalPoints * 4));
+    strokeQueue.push({
+      segments, segIdx: 0, pointIdx: 0, totalPoints, drawnPoints: 0,
+      start: performance.now(), duration
+    });
+    if (!rafId) rafId = requestAnimationFrame(tick);
+  }
+
+  function tick(now){
+    if (strokeQueue.length === 0){ rafId = null; return; }
+    const job = strokeQueue[0];
+    const elapsed = now - job.start;
+    const targetPoints = Math.min(job.totalPoints, Math.floor((elapsed / job.duration) * job.totalPoints));
+
+    ctx.fillStyle = color;
+    while (job.drawnPoints < targetPoints && job.segIdx < job.segments.length){
+      const seg = job.segments[job.segIdx];
+      if (job.pointIdx === 0){
+        const p = seg[0];
+        if (thick === 1) ctx.fillRect(Math.round(p[0]), Math.round(p[1]), 1, 1);
+        else ctx.fillRect(Math.round(p[0]-thick/2), Math.round(p[1]-thick/2), thick, thick);
+        job.pointIdx = 1;
+        job.drawnPoints++;
+      } else if (job.pointIdx < seg.length){
+        plotLine(seg[job.pointIdx-1][0], seg[job.pointIdx-1][1], seg[job.pointIdx][0], seg[job.pointIdx][1]);
+        job.pointIdx++;
+        job.drawnPoints++;
+      } else {
+        job.segIdx++;
+        job.pointIdx = 0;
+      }
+    }
+
+    if (job.drawnPoints >= job.totalPoints) strokeQueue.shift();
+    rafId = requestAnimationFrame(tick);
+  }
+
+  function drawChar(ch){
+    if (ch === '\n'){
+      cursor.x = 12;
+      cursor.y += scale + Math.round(scale * 0.35);
+      history.push({type:'newline'});
+      return;
+    }
+    let strokes = G[ch] || G[ch.toUpperCase()];
+    const w = Math.round(scale * 0.6);
+    const h = scale;
+    const space = Math.round(scale * 0.2);
+
+    if (cursor.x + w > W - 12){
+      cursor.x = 12;
+      cursor.y += scale + Math.round(scale * 0.35);
+    }
+    if (cursor.y + h > H - 12) return;
+
+    const startX = cursor.x;
+    const startY = cursor.y;
+
+    if (!strokes) strokes = [[[0.1,0.2],[0.9,0.2],[0.9,0.9],[0.1,0.9],[0.1,0.2]]];
+
+    strokes.forEach(s => {
+      const segments = buildStrokeSegments(s, startX, startY, w, h);
+      animateStroke(segments);
+    });
+
+    history.push({type:'char', x: startX - 4, y: startY - 6, w: w + space + 8, h: h * 1.5});
+    cursor.x += w + space;
+  }
+
+  function backspace(){
+    if (!history.length) return;
+    strokeQueue.length = 0;
+    if (rafId){ cancelAnimationFrame(rafId); rafId = null; }
+    const last = history.pop();
+    if (last.type === 'newline'){
+      cursor.y -= scale + Math.round(scale * 0.35);
+      let x = 12;
+      for (let i = history.length - 1; i >= 0; i--){
+        if (history[i].type === 'newline') break;
+        if (history[i].type === 'char'){ x = history[i].x + history[i].w - 4; }
+      }
+      cursor.x = Math.max(12, x);
+      return;
+    }
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(last.x, last.y, last.w, last.h);
+    cursor.x = last.x + 4;
+    cursor.y = last.y + 6;
+  }
+
+  canvas.addEventListener('click', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const sx = W / rect.width;
+    const sy = H / rect.height;
+    cursor.x = Math.max(12, Math.floor((e.clientX - rect.left) * sx));
+    cursor.y = Math.max(12, Math.floor((e.clientY - rect.top) * sy));
+    input.focus();
+  });
+
+  input.addEventListener('input', (e) => {
+    for (const ch of e.target.value) drawChar(ch);
+    e.target.value = '';
+  });
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter'){ e.preventDefault(); drawChar('\n'); }
+    else if (e.key === 'Backspace'){ e.preventDefault(); backspace(); }
+  });
+
+  thickEl.addEventListener('input', () => { thick = parseInt(thickEl.value,10); thickOut.textContent = thick; });
+  scaleEl.addEventListener('input', () => { scale = parseInt(scaleEl.value,10); scaleOut.textContent = scale; });
+  breakEl.addEventListener('input', () => { breakFreq = parseInt(breakEl.value,10); breakOut.textContent = breakFreq + '%'; });
+  jitterEl.addEventListener('input', () => { jitter = parseInt(jitterEl.value,10); jitterOut.textContent = jitter; });
+  clearBtn.addEventListener('click', () => {
+    strokeQueue.length = 0;
+    if (rafId){ cancelAnimationFrame(rafId); rafId = null; }
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, W, H);
+    cursor = { x: 12, y: 12 };
+    history = [];
+    input.focus();
+  });
+
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, W, H);
+  ['H','e','l','l','o',' ','1','9','9','5','!'].forEach(drawChar);
+  drawChar('\n');
+
+  setTimeout(() => input.focus(), 100);
+})();
+</script>
