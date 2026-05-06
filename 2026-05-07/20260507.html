@@ -28,7 +28,7 @@
       </div>
       <div>
         <label style="font-size: 12px; color: var(--color-text-secondary); display: block; margin-bottom: 4px;">끊김</label>
-        <input type="range" id="ms-break" min="0" max="40" value="2" step="1" style="width: 100%;">
+        <input type="range" id="ms-break" min="0" max="100" value="2" step="1" style="width: 100%;">
         <span id="ms-break-out" style="font-size: 11px; color: var(--color-text-tertiary);">2%</span>
       </div>
       <div>
@@ -584,7 +584,30 @@
     else if (e.key === 'Backspace'){ e.preventDefault(); backspace(); }
   });
 
-  styleEl.addEventListener('change', () => { drawStyle = parseInt(styleEl.value, 10); });
+  function drawDemo(){
+    strokeQueue.length = 0;
+    if (rafId){ cancelAnimationFrame(rafId); rafId = null; }
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, W, H);
+    cursor = { x: 12, y: 12 };
+    history = [];
+    if (drawStyle === 1){
+      ['안','녕','하','세','요',' ','H','e','l','l','o','!'].forEach(drawChar);
+    } else {
+      ['구','슬',' ','B','e','a','d','s'].forEach(drawChar);
+    }
+    drawChar('\n');
+  }
+
+  styleEl.addEventListener('change', () => {
+    drawStyle = parseInt(styleEl.value, 10);
+    if (drawStyle === 2){
+      breakFreq = 100; breakEl.value = 100; breakOut.textContent = '100%';
+    } else {
+      breakFreq = 2; breakEl.value = 2; breakOut.textContent = '2%';
+    }
+    drawDemo();
+  });
   thickEl.addEventListener('input', () => { thick = parseInt(thickEl.value,10); thickOut.textContent = thick; });
   scaleEl.addEventListener('input', () => { scale = parseInt(scaleEl.value,10); scaleOut.textContent = scale; });
   breakEl.addEventListener('input', () => { breakFreq = parseInt(breakEl.value,10); breakOut.textContent = breakFreq + '%'; });
