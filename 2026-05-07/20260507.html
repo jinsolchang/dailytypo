@@ -190,21 +190,29 @@
 
   function drawCircleAt(cx, cy, r){
     ctx.fillStyle = color;
+    // 채워진 원 (수평 스캔라인)
+    const ri = Math.round(r);
+    for (let dy = -ri; dy <= ri; dy++){
+      const halfW = Math.round(Math.sqrt(r * r - dy * dy));
+      const y = Math.round(cy) + dy;
+      for (let dx = -halfW; dx <= halfW; dx++){
+        ctx.fillRect(Math.round(cx) + dx, y, 1, 1);
+      }
+    }
+    // 윤곽에 떨림 추가 (손그림 느낌)
     const pts = CIRCLE_PTS;
     for (let i = 0; i < pts; i++){
       const a0 = (i / pts) * Math.PI * 2;
       const a1 = ((i + 1) / pts) * Math.PI * 2;
-      const x0 = cx + Math.cos(a0) * r + rand(jitter * 0.5);
-      const y0 = cy + Math.sin(a0) * r + rand(jitter * 0.5);
-      const x1 = cx + Math.cos(a1) * r + rand(jitter * 0.5);
-      const y1 = cy + Math.sin(a1) * r + rand(jitter * 0.5);
-      // Bresenham으로 원 둘레 선분 그리기
+      const x0 = cx + Math.cos(a0) * (r + rand(jitter)) ;
+      const y0 = cy + Math.sin(a0) * (r + rand(jitter));
+      const x1 = cx + Math.cos(a1) * (r + rand(jitter));
+      const y1 = cy + Math.sin(a1) * (r + rand(jitter));
       let px = Math.round(x0), py = Math.round(y0);
       const ex = Math.round(x1), ey = Math.round(y1);
       const ddx = Math.abs(ex - px), ssx = px < ex ? 1 : -1;
       const ddy = -Math.abs(ey - py), ssy = py < ey ? 1 : -1;
-      let e = ddx + ddy;
-      let s = 0;
+      let e = ddx + ddy, s = 0;
       while (s++ < 200){
         ctx.fillRect(px, py, thick, thick);
         if (px === ex && py === ey) break;
