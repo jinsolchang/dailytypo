@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Card Chaos</title>
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&display=swap');
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -13,11 +13,11 @@ body {
   background: #080c08;
   min-height: 100vh;
   overflow: hidden;
-  font-family: 'Press Start 2P', monospace;
   user-select: none;
   cursor: default;
 }
 
+/* CRT */
 body::before {
   content: '';
   position: fixed;
@@ -30,7 +30,7 @@ body::after {
   content: '';
   position: fixed;
   inset: 0;
-  background: radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.45) 100%);
+  background: radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.5) 100%);
   pointer-events: none;
   z-index: 9998;
 }
@@ -43,38 +43,94 @@ body::after {
 
 .card {
   position: absolute;
-  width: 120px;
-  height: 174px;
-  transition: filter 0.3s;
+  width: 110px;
+  height: 160px;
+  border-radius: 10px;
+  border: 1.5px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.03);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Playfair Display', Georgia, serif;
   will-change: transform;
-  filter: drop-shadow(2px 4px 6px rgba(0,0,0,0.4));
-}
-
-.card svg {
-  width: 100%;
-  height: 100%;
-  border-radius: 8px;
+  transition: border-color 0.3s;
   overflow: hidden;
 }
 
-.card::after {
+.card::before {
   content: '';
   position: absolute;
   inset: 0;
-  border-radius: 8px;
-  pointer-events: none;
+  border-radius: 10px;
   background: linear-gradient(
     var(--shimmer-angle, 135deg),
-    transparent 20%,
-    rgba(255,100,200,0.06) 30%,
-    rgba(255,220,50,0.08) 40%,
-    rgba(100,255,200,0.07) 50%,
-    rgba(80,150,255,0.08) 60%,
-    rgba(200,100,255,0.06) 70%,
-    transparent 80%
+    transparent 30%,
+    rgba(255,255,255,0.04) 45%,
+    rgba(255,200,100,0.03) 50%,
+    rgba(255,255,255,0.04) 55%,
+    transparent 70%
   );
-  mix-blend-mode: screen;
+  pointer-events: none;
 }
+
+.card .rank-top {
+  position: absolute;
+  top: 6px;
+  left: 8px;
+  font-size: 16px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.card .suit-top {
+  position: absolute;
+  top: 22px;
+  left: 9px;
+  font-size: 12px;
+  line-height: 1;
+}
+
+.card .center-suit {
+  font-size: 52px;
+  line-height: 1;
+  opacity: 0.9;
+}
+
+.card .rank-bottom {
+  position: absolute;
+  bottom: 6px;
+  right: 8px;
+  font-size: 16px;
+  font-weight: 900;
+  line-height: 1;
+  transform: rotate(180deg);
+}
+
+.card .suit-bottom {
+  position: absolute;
+  bottom: 22px;
+  right: 9px;
+  font-size: 12px;
+  line-height: 1;
+  transform: rotate(180deg);
+}
+
+.card.red { color: #ff4466; border-color: rgba(255,68,102,0.15); }
+.card.red::before {
+  background: linear-gradient(
+    var(--shimmer-angle, 135deg),
+    transparent 30%,
+    rgba(255,68,102,0.04) 45%,
+    rgba(255,150,100,0.03) 50%,
+    rgba(255,68,102,0.04) 55%,
+    transparent 70%
+  );
+}
+
+.card.black { color: #e8e8e8; border-color: rgba(255,255,255,0.12); }
 
 .hint {
   position: fixed;
@@ -82,199 +138,146 @@ body::after {
   left: 50%;
   transform: translateX(-50%);
   z-index: 100;
-  font-size: 7px;
-  color: rgba(255,255,255,0.25);
+  font-family: 'Playfair Display', serif;
+  font-size: 11px;
+  font-style: italic;
+  color: rgba(255,255,255,0.2);
   letter-spacing: 1px;
   text-align: center;
-  line-height: 1.8;
-}
-
-.loading {
-  position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  z-index: 200;
-  font-size: 10px;
-  color: rgba(255,255,255,0.4);
-  letter-spacing: 2px;
 }
 </style>
 </head>
 <body>
 
 <div class="stage" id="stage"></div>
-<div class="hint">click to line up · click again to scatter · spacebar to explode</div>
-<div class="loading" id="loading">LOADING DECK...</div>
+<div class="hint">click to line up · click again to scatter · space to explode</div>
 
 <script>
 const stage = document.getElementById('stage');
-const loadingEl = document.getElementById('loading');
 
-// SVG cards - fetch and embed inline for cross-origin support
-const SVG_URL = 'https://cdn.jsdelivr.net/npm/svg-cards@latest/svg-cards.svg';
-const CARD_NAT_W = 169.075;
-const CARD_NAT_H = 244.640;
+const SUITS = ['♠','♥','♦','♣'];
+const SUIT_CLASSES = ['black','red','red','black'];
+const RANKS = ['A','2','3','4','5','6','7','8','9','10','J','Q','K'];
 
-const SUIT_NAMES = ['spade', 'heart', 'diamond', 'club'];
-const RANK_NAMES = ['1','2','3','4','5','6','7','8','9','10','jack','queen','king'];
-
-// Card display size
-const CARD_W = 120;
-const CARD_H = 174;
+const CARD_W = 110;
+const CARD_H = 160;
 
 let W = window.innerWidth;
 let H = window.innerHeight;
 window.addEventListener('resize', () => { W = window.innerWidth; H = window.innerHeight; });
 
-// State
 let lineUpMode = false;
 let mx = W / 2, my = H / 2;
 
 document.addEventListener('mousemove', e => { mx = e.clientX; my = e.clientY; });
 document.addEventListener('touchmove', e => { e.preventDefault(); mx = e.touches[0].clientX; my = e.touches[0].clientY; }, { passive: false });
-
 document.addEventListener('click', () => { lineUpMode = !lineUpMode; });
 document.addEventListener('keydown', e => {
-  if (e.code === 'Space') {
-    e.preventDefault();
-    lineUpMode = false;
-    explode();
-  }
+  if (e.code === 'Space') { e.preventDefault(); lineUpMode = false; explode(); }
 });
 
-// Cards
 const cards = [];
 
 function createCards() {
   for (let s = 0; s < 4; s++) {
     for (let r = 0; r < 13; r++) {
-      const id = `${SUIT_NAMES[s]}_${RANK_NAMES[r]}`;
       const el = document.createElement('div');
-      el.className = 'card';
-      el.innerHTML = `<svg viewBox="0 0 ${CARD_NAT_W} ${CARD_NAT_H}"><use href="#${id}"/></svg>`;
-      
+      el.className = `card ${SUIT_CLASSES[s]}`;
+      el.innerHTML = `
+        <span class="rank-top">${RANKS[r]}</span>
+        <span class="suit-top">${SUITS[s]}</span>
+        <span class="center-suit">${SUITS[s]}</span>
+        <span class="rank-bottom">${RANKS[r]}</span>
+        <span class="suit-bottom">${SUITS[s]}</span>
+      `;
+
       const card = {
         el,
-        idx: s * 13 + r,
         suit: s,
         rank: r,
-        x: W / 2 + (Math.random() - 0.5) * 300,
-        y: H / 2 + (Math.random() - 0.5) * 300,
-        vx: 0,
-        vy: 0,
-        angle: (Math.random() - 0.5) * 40,
+        x: W / 2 + (Math.random() - 0.5) * 400,
+        y: H / 2 + (Math.random() - 0.5) * 400,
+        vx: (Math.random() - 0.5) * 3,
+        vy: (Math.random() - 0.5) * 3,
+        angle: (Math.random() - 0.5) * 30,
         va: 0,
-        zIndex: s * 13 + r,
       };
-      
+
       cards.push(card);
       stage.appendChild(el);
+      el.style.zIndex = s * 13 + r;
     }
   }
-  
-  cards.forEach(c => {
-    c.el.style.zIndex = c.zIndex;
-  });
 }
-
-// Load SVG sprite inline
-async function loadSVGSprite() {
-  try {
-    const resp = await fetch(SVG_URL);
-    const text = await resp.text();
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(text, 'image/svg+xml');
-    const svg = doc.documentElement;
-    svg.style.position = 'absolute';
-    svg.style.width = '0';
-    svg.style.height = '0';
-    svg.style.overflow = 'hidden';
-    svg.setAttribute('aria-hidden', 'true');
-    document.body.insertBefore(svg, document.body.firstChild);
-    loadingEl.style.display = 'none';
-    createCards();
-    requestAnimationFrame(loop);
-  } catch(e) {
-    loadingEl.textContent = 'LOAD FAILED - REFRESH';
-    console.error(e);
-  }
-}
-
-loadSVGSprite();
 
 function explode() {
   cards.forEach(c => {
-    const angle = Math.random() * Math.PI * 2;
-    const force = 15 + Math.random() * 20;
-    c.vx += Math.cos(angle) * force;
-    c.vy += Math.sin(angle) * force;
-    c.va += (Math.random() - 0.5) * 15;
+    const a = Math.random() * Math.PI * 2;
+    const f = 12 + Math.random() * 18;
+    c.vx += Math.cos(a) * f;
+    c.vy += Math.sin(a) * f;
+    c.va += (Math.random() - 0.5) * 12;
   });
 }
 
 function update() {
   const t = performance.now() * 0.001;
-  
+
   cards.forEach((c, i) => {
     const phase = (i / 52) * Math.PI * 2;
-    
+
     if (lineUpMode) {
-      // 4 rows × 13 cols
       const col = c.rank;
       const row = c.suit;
-      const spacingX = Math.min(CARD_W * 1.05, (W - CARD_W - 40) / 13);
-      const spacingY = Math.min(CARD_H * 1.05, (H - CARD_H - 40) / 4);
+      const spacingX = Math.min(CARD_W * 1.08, (W - 40) / 13);
+      const spacingY = Math.min(CARD_H * 1.08, (H - 40) / 4);
       const gridW = 12 * spacingX;
       const gridH = 3 * spacingY;
-      
-      const targetX = (W - gridW) / 2 + col * spacingX;
-      const targetY = (H - gridH) / 2 + row * spacingY;
-      
-      c.vx += (targetX - c.x) * 0.08;
-      c.vy += (targetY - c.y) * 0.08;
+      const tx = (W - gridW) / 2 + col * spacingX;
+      const ty = (H - gridH) / 2 + row * spacingY;
+
+      c.vx += (tx - c.x) * 0.07;
+      c.vy += (ty - c.y) * 0.07;
       c.va += (0 - c.angle) * 0.12;
-      
       c.vx *= 0.82;
       c.vy *= 0.82;
-      c.va *= 0.82;
+      c.va *= 0.8;
     } else {
-      // Slow swarm orbit
-      const orbitSpeed = 0.1 + (i % 7) * 0.015;
-      const orbitRadius = 150 + (i % 5) * 50;
-      const wobble = Math.sin(t * 0.25 + i * 0.7) * 35;
-      
-      const targetX = W / 2 + Math.cos(t * orbitSpeed + phase) * (orbitRadius + wobble);
-      const targetY = H / 2 + Math.sin(t * orbitSpeed * 0.6 + phase) * (orbitRadius * 0.5 + wobble * 0.4);
-      
-      c.vx += (targetX - c.x) * 0.006;
-      c.vy += (targetY - c.y) * 0.006;
-      
-      // Idle wobble angle
-      const targetAngle = Math.sin(t * 0.3 + i * 0.4) * 5;
-      c.va += (targetAngle - c.angle) * 0.02;
-      
-      c.vx *= 0.97;
-      c.vy *= 0.97;
-      c.va *= 0.95;
+      // Slow elegant orbit
+      const orbitSpeed = 0.08 + (i % 7) * 0.012;
+      const orbitRx = 160 + (i % 5) * 55 + Math.sin(t * 0.15 + i) * 30;
+      const orbitRy = 100 + (i % 4) * 40 + Math.cos(t * 0.2 + i) * 20;
+
+      const tx = W / 2 + Math.cos(t * orbitSpeed + phase) * orbitRx;
+      const ty = H / 2 + Math.sin(t * orbitSpeed * 0.7 + phase) * orbitRy;
+
+      c.vx += (tx - c.x) * 0.005;
+      c.vy += (ty - c.y) * 0.005;
+
+      const targetAngle = Math.sin(t * 0.25 + i * 0.3) * 8;
+      c.va += (targetAngle - c.angle) * 0.015;
+
+      c.vx *= 0.975;
+      c.vy *= 0.975;
+      c.va *= 0.96;
     }
-    
+
     c.x += c.vx;
     c.y += c.vy;
     c.angle += c.va;
-    
-    // Soft boundary
-    const margin = CARD_W * 0.5;
-    if (c.x < margin) c.vx += (margin - c.x) * 0.03;
-    if (c.x > W - margin) c.vx += (W - margin - c.x) * 0.03;
-    if (c.y < margin) c.vy += (margin - c.y) * 0.03;
-    if (c.y > H - margin) c.vy += (H - margin - c.y) * 0.03;
-    
-    // Update DOM
+
+    // Soft walls
+    const m = CARD_W * 0.3;
+    if (c.x < m) c.vx += (m - c.x) * 0.04;
+    if (c.x > W - m) c.vx += (W - m - c.x) * 0.04;
+    if (c.y < m) c.vy += (m - c.y) * 0.04;
+    if (c.y > H - m) c.vy += (H - m - c.y) * 0.04;
+
+    // Render
     c.el.style.transform = `translate(${c.x - CARD_W/2}px, ${c.y - CARD_H/2}px) rotate(${c.angle}deg)`;
-    
-    // Holographic shimmer angle based on position relative to center
-    const shimAngle = Math.atan2(c.y - H/2, c.x - W/2) * 180 / Math.PI + t * 20;
+
+    // Shimmer based on position
+    const shimAngle = Math.atan2(c.y - H/2, c.x - W/2) * 180 / Math.PI + t * 15;
     c.el.style.setProperty('--shimmer-angle', shimAngle + 'deg');
   });
 }
@@ -284,7 +287,8 @@ function loop() {
   requestAnimationFrame(loop);
 }
 
-// Start is handled by loadSVGSprite()
+createCards();
+requestAnimationFrame(loop);
 </script>
 
 </body>
