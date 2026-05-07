@@ -93,9 +93,9 @@ document.addEventListener('keydown', e => {
 const SUITS = ['♠','♥','♦','♣'];
 const RANKS = ['A','2','3','4','5','6','7','8','9','10','J','Q','K'];
 
-const CW = Math.round(70 * DPR);
-const CH = Math.round(100 * DPR);
-const CR = 6 * DPR;
+const CW = Math.round(140 * DPR);
+const CH = Math.round(200 * DPR);
+const CR = 10 * DPR;
 
 // Pre-render high quality cards
 const cardImages = [];
@@ -112,22 +112,22 @@ function createCardBack() {
   cx.fill();
   
   // Inner border
-  const m = 4 * DPR;
+  const m = 6 * DPR;
   cx.beginPath();
-  cx.roundRect(m, m, CW - m*2, CH - m*2, CR - 2);
+  cx.roundRect(m, m, CW - m*2, CH - m*2, CR - 3);
   cx.strokeStyle = '#b8963c';
-  cx.lineWidth = 1.5 * DPR;
+  cx.lineWidth = 2 * DPR;
   cx.stroke();
   
   // Diamond pattern
   cx.save();
   cx.beginPath();
-  cx.roundRect(m + 2*DPR, m + 2*DPR, CW - m*2 - 4*DPR, CH - m*2 - 4*DPR, CR - 3);
+  cx.roundRect(m + 3*DPR, m + 3*DPR, CW - m*2 - 6*DPR, CH - m*2 - 6*DPR, CR - 4);
   cx.clip();
   
-  const patSize = 10 * DPR;
+  const patSize = 14 * DPR;
   cx.strokeStyle = 'rgba(184,150,60,0.2)';
-  cx.lineWidth = 0.8 * DPR;
+  cx.lineWidth = 1 * DPR;
   for (let y = -patSize; y < CH + patSize; y += patSize) {
     for (let x = -patSize; x < CW + patSize; x += patSize) {
       cx.beginPath();
@@ -143,7 +143,7 @@ function createCardBack() {
   
   // Center ornament
   cx.fillStyle = '#b8963c';
-  cx.font = `${18 * DPR}px serif`;
+  cx.font = `${32 * DPR}px serif`;
   cx.textAlign = 'center';
   cx.textBaseline = 'middle';
   cx.fillText('♛', CW/2, CH/2);
@@ -152,7 +152,7 @@ function createCardBack() {
   cx.beginPath();
   cx.roundRect(0, 0, CW, CH, CR);
   cx.strokeStyle = 'rgba(0,0,0,0.4)';
-  cx.lineWidth = 1 * DPR;
+  cx.lineWidth = 1.5 * DPR;
   cx.stroke();
   
   return cv;
@@ -180,31 +180,31 @@ function createCardFace(suitIdx, rankIdx) {
   cx.beginPath();
   cx.roundRect(0, 0, CW, CH, CR);
   cx.strokeStyle = 'rgba(0,0,0,0.12)';
-  cx.lineWidth = 1 * DPR;
+  cx.lineWidth = 1.5 * DPR;
   cx.stroke();
   
   // Inner decorative border
-  const m = 3 * DPR;
+  const m = 5 * DPR;
   cx.beginPath();
-  cx.roundRect(m, m, CW - m*2, CH - m*2, CR - 1);
-  cx.strokeStyle = 'rgba(0,0,0,0.04)';
-  cx.lineWidth = 0.5 * DPR;
+  cx.roundRect(m, m, CW - m*2, CH - m*2, CR - 2);
+  cx.strokeStyle = 'rgba(0,0,0,0.05)';
+  cx.lineWidth = 0.8 * DPR;
   cx.stroke();
   
   cx.fillStyle = color;
   
   // Top-left rank
-  cx.font = `bold ${16 * DPR}px Georgia, "Times New Roman", serif`;
+  cx.font = `bold ${28 * DPR}px Georgia, "Times New Roman", serif`;
   cx.textAlign = 'left';
   cx.textBaseline = 'top';
-  cx.fillText(rank, 6 * DPR, 5 * DPR);
+  cx.fillText(rank, 10 * DPR, 8 * DPR);
   
   // Top-left suit (smaller)
-  cx.font = `${12 * DPR}px sans-serif`;
-  cx.fillText(suit, 7 * DPR, 21 * DPR);
+  cx.font = `${20 * DPR}px sans-serif`;
+  cx.fillText(suit, 12 * DPR, 36 * DPR);
   
   // Center suit (large)
-  cx.font = `${36 * DPR}px sans-serif`;
+  cx.font = `${64 * DPR}px sans-serif`;
   cx.textAlign = 'center';
   cx.textBaseline = 'middle';
   cx.fillText(suit, CW / 2, CH / 2);
@@ -212,21 +212,21 @@ function createCardFace(suitIdx, rankIdx) {
   // For face cards, add extra flair
   if (rankIdx >= 10) { // J, Q, K
     cx.globalAlpha = 0.04;
-    cx.font = `${60 * DPR}px serif`;
+    cx.font = `${100 * DPR}px serif`;
     cx.fillText(rank, CW / 2, CH / 2);
     cx.globalAlpha = 1;
   }
   
   // Bottom-right (rotated)
   cx.save();
-  cx.translate(CW - 6 * DPR, CH - 5 * DPR);
+  cx.translate(CW - 10 * DPR, CH - 8 * DPR);
   cx.rotate(Math.PI);
-  cx.font = `bold ${16 * DPR}px Georgia, "Times New Roman", serif`;
+  cx.font = `bold ${28 * DPR}px Georgia, "Times New Roman", serif`;
   cx.textAlign = 'left';
   cx.textBaseline = 'top';
   cx.fillText(rank, 0, 0);
-  cx.font = `${12 * DPR}px sans-serif`;
-  cx.fillText(suit, 1 * DPR, 16 * DPR);
+  cx.font = `${20 * DPR}px sans-serif`;
+  cx.fillText(suit, 2 * DPR, 28 * DPR);
   cx.restore();
   
   return cv;
@@ -240,7 +240,7 @@ for (let s = 0; s < 4; s++) {
 }
 
 // === Card particles ===
-const NUM = 52;
+const NUM = 32;
 const cards = [];
 
 for (let i = 0; i < NUM; i++) {
@@ -275,8 +275,8 @@ function update() {
     // Gentle orbit target (slow swarm)
     const phase = (i / NUM) * Math.PI * 2;
     const orbitSpeed = 0.15 + (i % 7) * 0.02;
-    const orbitRadius = (120 + (i % 5) * 40) * DPR;
-    const wobble = Math.sin(t * 0.3 + i * 0.7) * 30 * DPR;
+    const orbitRadius = (180 + (i % 5) * 60) * DPR;
+    const wobble = Math.sin(t * 0.3 + i * 0.7) * 40 * DPR;
     
     let targetX = W / 2 + Math.cos(t * orbitSpeed + phase) * (orbitRadius + wobble);
     let targetY = H / 2 + Math.sin(t * orbitSpeed * 0.7 + phase) * (orbitRadius * 0.6 + wobble * 0.5);
@@ -288,8 +288,8 @@ function update() {
     
     if (mouseDown) {
       // Attract toward mouse
-      targetX = mx + Math.cos(t * 0.5 + phase) * 80 * DPR;
-      targetY = my + Math.sin(t * 0.5 + phase) * 80 * DPR;
+      targetX = mx + Math.cos(t * 0.5 + phase) * 120 * DPR;
+      targetY = my + Math.sin(t * 0.5 + phase) * 120 * DPR;
       const pullStrength = 0.03;
       c.vx += (targetX - c.x) * pullStrength;
       c.vy += (targetY - c.y) * pullStrength;
@@ -300,8 +300,8 @@ function update() {
     }
     
     // Click scatter
-    if (mouseClicked && dist < 200 * DPR) {
-      const repel = (200 * DPR - dist) / (200 * DPR) * 15 * DPR;
+    if (mouseClicked && dist < 300 * DPR) {
+      const repel = (300 * DPR - dist) / (300 * DPR) * 18 * DPR;
       c.vx += (dx / dist) * repel;
       c.vy += (dy / dist) * repel;
       c.va += (Math.random() - 0.5) * 0.15;
@@ -376,16 +376,37 @@ function render() {
     ctx.shadowOffsetX = 0;
     ctx.shadowOffsetY = 0;
     
-    // Holographic shimmer
-    const shimT = (performance.now() * 0.001 + c.faceIdx * 0.3);
-    const shimX = Math.sin(shimT) * CW * 0.4;
-    const grad = ctx.createLinearGradient(shimX - CW*0.15, -CH/2, shimX + CW*0.15, CH/2);
-    grad.addColorStop(0, 'rgba(255,255,255,0)');
-    grad.addColorStop(0.4, 'rgba(255,255,255,0)');
-    grad.addColorStop(0.5, 'rgba(255,255,255,0.07)');
-    grad.addColorStop(0.6, 'rgba(255,255,255,0)');
-    grad.addColorStop(1, 'rgba(255,255,255,0)');
-    ctx.fillStyle = grad;
+    // Holographic prismatic shimmer
+    const shimT = (performance.now() * 0.0008 + c.faceIdx * 0.4);
+    const shimX = Math.sin(shimT) * CW * 0.5;
+    const shimY = Math.cos(shimT * 0.7) * CH * 0.3;
+    
+    // Rainbow gradient that moves across the card
+    const hGrad = ctx.createLinearGradient(
+      shimX - CW * 0.3, shimY - CH * 0.3,
+      shimX + CW * 0.3, shimY + CH * 0.3
+    );
+    hGrad.addColorStop(0, 'rgba(255,0,100,0)');
+    hGrad.addColorStop(0.2, 'rgba(255,0,100,0.06)');
+    hGrad.addColorStop(0.35, 'rgba(255,200,0,0.08)');
+    hGrad.addColorStop(0.5, 'rgba(0,255,150,0.07)');
+    hGrad.addColorStop(0.65, 'rgba(0,150,255,0.08)');
+    hGrad.addColorStop(0.8, 'rgba(180,0,255,0.06)');
+    hGrad.addColorStop(1, 'rgba(255,0,100,0)');
+    ctx.fillStyle = hGrad;
+    ctx.beginPath();
+    ctx.roundRect(-CW/2, -CH/2, CW, CH, CR);
+    ctx.fill();
+    
+    // Specular highlight (white glint that moves)
+    const specT = (performance.now() * 0.001 + c.faceIdx * 0.2);
+    const specX = Math.sin(specT * 0.6) * CW * 0.25;
+    const specY = Math.cos(specT * 0.4) * CH * 0.2 - CH * 0.1;
+    const specGrad = ctx.createRadialGradient(specX, specY, 0, specX, specY, CW * 0.4);
+    specGrad.addColorStop(0, 'rgba(255,255,255,0.12)');
+    specGrad.addColorStop(0.5, 'rgba(255,255,255,0.03)');
+    specGrad.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = specGrad;
     ctx.beginPath();
     ctx.roundRect(-CW/2, -CH/2, CW, CH, CR);
     ctx.fill();
