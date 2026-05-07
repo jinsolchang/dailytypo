@@ -18,7 +18,6 @@ body {
   cursor: default;
 }
 
-/* CRT */
 body::before {
   content: '';
   position: fixed;
@@ -36,7 +35,46 @@ body::after {
   z-index: 9998;
 }
 
-canvas { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 1; }
+.stage {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+}
+
+.card {
+  position: absolute;
+  width: 120px;
+  height: 174px;
+  transition: filter 0.3s;
+  will-change: transform;
+  filter: drop-shadow(2px 4px 6px rgba(0,0,0,0.4));
+}
+
+.card svg {
+  width: 100%;
+  height: 100%;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 8px;
+  pointer-events: none;
+  background: linear-gradient(
+    var(--shimmer-angle, 135deg),
+    transparent 20%,
+    rgba(255,100,200,0.06) 30%,
+    rgba(255,220,50,0.08) 40%,
+    rgba(100,255,200,0.07) 50%,
+    rgba(80,150,255,0.08) 60%,
+    rgba(200,100,255,0.06) 70%,
+    transparent 80%
+  );
+  mix-blend-mode: screen;
+}
 
 .hint {
   position: fixed;
@@ -50,224 +88,106 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 1; }
   text-align: center;
   line-height: 1.8;
 }
+
+.loading {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 200;
+  font-size: 10px;
+  color: rgba(255,255,255,0.4);
+  letter-spacing: 2px;
+}
 </style>
 </head>
 <body>
 
-<canvas id="c"></canvas>
+<div class="stage" id="stage"></div>
 <div class="hint">click to line up · click again to scatter · spacebar to explode</div>
+<div class="loading" id="loading">LOADING DECK...</div>
 
 <script>
-const canvas = document.getElementById('c');
-const ctx = canvas.getContext('2d');
+const stage = document.getElementById('stage');
+const loadingEl = document.getElementById('loading');
 
-const DPR = Math.min(devicePixelRatio || 1, 2);
-let W, H;
+// SVG cards from jsdelivr CDN
+const SVG_URL = 'https://cdn.jsdelivr.net/npm/svg-cards@4.0.5/svg-cards.svg';
+const CARD_NAT_W = 169.075;
+const CARD_NAT_H = 244.640;
 
-function resize() {
-  W = window.innerWidth * DPR;
-  H = window.innerHeight * DPR;
-  canvas.width = W;
-  canvas.height = H;
-}
-resize();
-window.addEventListener('resize', resize);
+const SUIT_NAMES = ['spade', 'heart', 'diamond', 'club'];
+const RANK_NAMES = ['1','2','3','4','5','6','7','8','9','10','jack','queen','king'];
 
-// === Input ===
-let mx = W / 2, my = H / 2;
-let mouseDown = false;
-let mouseClicked = false;
+// Card display size
+const CARD_W = 120;
+const CARD_H = 174;
+
+let W = window.innerWidth;
+let H = window.innerHeight;
+window.addEventListener('resize', () => { W = window.innerWidth; H = window.innerHeight; });
+
+// State
 let lineUpMode = false;
-let lineUpTimer = 0;
+let mx = W / 2, my = H / 2;
 
-document.addEventListener('mousemove', e => { mx = e.clientX * DPR; my = e.clientY * DPR; });
-document.addEventListener('touchmove', e => { e.preventDefault(); mx = e.touches[0].clientX * DPR; my = e.touches[0].clientY * DPR; }, { passive: false });
-document.addEventListener('mousedown', () => { mouseDown = true; mouseClicked = true; lineUpMode = !lineUpMode; lineUpTimer = performance.now(); });
-document.addEventListener('mouseup', () => { mouseDown = false; });
-document.addEventListener('touchstart', e => { mouseDown = true; mouseClicked = true; lineUpMode = !lineUpMode; lineUpTimer = performance.now(); mx = e.touches[0].clientX * DPR; my = e.touches[0].clientY * DPR; });
-document.addEventListener('touchend', () => { mouseDown = false; });
+document.addEventListener('mousemove', e => { mx = e.clientX; my = e.clientY; });
+document.addEventListener('touchmove', e => { e.preventDefault(); mx = e.touches[0].clientX; my = e.touches[0].clientY; }, { passive: false });
 
+document.addEventListener('click', () => { lineUpMode = !lineUpMode; });
 document.addEventListener('keydown', e => {
-  if (e.code === 'Space') { e.preventDefault(); lineUpMode = false; explode(); }
+  if (e.code === 'Space') {
+    e.preventDefault();
+    lineUpMode = false;
+    explode();
+  }
 });
 
-// === Card rendering ===
-const SUITS = ['♠','♥','♦','♣'];
-const RANKS = ['A','2','3','4','5','6','7','8','9','10','J','Q','K'];
-
-const CW = Math.round(140 * DPR);
-const CH = Math.round(200 * DPR);
-const CR = 10 * DPR;
-
-// Pre-render high quality cards
-const cardImages = [];
-const cardBackImg = createCardBack();
-
-function createCardBack() {
-  const cv = new OffscreenCanvas(CW, CH);
-  const cx = cv.getContext('2d');
-  
-  // Base
-  cx.beginPath();
-  cx.roundRect(0, 0, CW, CH, CR);
-  cx.fillStyle = '#1c2d6b';
-  cx.fill();
-  
-  // Inner border
-  const m = 6 * DPR;
-  cx.beginPath();
-  cx.roundRect(m, m, CW - m*2, CH - m*2, CR - 3);
-  cx.strokeStyle = '#b8963c';
-  cx.lineWidth = 2 * DPR;
-  cx.stroke();
-  
-  // Diamond pattern
-  cx.save();
-  cx.beginPath();
-  cx.roundRect(m + 3*DPR, m + 3*DPR, CW - m*2 - 6*DPR, CH - m*2 - 6*DPR, CR - 4);
-  cx.clip();
-  
-  const patSize = 14 * DPR;
-  cx.strokeStyle = 'rgba(184,150,60,0.2)';
-  cx.lineWidth = 1 * DPR;
-  for (let y = -patSize; y < CH + patSize; y += patSize) {
-    for (let x = -patSize; x < CW + patSize; x += patSize) {
-      cx.beginPath();
-      cx.moveTo(x, y - patSize/2);
-      cx.lineTo(x + patSize/2, y);
-      cx.lineTo(x, y + patSize/2);
-      cx.lineTo(x - patSize/2, y);
-      cx.closePath();
-      cx.stroke();
-    }
-  }
-  cx.restore();
-  
-  // Center ornament
-  cx.fillStyle = '#b8963c';
-  cx.font = `${32 * DPR}px serif`;
-  cx.textAlign = 'center';
-  cx.textBaseline = 'middle';
-  cx.fillText('♛', CW/2, CH/2);
-  
-  // Outer shadow edge
-  cx.beginPath();
-  cx.roundRect(0, 0, CW, CH, CR);
-  cx.strokeStyle = 'rgba(0,0,0,0.4)';
-  cx.lineWidth = 1.5 * DPR;
-  cx.stroke();
-  
-  return cv;
-}
-
-function createCardFace(suitIdx, rankIdx) {
-  const cv = new OffscreenCanvas(CW, CH);
-  const cx = cv.getContext('2d');
-  
-  const isRed = suitIdx === 1 || suitIdx === 2;
-  const color = isRed ? '#c62828' : '#1a1a1a';
-  const suit = SUITS[suitIdx];
-  const rank = RANKS[rankIdx];
-  
-  // White card body with subtle gradient
-  const bodyGrad = cx.createLinearGradient(0, 0, 0, CH);
-  bodyGrad.addColorStop(0, '#ffffff');
-  bodyGrad.addColorStop(1, '#f8f6f0');
-  cx.beginPath();
-  cx.roundRect(0, 0, CW, CH, CR);
-  cx.fillStyle = bodyGrad;
-  cx.fill();
-  
-  // Subtle inner shadow
-  cx.beginPath();
-  cx.roundRect(0, 0, CW, CH, CR);
-  cx.strokeStyle = 'rgba(0,0,0,0.12)';
-  cx.lineWidth = 1.5 * DPR;
-  cx.stroke();
-  
-  // Inner decorative border
-  const m = 5 * DPR;
-  cx.beginPath();
-  cx.roundRect(m, m, CW - m*2, CH - m*2, CR - 2);
-  cx.strokeStyle = 'rgba(0,0,0,0.05)';
-  cx.lineWidth = 0.8 * DPR;
-  cx.stroke();
-  
-  cx.fillStyle = color;
-  
-  // Top-left rank
-  cx.font = `bold ${28 * DPR}px Georgia, "Times New Roman", serif`;
-  cx.textAlign = 'left';
-  cx.textBaseline = 'top';
-  cx.fillText(rank, 10 * DPR, 8 * DPR);
-  
-  // Top-left suit (smaller)
-  cx.font = `${20 * DPR}px sans-serif`;
-  cx.fillText(suit, 12 * DPR, 36 * DPR);
-  
-  // Center suit (large)
-  cx.font = `${64 * DPR}px sans-serif`;
-  cx.textAlign = 'center';
-  cx.textBaseline = 'middle';
-  cx.fillText(suit, CW / 2, CH / 2);
-  
-  // For face cards, add extra flair
-  if (rankIdx >= 10) { // J, Q, K
-    cx.globalAlpha = 0.04;
-    cx.font = `${100 * DPR}px serif`;
-    cx.fillText(rank, CW / 2, CH / 2);
-    cx.globalAlpha = 1;
-  }
-  
-  // Bottom-right (rotated)
-  cx.save();
-  cx.translate(CW - 10 * DPR, CH - 8 * DPR);
-  cx.rotate(Math.PI);
-  cx.font = `bold ${28 * DPR}px Georgia, "Times New Roman", serif`;
-  cx.textAlign = 'left';
-  cx.textBaseline = 'top';
-  cx.fillText(rank, 0, 0);
-  cx.font = `${20 * DPR}px sans-serif`;
-  cx.fillText(suit, 2 * DPR, 28 * DPR);
-  cx.restore();
-  
-  return cv;
-}
-
-// Generate all 52 cards
-for (let s = 0; s < 4; s++) {
-  for (let r = 0; r < 13; r++) {
-    cardImages.push(createCardFace(s, r));
-  }
-}
-
-// === Card particles ===
-const NUM = 52;
+// Cards
 const cards = [];
 
-for (let i = 0; i < NUM; i++) {
-  cards.push({
-    x: W / 2 + (Math.random() - 0.5) * 200 * DPR,
-    y: H / 2 + (Math.random() - 0.5) * 200 * DPR,
-    vx: 0,
-    vy: 0,
-    angle: (Math.random() - 0.5) * 0.8,
-    va: 0,
-    faceIdx: i % 52,
-    showFace: Math.random() > 0.25,
-    targetAngle: 0,
-    sortOrder: i,
+function createCards() {
+  for (let s = 0; s < 4; s++) {
+    for (let r = 0; r < 13; r++) {
+      const id = `${SUIT_NAMES[s]}_${RANK_NAMES[r]}`;
+      const el = document.createElement('div');
+      el.className = 'card';
+      el.innerHTML = `<svg viewBox="0 0 ${CARD_NAT_W} ${CARD_NAT_H}"><use href="${SVG_URL}#${id}"/></svg>`;
+      
+      const card = {
+        el,
+        idx: s * 13 + r,
+        suit: s,
+        rank: r,
+        x: W / 2 + (Math.random() - 0.5) * 300,
+        y: H / 2 + (Math.random() - 0.5) * 300,
+        vx: 0,
+        vy: 0,
+        angle: (Math.random() - 0.5) * 40,
+        va: 0,
+        zIndex: s * 13 + r, // fixed z-order by suit then rank
+      };
+      
+      cards.push(card);
+      stage.appendChild(el);
+    }
+  }
+  
+  // Set fixed z-index (no more flickering)
+  cards.forEach(c => {
+    c.el.style.zIndex = c.zIndex;
   });
+  
+  loadingEl.style.display = 'none';
 }
 
-// === Physics ===
 function explode() {
   cards.forEach(c => {
     const angle = Math.random() * Math.PI * 2;
-    const force = (8 + Math.random() * 12) * DPR;
+    const force = 15 + Math.random() * 20;
     c.vx += Math.cos(angle) * force;
     c.vy += Math.sin(angle) * force;
-    c.va += (Math.random() - 0.5) * 0.3;
+    c.va += (Math.random() - 0.5) * 15;
   });
 }
 
@@ -275,170 +195,75 @@ function update() {
   const t = performance.now() * 0.001;
   
   cards.forEach((c, i) => {
-    // Gentle orbit target (slow swarm)
-    const phase = (i / NUM) * Math.PI * 2;
-    const orbitSpeed = 0.15 + (i % 7) * 0.02;
-    const orbitRadius = (180 + (i % 5) * 60) * DPR;
-    const wobble = Math.sin(t * 0.3 + i * 0.7) * 40 * DPR;
-    
-    let targetX, targetY, targetAngle;
+    const phase = (i / 52) * Math.PI * 2;
     
     if (lineUpMode) {
-      // 4 rows × 13 cols (one suit per row)
-      const cols = 13;
-      const row = Math.floor(c.faceIdx / 13); // suit
-      const col = c.faceIdx % 13;             // rank
-      const spacingX = (W - CW * 0.8) / cols;
-      const spacingY = (H - CH * 0.6) / 4;
-      const gridW = (cols - 1) * spacingX;
+      // 4 rows × 13 cols
+      const col = c.rank;
+      const row = c.suit;
+      const spacingX = Math.min(CARD_W * 1.05, (W - CARD_W - 40) / 13);
+      const spacingY = Math.min(CARD_H * 1.05, (H - CARD_H - 40) / 4);
+      const gridW = 12 * spacingX;
       const gridH = 3 * spacingY;
       
-      targetX = (W - gridW) / 2 + col * spacingX;
-      targetY = (H - gridH) / 2 + row * spacingY;
-      targetAngle = 0;
+      const targetX = (W - gridW) / 2 + col * spacingX;
+      const targetY = (H - gridH) / 2 + row * spacingY;
       
-      // Stronger pull for snappy lineup
-      c.vx += (targetX - c.x) * 0.06;
-      c.vy += (targetY - c.y) * 0.06;
-      c.va += (0 - c.angle) * 0.1;
+      c.vx += (targetX - c.x) * 0.08;
+      c.vy += (targetY - c.y) * 0.08;
+      c.va += (0 - c.angle) * 0.12;
+      
+      c.vx *= 0.82;
+      c.vy *= 0.82;
+      c.va *= 0.82;
     } else {
-      targetX = W / 2 + Math.cos(t * orbitSpeed + phase) * (orbitRadius + wobble);
-      targetY = H / 2 + Math.sin(t * orbitSpeed * 0.7 + phase) * (orbitRadius * 0.6 + wobble * 0.5);
+      // Slow swarm orbit
+      const orbitSpeed = 0.1 + (i % 7) * 0.015;
+      const orbitRadius = 150 + (i % 5) * 50;
+      const wobble = Math.sin(t * 0.25 + i * 0.7) * 35;
       
-      // Gentle drift toward orbit position
-      c.vx += (targetX - c.x) * 0.008;
-      c.vy += (targetY - c.y) * 0.008;
+      const targetX = W / 2 + Math.cos(t * orbitSpeed + phase) * (orbitRadius + wobble);
+      const targetY = H / 2 + Math.sin(t * orbitSpeed * 0.6 + phase) * (orbitRadius * 0.5 + wobble * 0.4);
+      
+      c.vx += (targetX - c.x) * 0.006;
+      c.vy += (targetY - c.y) * 0.006;
+      
+      // Idle wobble angle
+      const targetAngle = Math.sin(t * 0.3 + i * 0.4) * 5;
+      c.va += (targetAngle - c.angle) * 0.02;
+      
+      c.vx *= 0.97;
+      c.vy *= 0.97;
+      c.va *= 0.95;
     }
     
-    // Mouse interaction (only in swarm mode)
-    const dx = c.x - mx;
-    const dy = c.y - my;
-    const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-    
-    if (!lineUpMode && mouseDown) {
-      // Attract toward mouse
-      targetX = mx + Math.cos(t * 0.5 + phase) * 120 * DPR;
-      targetY = my + Math.sin(t * 0.5 + phase) * 120 * DPR;
-      const pullStrength = 0.03;
-      c.vx += (targetX - c.x) * pullStrength;
-      c.vy += (targetY - c.y) * pullStrength;
-    }
-    
-    // Damping
-    c.vx *= lineUpMode ? 0.88 : 0.96;
-    c.vy *= lineUpMode ? 0.88 : 0.96;
-    c.va *= lineUpMode ? 0.85 : 0.95;
-    
-    // Apply velocity
     c.x += c.vx;
     c.y += c.vy;
     c.angle += c.va;
     
-    // Gentle angle toward movement direction when moving fast
-    const speed = Math.sqrt(c.vx * c.vx + c.vy * c.vy);
-    if (speed > 1 * DPR) {
-      const moveAngle = Math.atan2(c.vy, c.vx);
-      c.targetAngle = moveAngle * 0.15;
-    } else {
-      // Slow idle wobble
-      c.targetAngle = Math.sin(t * 0.4 + i * 0.5) * 0.08;
-    }
-    c.angle += (c.targetAngle - c.angle) * 0.02;
-    
     // Soft boundary
-    const margin = CW;
-    if (c.x < margin) c.vx += (margin - c.x) * 0.02;
-    if (c.x > W - margin) c.vx += (W - margin - c.x) * 0.02;
-    if (c.y < margin) c.vy += (margin - c.y) * 0.02;
-    if (c.y > H - margin) c.vy += (H - margin - c.y) * 0.02;
-  });
-  
-  mouseClicked = false;
-}
-
-// === Render ===
-function render() {
-  // Background
-  ctx.fillStyle = '#080c08';
-  ctx.fillRect(0, 0, W, H);
-  
-  // Felt glow
-  const glow = ctx.createRadialGradient(W/2, H/2, 0, W/2, H/2, W * 0.5);
-  glow.addColorStop(0, 'rgba(20,60,30,0.2)');
-  glow.addColorStop(0.5, 'rgba(15,45,25,0.1)');
-  glow.addColorStop(1, 'rgba(0,0,0,0)');
-  ctx.fillStyle = glow;
-  ctx.fillRect(0, 0, W, H);
-  
-  // Sort by y for depth
-  const sorted = [...cards].sort((a, b) => a.y - b.y);
-  
-  sorted.forEach(c => {
-    ctx.save();
-    ctx.translate(c.x, c.y);
-    ctx.rotate(c.angle);
+    const margin = CARD_W * 0.5;
+    if (c.x < margin) c.vx += (margin - c.x) * 0.03;
+    if (c.x > W - margin) c.vx += (W - margin - c.x) * 0.03;
+    if (c.y < margin) c.vy += (margin - c.y) * 0.03;
+    if (c.y > H - margin) c.vy += (H - margin - c.y) * 0.03;
     
-    // Drop shadow
-    ctx.shadowColor = 'rgba(0,0,0,0.35)';
-    ctx.shadowBlur = 12 * DPR;
-    ctx.shadowOffsetX = 3 * DPR;
-    ctx.shadowOffsetY = 5 * DPR;
+    // Update DOM
+    c.el.style.transform = `translate(${c.x - CARD_W/2}px, ${c.y - CARD_H/2}px) rotate(${c.angle}deg)`;
     
-    const img = (c.showFace || lineUpMode) ? cardImages[c.faceIdx] : cardBackImg;
-    ctx.drawImage(img, -CW/2, -CH/2, CW, CH);
-    
-    // Reset shadow for shimmer
-    ctx.shadowColor = 'transparent';
-    ctx.shadowBlur = 0;
-    ctx.shadowOffsetX = 0;
-    ctx.shadowOffsetY = 0;
-    
-    // Holographic prismatic shimmer
-    const shimT = (performance.now() * 0.0008 + c.faceIdx * 0.4);
-    const shimX = Math.sin(shimT) * CW * 0.5;
-    const shimY = Math.cos(shimT * 0.7) * CH * 0.3;
-    
-    // Rainbow gradient that moves across the card
-    const hGrad = ctx.createLinearGradient(
-      shimX - CW * 0.3, shimY - CH * 0.3,
-      shimX + CW * 0.3, shimY + CH * 0.3
-    );
-    hGrad.addColorStop(0, 'rgba(255,0,100,0)');
-    hGrad.addColorStop(0.2, 'rgba(255,0,100,0.06)');
-    hGrad.addColorStop(0.35, 'rgba(255,200,0,0.08)');
-    hGrad.addColorStop(0.5, 'rgba(0,255,150,0.07)');
-    hGrad.addColorStop(0.65, 'rgba(0,150,255,0.08)');
-    hGrad.addColorStop(0.8, 'rgba(180,0,255,0.06)');
-    hGrad.addColorStop(1, 'rgba(255,0,100,0)');
-    ctx.fillStyle = hGrad;
-    ctx.beginPath();
-    ctx.roundRect(-CW/2, -CH/2, CW, CH, CR);
-    ctx.fill();
-    
-    // Specular highlight (white glint that moves)
-    const specT = (performance.now() * 0.001 + c.faceIdx * 0.2);
-    const specX = Math.sin(specT * 0.6) * CW * 0.25;
-    const specY = Math.cos(specT * 0.4) * CH * 0.2 - CH * 0.1;
-    const specGrad = ctx.createRadialGradient(specX, specY, 0, specX, specY, CW * 0.4);
-    specGrad.addColorStop(0, 'rgba(255,255,255,0.12)');
-    specGrad.addColorStop(0.5, 'rgba(255,255,255,0.03)');
-    specGrad.addColorStop(1, 'rgba(255,255,255,0)');
-    ctx.fillStyle = specGrad;
-    ctx.beginPath();
-    ctx.roundRect(-CW/2, -CH/2, CW, CH, CR);
-    ctx.fill();
-    
-    ctx.restore();
+    // Holographic shimmer angle based on position relative to center
+    const shimAngle = Math.atan2(c.y - H/2, c.x - W/2) * 180 / Math.PI + t * 20;
+    c.el.style.setProperty('--shimmer-angle', shimAngle + 'deg');
   });
 }
 
-// === Loop ===
 function loop() {
   update();
-  render();
   requestAnimationFrame(loop);
 }
 
+// Start
+createCards();
 requestAnimationFrame(loop);
 </script>
 
