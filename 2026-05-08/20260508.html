@@ -242,7 +242,7 @@ for (let s = 0; s < 4; s++) {
 }
 
 // === Card particles ===
-const NUM = 32;
+const NUM = 52;
 const cards = [];
 
 for (let i = 0; i < NUM; i++) {
@@ -284,15 +284,14 @@ function update() {
     let targetX, targetY, targetAngle;
     
     if (lineUpMode) {
-      // Line up in a grid/row arrangement
-      const cols = Math.ceil(Math.sqrt(NUM * (W / H)));
-      const rows = Math.ceil(NUM / cols);
-      const col = i % cols;
-      const row = Math.floor(i / cols);
-      const spacingX = Math.min(CW * 1.15, (W - CW) / cols);
-      const spacingY = Math.min(CH * 1.15, (H - CH) / rows);
+      // 4 rows × 13 cols (one suit per row)
+      const cols = 13;
+      const row = Math.floor(c.faceIdx / 13); // suit
+      const col = c.faceIdx % 13;             // rank
+      const spacingX = (W - CW * 0.8) / cols;
+      const spacingY = (H - CH * 0.6) / 4;
       const gridW = (cols - 1) * spacingX;
-      const gridH = (rows - 1) * spacingY;
+      const gridH = 3 * spacingY;
       
       targetX = (W - gridW) / 2 + col * spacingX;
       targetY = (H - gridH) / 2 + row * spacingY;
