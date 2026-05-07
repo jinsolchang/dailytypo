@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Balatro Hand</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --felt: #1a472a;
+  --felt-dark: #0f2e1a;
+  --gold: #f0c040;
+  --neon-blue: #4af;
+  --neon-pink: #f4a;
+}
+
+body {
+  background: var(--felt);
+  min-height: 100vh;
+  overflow: hidden;
+  font-family: 'Press Start 2P', monospace;
+  color: #fff;
+  user-select: none;
+}
+
+/* CRT overlay */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(0,0,0,0.06) 0px,
+    rgba(0,0,0,0.06) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+  pointer-events: none;
+  z-index: 1000;
+}
+
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,0.4) 100%);
+  pointer-events: none;
+  z-index: 999;
+}
+
+/* Felt texture */
+.felt-bg {
+  position: fixed;
+  inset: 0;
+  background: 
+    radial-gradient(ellipse at 50% 80%, rgba(40,120,60,0.3) 0%, transparent 60%),
+    url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.2' numOctaves='3'/%3E%3CfeColorMatrix values='0 0 0 0 0.1 0 0 0 0 0.28 0 0 0 0 0.16 0 0 0 0.15 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  z-index: 0;
+}
+
+/* Header */
+.header {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 100;
+  text-align: center;
+}
+
+.title {
+  font-size: 14px;
+  color: var(--gold);
+  text-shadow: 0 0 10px rgba(240,192,64,0.5);
+  letter-spacing: 2px;
+}
+
+.subtitle {
+  font-size: 8px;
+  color: rgba(255,255,255,0.4);
+  margin-top: 8px;
+}
+
+/* Score panel */
+.score-panel {
+  position: fixed;
+  top: 20px;
+  right: 24px;
+  z-index: 100;
+  text-align: right;
+}
+
+.score-label {
+  font-size: 7px;
+  color: rgba(255,255,255,0.4);
+  margin-bottom: 4px;
+}
+
+.score-value {
+  font-size: 16px;
+  color: var(--gold);
+  text-shadow: 0 0 8px rgba(240,192,64,0.4);
+}
+
+/* Hand info */
+.hand-info {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 50;
+  text-align: center;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.hand-info.visible {
+  opacity: 1;
+}
+
+.hand-name {
+  font-size: 18px;
+  color: var(--neon-blue);
+  text-shadow: 0 0 20px rgba(68,170,255,0.6);
+  margin-bottom: 8px;
+}
+
+.hand-mult {
+  font-size: 12px;
+  color: var(--neon-pink);
+  text-shadow: 0 0 15px rgba(255,68,170,0.5);
+}
+
+/* Controls */
+.controls {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 100;
+  display: flex;
+  gap: 12px;
+}
+
+.btn {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 9px;
+  padding: 10px 20px;
+  border: 2px solid var(--gold);
+  background: rgba(0,0,0,0.5);
+  color: var(--gold);
+  cursor: pointer;
+  transition: all 0.15s;
+  text-transform: uppercase;
+}
+
+.btn:hover {
+  background: var(--gold);
+  color: #000;
+  box-shadow: 0 0 15px rgba(240,192,64,0.4);
+}
+
+.btn:active {
+  transform: scale(0.95);
+}
+
+.btn.play-btn {
+  border-color: var(--neon-blue);
+  color: var(--neon-blue);
+}
+
+.btn.play-btn:hover {
+  background: var(--neon-blue);
+  color: #000;
+  box-shadow: 0 0 15px rgba(68,170,255,0.4);
+}
+
+/* Card hand area */
+.hand {
+  position: fixed;
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  width: 100%;
+  height: 300px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+/* Card */
+.card {
+  position: absolute;
+  width: 90px;
+  height: 130px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), 
+              box-shadow 0.2s,
+              filter 0.2s;
+  transform-origin: bottom center;
+  will-change: transform;
+}
+
+.card.selected {
+  transform: var(--fan-transform) translateY(-30px) !important;
+  filter: brightness(1.1);
+}
+
+.card:hover:not(.selected) {
+  filter: brightness(1.05);
+}
+
+.card-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 
+    0 2px 8px rgba(0,0,0,0.3),
+    0 0 0 1px rgba(0,0,0,0.1),
+    inset 0 0 0 4px #fff,
+    inset 0 0 0 5px #ddd;
+  overflow: hidden;
+}
+
+.card.selected .card-inner {
+  box-shadow: 
+    0 4px 20px rgba(68,170,255,0.4),
+    0 0 0 2px var(--neon-blue),
+    inset 0 0 0 4px #fff,
+    inset 0 0 0 5px #ddd;
+}
+
+/* Card face */
+.card-rank {
+  position: absolute;
+  top: 6px;
+  left: 8px;
+  font-family: Georgia, serif;
+  font-size: 18px;
+  font-weight: bold;
+  line-height: 1;
+}
+
+.card-rank-bottom {
+  position: absolute;
+  bottom: 6px;
+  right: 8px;
+  font-family: Georgia, serif;
+  font-size: 18px;
+  font-weight: bold;
+  line-height: 1;
+  transform: rotate(180deg);
+}
+
+.card-suit-top {
+  position: absolute;
+  top: 24px;
+  left: 9px;
+  font-size: 14px;
+  line-height: 1;
+}
+
+.card-suit-center {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 40px;
+}
+
+.card-suit-bottom {
+  position: absolute;
+  bottom: 24px;
+  right: 9px;
+  font-size: 14px;
+  line-height: 1;
+  transform: rotate(180deg);
+}
+
+.suit-red { color: #d32f2f; }
+.suit-black { color: #1a1a1a; }
+
+/* Card back */
+.card-back {
+  position: absolute;
+  inset: 0;
+  border-radius: 8px;
+  background: 
+    repeating-linear-gradient(45deg, #2a4494 0px, #2a4494 2px, #1a3070 2px, #1a3070 4px);
+  border: 4px solid #fff;
+  box-shadow: inset 0 0 0 2px #c0a040;
+}
+
+.card-back::after {
+  content: '✦';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 28px;
+  color: #c0a040;
+}
+
+/* Foil shimmer */
+.card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 8px;
+  background: linear-gradient(
+    135deg,
+    transparent 30%,
+    rgba(255,255,255,0.1) 45%,
+    rgba(255,255,255,0.2) 50%,
+    rgba(255,255,255,0.1) 55%,
+    transparent 70%
+  );
+  background-size: 200% 200%;
+  animation: shimmer 3s ease-in-out infinite;
+  pointer-events: none;
+  z-index: 5;
+}
+
+@keyframes shimmer {
+  0%, 100% { background-position: 200% 200%; }
+  50% { background-position: 0% 0%; }
+}
+
+/* Deck pile */
+.deck-pile {
+  position: fixed;
+  top: 50%;
+  left: 40px;
+  transform: translateY(-50%);
+  z-index: 5;
+}
+
+.deck-card {
+  position: absolute;
+  width: 90px;
+  height: 130px;
+  border-radius: 8px;
+}
+
+.deck-card .card-back {
+  box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+}
+
+/* Chips counter */
+.chips {
+  position: fixed;
+  top: 20px;
+  left: 24px;
+  z-index: 100;
+}
+
+.chips-label {
+  font-size: 7px;
+  color: rgba(255,255,255,0.4);
+  margin-bottom: 4px;
+}
+
+.chips-value {
+  font-size: 12px;
+  color: #fff;
+}
+
+.cards-left {
+  font-size: 7px;
+  color: rgba(255,255,255,0.3);
+  margin-top: 8px;
+}
+
+@media (max-width: 700px) {
+  .card { width: 65px; height: 95px; }
+  .card-rank { font-size: 14px; top: 4px; left: 5px; }
+  .card-rank-bottom { font-size: 14px; bottom: 4px; right: 5px; }
+  .card-suit-center { font-size: 28px; }
+  .card-suit-top { font-size: 10px; top: 18px; left: 6px; }
+  .card-suit-bottom { font-size: 10px; bottom: 18px; right: 6px; }
+  .title { font-size: 10px; }
+  .hand { bottom: 60px; height: 200px; }
+}
+</style>
+</head>
+<body>
+
+<div class="felt-bg"></div>
+
+<div class="header">
+  <div class="title">BALATRO HAND</div>
+  <div class="subtitle">click cards to select · play hand to score</div>
+</div>
+
+<div class="chips">
+  <div class="chips-label">HAND</div>
+  <div class="chips-value" id="handCount">4 / 4</div>
+  <div class="cards-left">DECK: <span id="deckCount">44</span></div>
+</div>
+
+<div class="score-panel">
+  <div class="score-label">SCORE</div>
+  <div class="score-value" id="score">0</div>
+</div>
+
+<div class="hand-info" id="handInfo">
+  <div class="hand-name" id="handName"></div>
+  <div class="hand-mult" id="handMult"></div>
+</div>
+
+<div class="deck-pile" id="deckPile"></div>
+
+<div class="hand" id="hand"></div>
+
+<div class="controls">
+  <button class="btn" onclick="dealHand()">Deal</button>
+  <button class="btn play-btn" onclick="playHand()">Play</button>
+  <button class="btn" onclick="discardSelected()">Discard</button>
+</div>
+
+<script>
+// ==========================================
+// Balatro-style card hand interaction
+// ==========================================
+
+const SUITS = ['♠','♥','♦','♣'];
+const SUIT_NAMES = ['spades','hearts','diamonds','clubs'];
+const RANKS = ['A','2','3','4','5','6','7','8','9','10','J','Q','K'];
+const RANK_VALUES = [14,2,3,4,5,6,7,8,9,10,11,12,13];
+
+let deck = [];
+let hand = [];
+let selected = new Set();
+let score = 0;
+let handsLeft = 4;
+
+const handEl = document.getElementById('hand');
+const handInfo = document.getElementById('handInfo');
+const handName = document.getElementById('handName');
+const handMult = document.getElementById('handMult');
+const scoreEl = document.getElementById('score');
+const handCountEl = document.getElementById('handCount');
+const deckCountEl = document.getElementById('deckCount');
+const deckPile = document.getElementById('deckPile');
+
+function createDeck() {
+  deck = [];
+  for (let s = 0; s < 4; s++) {
+    for (let r = 0; r < 13; r++) {
+      deck.push({ suit: s, rank: r });
+    }
+  }
+  shuffle(deck);
+}
+
+function shuffle(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+}
+
+function isRed(suit) { return suit === 1 || suit === 2; }
+
+function createCardElement(card, index) {
+  const el = document.createElement('div');
+  el.className = 'card';
+  el.dataset.index = index;
+  
+  const colorClass = isRed(card.suit) ? 'suit-red' : 'suit-black';
+  const suit = SUITS[card.suit];
+  const rank = RANKS[card.rank];
+  
+  el.innerHTML = `
+    <div class="card-inner">
+      <div class="card-rank ${colorClass}">${rank}</div>
+      <div class="card-suit-top ${colorClass}">${suit}</div>
+      <div class="card-suit-center ${colorClass}">${suit}</div>
+      <div class="card-suit-bottom ${colorClass}">${suit}</div>
+      <div class="card-rank-bottom ${colorClass}">${rank}</div>
+    </div>
+  `;
+  
+  el.addEventListener('click', () => toggleSelect(index));
+  
+  return el;
+}
+
+function toggleSelect(index) {
+  if (selected.has(index)) {
+    selected.delete(index);
+  } else {
+    if (selected.size >= 5) return; // max 5 cards
+    selected.add(index);
+  }
+  layoutHand();
+}
+
+function layoutHand() {
+  const cards = handEl.querySelectorAll('.card');
+  const n = cards.length;
+  if (n === 0) return;
+  
+  const isMobile = window.innerWidth < 700;
+  const cardW = isMobile ? 65 : 90;
+  const maxSpread = Math.min(n * (cardW * 0.7), window.innerWidth * 0.75);
+  const spacing = maxSpread / n;
+  const startX = -maxSpread / 2 + spacing / 2;
+  
+  // Arc parameters
+  const arcRadius = 800;
+  const maxAngle = Math.min(n * 2.5, 25); // degrees total spread
+  
+  cards.forEach((card, i) => {
+    const x = startX + i * spacing;
+    const t = n > 1 ? (i / (n - 1)) - 0.5 : 0; // -0.5 to 0.5
+    const angle = t * maxAngle;
+    const yOffset = Math.abs(t) * Math.abs(t) * 40; // parabolic arc
+    
+    const transform = `translateX(${x}px) translateY(${yOffset}px) rotate(${angle}deg)`;
+    card.style.setProperty('--fan-transform', transform);
+    card.style.transform = transform;
+    card.style.zIndex = i + 1;
+    
+    if (selected.has(parseInt(card.dataset.index))) {
+      card.classList.add('selected');
+    } else {
+      card.classList.remove('selected');
+    }
+  });
+}
+
+function dealHand() {
+  if (deck.length < 8) {
+    createDeck();
+    handsLeft = 4;
+  }
+  
+  // Clear current hand
+  hand = [];
+  selected.clear();
+  handEl.innerHTML = '';
+  handInfo.classList.remove('visible');
+  
+  // Deal 8 cards
+  const dealCount = Math.min(8, deck.length);
+  for (let i = 0; i < dealCount; i++) {
+    hand.push(deck.pop());
+  }
+  
+  // Create card elements with staggered animation
+  hand.forEach((card, i) => {
+    const el = createCardElement(card, i);
+    el.style.opacity = '0';
+    el.style.transform = 'translateX(0) translateY(100px) rotate(0deg) scale(0.8)';
+    handEl.appendChild(el);
+    
+    setTimeout(() => {
+      el.style.opacity = '1';
+      layoutHand();
+    }, i * 80);
+  });
+  
+  updateUI();
+}
+
+function playHand() {
+  if (selected.size === 0) return;
+  if (handsLeft <= 0) return;
+  
+  const selectedCards = [...selected].map(i => hand[i]).filter(Boolean);
+  if (selectedCards.length === 0) return;
+  
+  const result = evaluateHand(selectedCards);
+  
+  // Show hand info
+  handName.textContent = result.name;
+  handMult.textContent = `${result.chips} × ${result.mult} = ${result.chips * result.mult}`;
+  handInfo.classList.add('visible');
+  
+  // Animate score
+  const points = result.chips * result.mult;
+  animateScore(points);
+  
+  // Remove played cards with animation
+  const cardEls = handEl.querySelectorAll('.card');
+  const toRemove = [];
+  cardEls.forEach(el => {
+    const idx = parseInt(el.dataset.index);
+    if (selected.has(idx)) {
+      toRemove.push(el);
+      el.style.transition = 'transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s';
+      el.style.transform += ' translateY(-200px) scale(0.5)';
+      el.style.opacity = '0';
+    }
+  });
+  
+  handsLeft--;
+  
+  setTimeout(() => {
+    // Remove played cards from hand array (reverse order to preserve indices)
+    const indices = [...selected].sort((a, b) => b - a);
+    indices.forEach(i => hand.splice(i, 1));
+    selected.clear();
+    
+    // Rebuild hand display
+    handEl.innerHTML = '';
+    hand.forEach((card, i) => {
+      const el = createCardElement(card, i);
+      handEl.appendChild(el);
+    });
+    layoutHand();
+    updateUI();
+  }, 500);
+  
+  setTimeout(() => {
+    handInfo.classList.remove('visible');
+  }, 2000);
+}
+
+function discardSelected() {
+  if (selected.size === 0) return;
+  
+  const cardEls = handEl.querySelectorAll('.card');
+  cardEls.forEach(el => {
+    const idx = parseInt(el.dataset.index);
+    if (selected.has(idx)) {
+      el.style.transition = 'transform 0.3s ease-in, opacity 0.3s';
+      el.style.transform += ' translateY(100px)';
+      el.style.opacity = '0';
+    }
+  });
+  
+  setTimeout(() => {
+    const indices = [...selected].sort((a, b) => b - a);
+    indices.forEach(i => hand.splice(i, 1));
+    
+    // Draw replacements
+    const drawCount = Math.min(indices.length, deck.length);
+    for (let i = 0; i < drawCount; i++) {
+      hand.push(deck.pop());
+    }
+    
+    selected.clear();
+    handEl.innerHTML = '';
+    hand.forEach((card, i) => {
+      const el = createCardElement(card, i);
+      handEl.appendChild(el);
+    });
+    layoutHand();
+    updateUI();
+  }, 350);
+}
+
+function animateScore(points) {
+  const target = score + points;
+  const start = score;
+  const duration = 600;
+  const startTime = performance.now();
+  
+  function tick(now) {
+    const elapsed = now - startTime;
+    const t = Math.min(1, elapsed / duration);
+    const eased = 1 - Math.pow(1 - t, 3);
+    const current = Math.round(start + (target - start) * eased);
+    scoreEl.textContent = current.toLocaleString();
+    if (t < 1) requestAnimationFrame(tick);
+    else score = target;
+  }
+  requestAnimationFrame(tick);
+}
+
+function evaluateHand(cards) {
+  const n = cards.length;
+  const ranks = cards.map(c => RANK_VALUES[c.rank]).sort((a, b) => b - a);
+  const suits = cards.map(c => c.suit);
+  
+  // Count ranks
+  const rankCount = {};
+  ranks.forEach(r => { rankCount[r] = (rankCount[r] || 0) + 1; });
+  const counts = Object.values(rankCount).sort((a, b) => b - a);
+  
+  // Check flush
+  const isFlush = n >= 5 && suits.every(s => s === suits[0]);
+  
+  // Check straight
+  let isStraight = false;
+  if (n >= 5) {
+    const unique = [...new Set(ranks)].sort((a, b) => b - a);
+    if (unique.length >= 5) {
+      for (let i = 0; i <= unique.length - 5; i++) {
+        if (unique[i] - unique[i + 4] === 4) { isStraight = true; break; }
+      }
+      // Ace-low straight
+      if (!isStraight && unique.includes(14) && unique.includes(2) && unique.includes(3) && unique.includes(4) && unique.includes(5)) {
+        isStraight = true;
+      }
+    }
+  }
+  
+  const baseChips = ranks.reduce((a, r) => a + r, 0);
+  
+  if (isFlush && isStraight) return { name: 'STRAIGHT FLUSH', chips: baseChips + 100, mult: 8 };
+  if (counts[0] === 4) return { name: 'FOUR OF A KIND', chips: baseChips + 60, mult: 7 };
+  if (counts[0] === 3 && counts[1] === 2) return { name: 'FULL HOUSE', chips: baseChips + 40, mult: 4 };
+  if (isFlush) return { name: 'FLUSH', chips: baseChips + 35, mult: 4 };
+  if (isStraight) return { name: 'STRAIGHT', chips: baseChips + 30, mult: 4 };
+  if (counts[0] === 3) return { name: 'THREE OF A KIND', chips: baseChips + 30, mult: 3 };
+  if (counts[0] === 2 && counts[1] === 2) return { name: 'TWO PAIR', chips: baseChips + 20, mult: 2 };
+  if (counts[0] === 2) return { name: 'PAIR', chips: baseChips + 10, mult: 2 };
+  return { name: 'HIGH CARD', chips: baseChips, mult: 1 };
+}
+
+function updateUI() {
+  handCountEl.textContent = `${handsLeft} / 4`;
+  deckCountEl.textContent = deck.length;
+  renderDeckPile();
+}
+
+function renderDeckPile() {
+  deckPile.innerHTML = '';
+  const show = Math.min(5, Math.ceil(deck.length / 10));
+  for (let i = 0; i < show; i++) {
+    const el = document.createElement('div');
+    el.className = 'deck-card';
+    el.style.top = (-i * 2) + 'px';
+    el.style.left = (i * 1) + 'px';
+    el.innerHTML = '<div class="card-back"></div>';
+    deckPile.appendChild(el);
+  }
+}
+
+// Hover effect - card lifts slightly
+handEl.addEventListener('mousemove', (e) => {
+  const cards = handEl.querySelectorAll('.card');
+  const rect = handEl.getBoundingClientRect();
+  
+  cards.forEach(card => {
+    const cardRect = card.getBoundingClientRect();
+    const cardCenterX = cardRect.left + cardRect.width / 2;
+    const dist = Math.abs(e.clientX - cardCenterX);
+    
+    if (dist < cardRect.width * 0.6 && !card.classList.contains('selected')) {
+      card.style.zIndex = 100;
+      const idx = parseInt(card.dataset.index);
+      const n = cards.length;
+      const t = n > 1 ? (idx / (n - 1)) - 0.5 : 0;
+      const angle = t * Math.min(n * 2.5, 25);
+      const baseTransform = card.style.getPropertyValue('--fan-transform');
+      card.style.transform = baseTransform + ' translateY(-20px) scale(1.08)';
+    } else if (!card.classList.contains('selected')) {
+      card.style.transform = card.style.getPropertyValue('--fan-transform');
+      card.style.zIndex = parseInt(card.dataset.index) + 1;
+    }
+  });
+});
+
+handEl.addEventListener('mouseleave', () => {
+  const cards = handEl.querySelectorAll('.card');
+  cards.forEach(card => {
+    if (!card.classList.contains('selected')) {
+      card.style.transform = card.style.getPropertyValue('--fan-transform');
+      card.style.zIndex = parseInt(card.dataset.index) + 1;
+    }
+  });
+});
+
+window.addEventListener('resize', layoutHand);
+
+// Init
+createDeck();
+dealHand();
+</script>
+
+</body>
+</html>
