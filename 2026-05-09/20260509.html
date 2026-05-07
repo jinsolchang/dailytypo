@@ -467,9 +467,17 @@ function s3drawCharAt(ch,ox,oy){
 function s3redrawCanvas(){
   ctx3.fillStyle=bg();ctx3.fillRect(0,0,W3,H3);
   if(!s3font){
-    ctx3.fillStyle='#999';ctx3.font='14px sans-serif';ctx3.textAlign='center';
-    ctx3.fillText('폰트를 먼저 로드하세요 (상단 "로컬 폰트 불러오기" 클릭)',W3/2,H3/2);
-    ctx3.textAlign='left';
+    // s2fontFamily가 설정되어 있으면 자동 로드 시도
+    if(cachedFonts){
+      const fontName=s2fontFamily.replace(/"/g,'');
+      const match=cachedFonts.find(f=>f.family===fontName);
+      if(match){
+        match.blob().then(b=>b.arrayBuffer()).then(buf=>{
+          s3font=opentype.parse(buf);
+          s3redrawCanvas();
+        }).catch(()=>{});
+      }
+    }
     return;
   }
   cursor={x:24,y:24+scale};
@@ -825,9 +833,11 @@ async function exportSvgStyle2(){
     }catch(e){alert('폰트 파싱 실패');return;}
   }
   const w2=800,h2=600;
-  const paths=[];
+  const fillPaths=[]; // 원본 path (dot fill용)
+  const strokePaths=[]; // jitter path (외곽선용)
   let cx=32,cy=32+scale;
   const fgc=inverted?'rgba(255,255,255,0.85)':'rgba(0,0,0,0.85)';
+  const dotFill=inverted?'rgba(255,255,255,0.8)':'rgba(0,0,0,0.8)';
   for(const ch of allChars){
     if(ch==='__CMP__')continue;
     if(ch==='\n'){cx=32;cy+=scale*1.4;continue;}
@@ -836,7 +846,10 @@ async function exportSvgStyle2(){
     if(!glyph||glyph.index===0){cx+=scale*0.3;continue;}
     const sc=scale/otFont.unitsPerEm;
     const path=glyph.getPath(cx,cy,scale);
-    // path를 점으로 샘플링 + jitter 적용 (스타일3과 동일)
+    // 원본 path (fill용)
+    const origD=path.toPathData(2);
+    if(origD) fillPaths.push(origD);
+    // jitter path (stroke용)
     const strokes=pathToStrokes(path);
     strokes.forEach(pts=>{
       const segs=s3buildSegs(pts);
@@ -844,14 +857,24 @@ async function exportSvgStyle2(){
         if(seg.length<2)return;
         let d='M'+seg[0][0].toFixed(1)+','+seg[0][1].toFixed(1);
         for(let i=1;i<seg.length;i++)d+=' L'+seg[i][0].toFixed(1)+','+seg[i][1].toFixed(1);
-        paths.push(d);
+        strokePaths.push(d);
       });
     });
     cx+=Math.round(glyph.advanceWidth*sc);
     if(cx>w2-32){cx=32;cy+=scale*1.4;}
   }
-  const svg=`<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w2} ${h2}" width="${w2}" height="${h2}">\n<rect width="${w2}" height="${h2}" fill="${bg()}"/>\n${paths.map(d=>`<path d="${d}" fill="none" stroke="${fgc}" stroke-width="${s2strokeW}" stroke-linecap="round" stroke-linejoin="round"/>`).join('\n')}\n</svg>`;
-  downloadSvg(svg,'style2');
+  const svgParts=[
+    `<?xml version="1.0" encoding="UTF-8"?>`,
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w2} ${h2}" width="${w2}" height="${h2}">`,
+    `<rect width="${w2}" height="${h2}" fill="${bg()}"/>`,
+    `<defs><pattern id="dots" width="${s2dotGap}" height="${s2dotGap}" patternUnits="userSpaceOnUse"><circle cx="${s2dotGap/2}" cy="${s2dotGap/2}" r="${s2dotSize}" fill="${dotFill}"/></pattern></defs>`,
+    // 내부 도트 (원본 path + fill pattern)
+    ...fillPaths.map(d=>`<path d="${d}" fill="url(#dots)" fill-rule="nonzero" stroke="none"/>`),
+    // 외곽선 (jitter path)
+    ...strokePaths.map(d=>`<path d="${d}" fill="none" stroke="${fgc}" stroke-width="${s2strokeW}" stroke-linecap="round" stroke-linejoin="round"/>`),
+    `</svg>`
+  ];
+  downloadSvg(svgParts.join('\n'),'style2');
 }
 
 function exportSvgStyle3(){
@@ -952,6 +975,8 @@ function exportAnimSvgStyle2(){
   const frames=30;
   const w2=800,h2=600;
   const fgc=inverted?'rgba(255,255,255,0.85)':'rgba(0,0,0,0.85)';
+  const dotFill=inverted?'rgba(255,255,255,0.8)':'rgba(0,0,0,0.8)';
+  const fillPaths=[];
   const strokeData=[];
   let cx=32,cy=32+scale;
   for(const ch of allChars){
@@ -962,6 +987,8 @@ function exportAnimSvgStyle2(){
     if(!glyph||glyph.index===0){cx+=scale*0.3;continue;}
     const sc=scale/otFont.unitsPerEm;
     const path=glyph.getPath(cx,cy,scale);
+    const origD=path.toPathData(2);
+    if(origD) fillPaths.push(origD);
     const strokes=pathToStrokes(path);
     strokes.forEach(pts=>{strokeData.push(pts);});
     cx+=Math.round(glyph.advanceWidth*sc);
@@ -979,8 +1006,16 @@ function exportAnimSvgStyle2(){
     const dur=(2.4+Math.random()*1.6).toFixed(1);
     return `<path d="${dVals[0]}" fill="none" stroke="${fgc}" stroke-width="${s2strokeW}" stroke-linecap="round" stroke-linejoin="round"><animate attributeName="d" values="${dVals.join(';')}" dur="${dur}s" repeatCount="indefinite"/></path>`;
   });
-  const svg=`<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w2} ${h2}" width="${w2}" height="${h2}">\n<rect width="${w2}" height="${h2}" fill="${bg()}"/>\n${elements.join('\n')}\n</svg>`;
-  downloadSvg(svg,'style2-anim');
+  const svgParts=[
+    `<?xml version="1.0" encoding="UTF-8"?>`,
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w2} ${h2}" width="${w2}" height="${h2}">`,
+    `<rect width="${w2}" height="${h2}" fill="${bg()}"/>`,
+    `<defs><pattern id="dots" width="${s2dotGap}" height="${s2dotGap}" patternUnits="userSpaceOnUse"><circle cx="${s2dotGap/2}" cy="${s2dotGap/2}" r="${s2dotSize}" fill="${dotFill}"/></pattern></defs>`,
+    ...fillPaths.map(d=>`<path d="${d}" fill="url(#dots)" fill-rule="nonzero" stroke="none"/>`),
+    ...elements,
+    `</svg>`
+  ];
+  downloadSvg(svgParts.join('\n'),'style2-anim');
 }
 
 function exportAnimSvgStyle3(){
