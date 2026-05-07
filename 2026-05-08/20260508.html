@@ -111,7 +111,7 @@ body::after {
 const stage = document.getElementById('stage');
 const loadingEl = document.getElementById('loading');
 
-// SVG cards from jsdelivr CDN
+// SVG cards - fetch and embed inline for cross-origin support
 const SVG_URL = 'https://cdn.jsdelivr.net/npm/svg-cards@4.0.5/svg-cards.svg';
 const CARD_NAT_W = 169.075;
 const CARD_NAT_H = 244.640;
@@ -152,7 +152,7 @@ function createCards() {
       const id = `${SUIT_NAMES[s]}_${RANK_NAMES[r]}`;
       const el = document.createElement('div');
       el.className = 'card';
-      el.innerHTML = `<svg viewBox="0 0 ${CARD_NAT_W} ${CARD_NAT_H}"><use href="${SVG_URL}#${id}"/></svg>`;
+      el.innerHTML = `<svg viewBox="0 0 ${CARD_NAT_W} ${CARD_NAT_H}"><use href="#${id}"/></svg>`;
       
       const card = {
         el,
@@ -165,7 +165,7 @@ function createCards() {
         vy: 0,
         angle: (Math.random() - 0.5) * 40,
         va: 0,
-        zIndex: s * 13 + r, // fixed z-order by suit then rank
+        zIndex: s * 13 + r,
       };
       
       cards.push(card);
@@ -173,13 +173,35 @@ function createCards() {
     }
   }
   
-  // Set fixed z-index (no more flickering)
   cards.forEach(c => {
     c.el.style.zIndex = c.zIndex;
   });
-  
-  loadingEl.style.display = 'none';
 }
+
+// Load SVG sprite inline
+async function loadSVGSprite() {
+  try {
+    const resp = await fetch(SVG_URL);
+    const text = await resp.text();
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(text, 'image/svg+xml');
+    const svg = doc.documentElement;
+    svg.style.position = 'absolute';
+    svg.style.width = '0';
+    svg.style.height = '0';
+    svg.style.overflow = 'hidden';
+    svg.setAttribute('aria-hidden', 'true');
+    document.body.insertBefore(svg, document.body.firstChild);
+    loadingEl.style.display = 'none';
+    createCards();
+    requestAnimationFrame(loop);
+  } catch(e) {
+    loadingEl.textContent = 'LOAD FAILED - REFRESH';
+    console.error(e);
+  }
+}
+
+loadSVGSprite();
 
 function explode() {
   cards.forEach(c => {
@@ -262,9 +284,7 @@ function loop() {
   requestAnimationFrame(loop);
 }
 
-// Start
-createCards();
-requestAnimationFrame(loop);
+// Start is handled by loadSVGSprite()
 </script>
 
 </body>
