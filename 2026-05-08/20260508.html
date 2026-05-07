@@ -55,7 +55,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 1; }
 <body>
 
 <canvas id="c"></canvas>
-<div class="hint">click to scatter · hold to attract · spacebar to explode</div>
+<div class="hint">click to line up · click again to scatter · spacebar to explode</div>
 
 <script>
 const canvas = document.getElementById('c');
@@ -77,16 +77,18 @@ window.addEventListener('resize', resize);
 let mx = W / 2, my = H / 2;
 let mouseDown = false;
 let mouseClicked = false;
+let lineUpMode = false;
+let lineUpTimer = 0;
 
 document.addEventListener('mousemove', e => { mx = e.clientX * DPR; my = e.clientY * DPR; });
 document.addEventListener('touchmove', e => { e.preventDefault(); mx = e.touches[0].clientX * DPR; my = e.touches[0].clientY * DPR; }, { passive: false });
-document.addEventListener('mousedown', () => { mouseDown = true; mouseClicked = true; });
+document.addEventListener('mousedown', () => { mouseDown = true; mouseClicked = true; lineUpMode = !lineUpMode; lineUpTimer = performance.now(); });
 document.addEventListener('mouseup', () => { mouseDown = false; });
-document.addEventListener('touchstart', e => { mouseDown = true; mouseClicked = true; mx = e.touches[0].clientX * DPR; my = e.touches[0].clientY * DPR; });
+document.addEventListener('touchstart', e => { mouseDown = true; mouseClicked = true; lineUpMode = !lineUpMode; lineUpTimer = performance.now(); mx = e.touches[0].clientX * DPR; my = e.touches[0].clientY * DPR; });
 document.addEventListener('touchend', () => { mouseDown = false; });
 
 document.addEventListener('keydown', e => {
-  if (e.code === 'Space') { e.preventDefault(); explode(); }
+  if (e.code === 'Space') { e.preventDefault(); lineUpMode = false; explode(); }
 });
 
 // === Card rendering ===
@@ -251,9 +253,10 @@ for (let i = 0; i < NUM; i++) {
     vy: 0,
     angle: (Math.random() - 0.5) * 0.8,
     va: 0,
-    faceIdx: i,
+    faceIdx: i % 52,
     showFace: Math.random() > 0.25,
     targetAngle: 0,
+    sortOrder: i,
   });
 }
 
@@ -278,39 +281,54 @@ function update() {
     const orbitRadius = (180 + (i % 5) * 60) * DPR;
     const wobble = Math.sin(t * 0.3 + i * 0.7) * 40 * DPR;
     
-    let targetX = W / 2 + Math.cos(t * orbitSpeed + phase) * (orbitRadius + wobble);
-    let targetY = H / 2 + Math.sin(t * orbitSpeed * 0.7 + phase) * (orbitRadius * 0.6 + wobble * 0.5);
+    let targetX, targetY, targetAngle;
     
-    // Mouse interaction
+    if (lineUpMode) {
+      // Line up in a grid/row arrangement
+      const cols = Math.ceil(Math.sqrt(NUM * (W / H)));
+      const rows = Math.ceil(NUM / cols);
+      const col = i % cols;
+      const row = Math.floor(i / cols);
+      const spacingX = Math.min(CW * 1.15, (W - CW) / cols);
+      const spacingY = Math.min(CH * 1.15, (H - CH) / rows);
+      const gridW = (cols - 1) * spacingX;
+      const gridH = (rows - 1) * spacingY;
+      
+      targetX = (W - gridW) / 2 + col * spacingX;
+      targetY = (H - gridH) / 2 + row * spacingY;
+      targetAngle = 0;
+      
+      // Stronger pull for snappy lineup
+      c.vx += (targetX - c.x) * 0.06;
+      c.vy += (targetY - c.y) * 0.06;
+      c.va += (0 - c.angle) * 0.1;
+    } else {
+      targetX = W / 2 + Math.cos(t * orbitSpeed + phase) * (orbitRadius + wobble);
+      targetY = H / 2 + Math.sin(t * orbitSpeed * 0.7 + phase) * (orbitRadius * 0.6 + wobble * 0.5);
+      
+      // Gentle drift toward orbit position
+      c.vx += (targetX - c.x) * 0.008;
+      c.vy += (targetY - c.y) * 0.008;
+    }
+    
+    // Mouse interaction (only in swarm mode)
     const dx = c.x - mx;
     const dy = c.y - my;
     const dist = Math.sqrt(dx * dx + dy * dy) || 1;
     
-    if (mouseDown) {
+    if (!lineUpMode && mouseDown) {
       // Attract toward mouse
       targetX = mx + Math.cos(t * 0.5 + phase) * 120 * DPR;
       targetY = my + Math.sin(t * 0.5 + phase) * 120 * DPR;
       const pullStrength = 0.03;
       c.vx += (targetX - c.x) * pullStrength;
       c.vy += (targetY - c.y) * pullStrength;
-    } else {
-      // Gentle drift toward orbit position
-      c.vx += (targetX - c.x) * 0.008;
-      c.vy += (targetY - c.y) * 0.008;
-    }
-    
-    // Click scatter
-    if (mouseClicked && dist < 300 * DPR) {
-      const repel = (300 * DPR - dist) / (300 * DPR) * 18 * DPR;
-      c.vx += (dx / dist) * repel;
-      c.vy += (dy / dist) * repel;
-      c.va += (Math.random() - 0.5) * 0.15;
     }
     
     // Damping
-    c.vx *= 0.96;
-    c.vy *= 0.96;
-    c.va *= 0.95;
+    c.vx *= lineUpMode ? 0.88 : 0.96;
+    c.vy *= lineUpMode ? 0.88 : 0.96;
+    c.va *= lineUpMode ? 0.85 : 0.95;
     
     // Apply velocity
     c.x += c.vx;
@@ -367,7 +385,7 @@ function render() {
     ctx.shadowOffsetX = 3 * DPR;
     ctx.shadowOffsetY = 5 * DPR;
     
-    const img = c.showFace ? cardImages[c.faceIdx] : cardBackImg;
+    const img = (c.showFace || lineUpMode) ? cardImages[c.faceIdx] : cardBackImg;
     ctx.drawImage(img, -CW/2, -CH/2, CW, CH);
     
     // Reset shadow for shimmer
