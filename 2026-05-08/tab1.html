@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kinetic Typography</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Space+Grotesk:wght@300;400;500;600;700&display=swap');
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg: #0a0a0a;
+            --fg: #f5f0eb;
+            --accent: #ff4d00;
+            --muted: #666;
+        }
+
+        html {
+            font-size: 16px;
+        }
+
+        body {
+            background: var(--bg);
+            color: var(--fg);
+            font-family: 'Space Grotesk', sans-serif;
+            overflow-x: hidden;
+            cursor: none;
+        }
+
+        .cursor {
+            position: fixed;
+            width: 20px;
+            height: 20px;
+            border: 1.5px solid var(--fg);
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 9999;
+            mix-blend-mode: difference;
+            transition: transform 0.15s ease;
+        }
+
+        .cursor.hover {
+            transform: scale(3);
+            background: var(--fg);
+            opacity: 0.3;
+        }
+
+        .cursor-dot {
+            position: fixed;
+            width: 4px;
+            height: 4px;
+            background: var(--fg);
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 9999;
+            mix-blend-mode: difference;
+        }
+
+        section {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            padding: 4rem 2rem;
+        }
+
+        /* Hero */
+        .hero {
+            flex-direction: column;
+            gap: 2rem;
+        }
+
+        .hero-title {
+            font-family: 'Instrument Serif', serif;
+            font-size: clamp(4rem, 12vw, 12rem);
+            line-height: 0.9;
+            text-align: center;
+            overflow: hidden;
+        }
+
+        .hero-title .line {
+            display: block;
+            overflow: hidden;
+        }
+
+        .hero-title .word {
+            display: inline-block;
+            transform: translateY(120%);
+        }
+
+        .hero-title .italic {
+            font-style: italic;
+            color: var(--accent);
+        }
+
+        .hero-sub {
+            font-size: clamp(0.9rem, 1.5vw, 1.1rem);
+            color: var(--muted);
+            text-align: center;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            opacity: 0;
+        }
+
+        .scroll-indicator {
+            position: absolute;
+            bottom: 3rem;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.5rem;
+            opacity: 0;
+        }
+
+        .scroll-indicator span {
+            font-size: 0.7rem;
+            letter-spacing: 0.3em;
+            text-transform: uppercase;
+            color: var(--muted);
+        }
+
+        .scroll-line {
+            width: 1px;
+            height: 40px;
+            background: var(--muted);
+            transform-origin: top;
+        }
+
+        /* Marquee */
+        .marquee-section {
+            overflow: hidden;
+            min-height: 40vh;
+        }
+
+        .marquee-track {
+            display: flex;
+            white-space: nowrap;
+            will-change: transform;
+        }
+
+        .marquee-text {
+            font-family: 'Instrument Serif', serif;
+            font-size: clamp(3rem, 8vw, 8rem);
+            padding: 0 2rem;
+            color: transparent;
+            -webkit-text-stroke: 1px var(--fg);
+        }
+
+        .marquee-text.filled {
+            color: var(--fg);
+            -webkit-text-stroke: none;
+        }
+
+        /* Split text section */
+        .split-section {
+            flex-direction: column;
+            gap: 4rem;
+        }
+
+        .split-heading {
+            font-family: 'Instrument Serif', serif;
+            font-size: clamp(2.5rem, 6vw, 6rem);
+            line-height: 1.1;
+            max-width: 900px;
+        }
+
+        .split-heading .char {
+            display: inline-block;
+            opacity: 0;
+        }
+
+        .split-paragraph {
+            font-size: clamp(1rem, 1.5vw, 1.2rem);
+            line-height: 1.8;
+            max-width: 600px;
+            color: var(--muted);
+        }
+
+        .split-paragraph .word {
+            display: inline-block;
+            opacity: 0;
+            transform: translateY(10px);
+        }
+
+        /* Horizontal scroll */
+        .horizontal-section {
+            height: 100vh;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .horizontal-track {
+            display: flex;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+
+        .h-panel {
+            min-width: 100vw;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 4rem;
+        }
+
+        .h-panel-number {
+            font-family: 'Instrument Serif', serif;
+            font-size: clamp(8rem, 20vw, 20rem);
+            color: transparent;
+            -webkit-text-stroke: 1px rgba(255,255,255,0.1);
+            position: absolute;
+            right: 10%;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+
+        .h-panel-content {
+            position: relative;
+            z-index: 2;
+        }
+
+        .h-panel-label {
+            font-size: 0.7rem;
+            letter-spacing: 0.3em;
+            text-transform: uppercase;
+            color: var(--accent);
+            margin-bottom: 1rem;
+        }
+
+        .h-panel-title {
+            font-family: 'Instrument Serif', serif;
+            font-size: clamp(2rem, 4vw, 4rem);
+            line-height: 1.2;
+            max-width: 500px;
+        }
+
+        /* Stagger grid */
+        .grid-section {
+            padding: 8rem 4rem;
+            min-height: auto;
+            display: block;
+        }
+
+        .grid-header {
+            font-family: 'Instrument Serif', serif;
+            font-size: clamp(2rem, 4vw, 3.5rem);
+            margin-bottom: 4rem;
+            text-align: center;
+        }
+
+        .stagger-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 2rem;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .grid-item {
+            border: 1px solid rgba(255,255,255,0.08);
+            padding: 2.5rem;
+            border-radius: 2px;
+            opacity: 0;
+            transform: translateY(40px);
+            transition: border-color 0.3s;
+        }
+
+        .grid-item:hover {
+            border-color: var(--accent);
+        }
+
+        .grid-item-number {
+            font-size: 0.7rem;
+            color: var(--accent);
+            letter-spacing: 0.2em;
+            margin-bottom: 1.5rem;
+        }
+
+        .grid-item-title {
+            font-family: 'Instrument Serif', serif;
+            font-size: 1.5rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .grid-item-desc {
+            font-size: 0.85rem;
+            color: var(--muted);
+            line-height: 1.6;
+        }
+
+        /* Footer */
+        .footer {
+            min-height: 60vh;
+            flex-direction: column;
+            gap: 2rem;
+        }
+
+        .footer-title {
+            font-family: 'Instrument Serif', serif;
+            font-size: clamp(3rem, 10vw, 10rem);
+            text-align: center;
+            line-height: 0.9;
+        }
+
+        .footer-title .char {
+            display: inline-block;
+            transition: color 0.3s;
+        }
+
+        .footer-title .char:hover {
+            color: var(--accent);
+        }
+
+        .footer-bottom {
+            position: absolute;
+            bottom: 2rem;
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            padding: 0 2rem;
+            font-size: 0.75rem;
+            color: var(--muted);
+            letter-spacing: 0.1em;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="cursor"></div>
+    <div class="cursor-dot"></div>
+
+    <section class="hero">
+        <h1 class="hero-title">
+            <span class="line"><span class="word">Design</span></span>
+            <span class="line"><span class="word">in</span> <span class="word italic">Motion</span></span>
+        </h1>
+        <p class="hero-sub">Interactive Typography Experience</p>
+        <div class="scroll-indicator">
+            <span>Scroll</span>
+            <div class="scroll-line"></div>
+        </div>
+    </section>
+
+    <section class="marquee-section">
+        <div class="marquee-track" data-speed="-1">
+            <span class="marquee-text">Typography</span>
+            <span class="marquee-text filled">Interaction</span>
+            <span class="marquee-text">Motion</span>
+            <span class="marquee-text filled">Design</span>
+            <span class="marquee-text">Typography</span>
+            <span class="marquee-text filled">Interaction</span>
+            <span class="marquee-text">Motion</span>
+            <span class="marquee-text filled">Design</span>
+        </div>
+        <div class="marquee-track" data-speed="0.5">
+            <span class="marquee-text filled">Creative</span>
+            <span class="marquee-text">Development</span>
+            <span class="marquee-text filled">Experience</span>
+            <span class="marquee-text">Digital</span>
+            <span class="marquee-text filled">Creative</span>
+            <span class="marquee-text">Development</span>
+            <span class="marquee-text filled">Experience</span>
+            <span class="marquee-text">Digital</span>
+        </div>
+    </section>
+
+    <section class="split-section">
+        <h2 class="split-heading">Where typography meets interaction, stories come alive</h2>
+        <p class="split-paragraph">We craft digital experiences that blur the line between art and technology. Every letter breathes, every scroll reveals, every interaction tells a story.</p>
+    </section>
+
+    <div class="horizontal-section">
+        <div class="horizontal-track">
+            <div class="h-panel">
+                <span class="h-panel-number">01</span>
+                <div class="h-panel-content">
+                    <p class="h-panel-label">Principle</p>
+                    <h3 class="h-panel-title">Motion with purpose, not decoration</h3>
+                </div>
+            </div>
+            <div class="h-panel">
+                <span class="h-panel-number">02</span>
+                <div class="h-panel-content">
+                    <p class="h-panel-label">Philosophy</p>
+                    <h3 class="h-panel-title">Typography as the primary interface</h3>
+                </div>
+            </div>
+            <div class="h-panel">
+                <span class="h-panel-number">03</span>
+                <div class="h-panel-content">
+                    <p class="h-panel-label">Approach</p>
+                    <h3 class="h-panel-title">Scroll as a narrative device</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <section class="grid-section">
+        <h2 class="grid-header">Capabilities</h2>
+        <div class="stagger-grid">
+            <div class="grid-item">
+                <p class="grid-item-number">001</p>
+                <h3 class="grid-item-title">Kinetic Type</h3>
+                <p class="grid-item-desc">Character-level animation that gives text rhythm and personality.</p>
+            </div>
+            <div class="grid-item">
+                <p class="grid-item-number">002</p>
+                <h3 class="grid-item-title">Scroll Narratives</h3>
+                <p class="grid-item-desc">Content that unfolds with intention as the user navigates.</p>
+            </div>
+            <div class="grid-item">
+                <p class="grid-item-number">003</p>
+                <h3 class="grid-item-title">Spatial Design</h3>
+                <p class="grid-item-desc">Depth and dimension through layered parallax and 3D transforms.</p>
+            </div>
+            <div class="grid-item">
+                <p class="grid-item-number">004</p>
+                <h3 class="grid-item-title">Micro-interactions</h3>
+                <p class="grid-item-desc">Subtle feedback that makes every touch point feel alive.</p>
+            </div>
+            <div class="grid-item">
+                <p class="grid-item-number">005</p>
+                <h3 class="grid-item-title">Page Transitions</h3>
+                <p class="grid-item-desc">Seamless flow between states that maintains spatial context.</p>
+            </div>
+            <div class="grid-item">
+                <p class="grid-item-number">006</p>
+                <h3 class="grid-item-title">Variable Fonts</h3>
+                <p class="grid-item-desc">Dynamic weight and width axes responding to user input in real-time.</p>
+            </div>
+        </div>
+    </section>
+
+    <section class="footer">
+        <h2 class="footer-title">Let's Create</h2>
+        <div class="footer-bottom">
+            <span>2026</span>
+            <span>Kinetic Typography</span>
+            <span>Seoul</span>
+        </div>
+    </section>
+
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.7/dist/gsap.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.7/dist/ScrollTrigger.min.js"></script>
+    <script>
+        gsap.registerPlugin(ScrollTrigger);
+
+        // Custom cursor
+        const cursor = document.querySelector('.cursor');
+        const cursorDot = document.querySelector('.cursor-dot');
+        let mouseX = 0, mouseY = 0;
+        let cursorX = 0, cursorY = 0;
+
+        document.addEventListener('mousemove', (e) => {
+            mouseX = e.clientX;
+            mouseY = e.clientY;
+            cursorDot.style.left = mouseX - 2 + 'px';
+            cursorDot.style.top = mouseY - 2 + 'px';
+        });
+
+        function animateCursor() {
+            cursorX += (mouseX - cursorX) * 0.12;
+            cursorY += (mouseY - cursorY) * 0.12;
+            cursor.style.left = cursorX - 10 + 'px';
+            cursor.style.top = cursorY - 10 + 'px';
+            requestAnimationFrame(animateCursor);
+        }
+        animateCursor();
+
+        document.querySelectorAll('a, .grid-item, .h-panel').forEach(el => {
+            el.addEventListener('mouseenter', () => cursor.classList.add('hover'));
+            el.addEventListener('mouseleave', () => cursor.classList.remove('hover'));
+        });
+
+        // Hero animation
+        const heroTl = gsap.timeline({ delay: 0.3 });
+        heroTl
+            .to('.hero-title .word', {
+                y: 0,
+                duration: 1.2,
+                stagger: 0.1,
+                ease: 'power4.out'
+            })
+            .to('.hero-sub', {
+                opacity: 1,
+                duration: 0.8,
+                ease: 'power2.out'
+            }, '-=0.4')
+            .to('.scroll-indicator', {
+                opacity: 1,
+                duration: 0.6
+            }, '-=0.2')
+            .to('.scroll-line', {
+                scaleY: 0,
+                transformOrigin: 'bottom',
+                duration: 1.5,
+                repeat: -1,
+                yoyo: true,
+                ease: 'power2.inOut'
+            });
+
+        // Marquee scroll-driven
+        document.querySelectorAll('.marquee-track').forEach(track => {
+            const speed = parseFloat(track.dataset.speed);
+            gsap.to(track, {
+                x: () => speed * 300,
+                scrollTrigger: {
+                    trigger: '.marquee-section',
+                    start: 'top bottom',
+                    end: 'bottom top',
+                    scrub: 1
+                }
+            });
+        });
+
+        // Split heading - character animation
+        const splitHeading = document.querySelector('.split-heading');
+        const headingText = splitHeading.textContent;
+        splitHeading.innerHTML = headingText.split('').map(char =>
+            char === ' ' ? ' ' : `<span class="char">${char}</span>`
+        ).join('');
+
+        gsap.to('.split-heading .char', {
+            opacity: 1,
+            stagger: 0.02,
+            scrollTrigger: {
+                trigger: '.split-section',
+                start: 'top 70%',
+                end: 'center center',
+                scrub: 1
+            }
+        });
+
+        // Split paragraph - word animation
+        const splitPara = document.querySelector('.split-paragraph');
+        const paraText = splitPara.textContent;
+        splitPara.innerHTML = paraText.split(' ').map(word =>
+            `<span class="word">${word}</span>`
+        ).join(' ');
+
+        gsap.to('.split-paragraph .word', {
+            opacity: 1,
+            y: 0,
+            stagger: 0.03,
+            scrollTrigger: {
+                trigger: '.split-paragraph',
+                start: 'top 80%',
+                end: 'bottom 60%',
+                scrub: 1
+            }
+        });
+
+        // Horizontal scroll
+        const horizontalSection = document.querySelector('.horizontal-section');
+        const horizontalTrack = document.querySelector('.horizontal-track');
+        const panels = document.querySelectorAll('.h-panel');
+
+        gsap.to(horizontalTrack, {
+            x: () => -(horizontalTrack.scrollWidth - window.innerWidth),
+            ease: 'none',
+            scrollTrigger: {
+                trigger: horizontalSection,
+                start: 'top top',
+                end: () => '+=' + (horizontalTrack.scrollWidth - window.innerWidth),
+                scrub: 1,
+                pin: true,
+                anticipatePin: 1
+            }
+        });
+
+        // Grid stagger
+        gsap.to('.grid-item', {
+            opacity: 1,
+            y: 0,
+            stagger: 0.1,
+            duration: 0.8,
+            ease: 'power3.out',
+            scrollTrigger: {
+                trigger: '.stagger-grid',
+                start: 'top 75%'
+            }
+        });
+
+        // Footer character split
+        const footerTitle = document.querySelector('.footer-title');
+        const footerText = footerTitle.textContent;
+        footerTitle.innerHTML = footerText.split('').map(char =>
+            char === ' ' ? ' ' : `<span class="char">${char}</span>`
+        ).join('');
+
+        gsap.from('.footer-title .char', {
+            y: 80,
+            opacity: 0,
+            stagger: 0.04,
+            duration: 0.8,
+            ease: 'power3.out',
+            scrollTrigger: {
+                trigger: '.footer',
+                start: 'top 70%'
+            }
+        });
+    </script>
+</body>
+</html>

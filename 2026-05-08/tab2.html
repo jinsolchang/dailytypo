@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kinetic</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Space+Grotesk:wght@300;700&display=swap');
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background: #050505;
+            color: #f0ece6;
+            font-family: 'Space Grotesk', sans-serif;
+            height: 100vh;
+            overflow: hidden;
+            cursor: none;
+        }
+
+        canvas {
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+        }
+
+        .container {
+            position: relative;
+            z-index: 1;
+            height: 100vh;
+            display: grid;
+            place-items: center;
+        }
+
+        .title {
+            font-family: 'Instrument Serif', serif;
+            font-size: clamp(5rem, 15vw, 14rem);
+            line-height: 0.85;
+            text-align: center;
+            user-select: none;
+            pointer-events: none;
+        }
+
+        .title .char {
+            display: inline-block;
+            transition: none;
+            will-change: transform, opacity;
+        }
+
+        .subtitle {
+            position: absolute;
+            bottom: 12%;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 0.7rem;
+            letter-spacing: 0.4em;
+            text-transform: uppercase;
+            color: #555;
+            pointer-events: none;
+        }
+
+        .cursor-ring {
+            position: fixed;
+            width: 40px;
+            height: 40px;
+            border: 1px solid rgba(255,255,255,0.4);
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 999;
+            mix-blend-mode: difference;
+        }
+
+        .corner {
+            position: fixed;
+            font-size: 0.65rem;
+            letter-spacing: 0.15em;
+            color: #444;
+            pointer-events: none;
+            z-index: 2;
+        }
+        .corner.tl { top: 2rem; left: 2rem; }
+        .corner.tr { top: 2rem; right: 2rem; }
+        .corner.bl { bottom: 2rem; left: 2rem; }
+        .corner.br { bottom: 2rem; right: 2rem; }
+
+        @media (prefers-reduced-motion: reduce) {
+            .char { transition: none !important; transform: none !important; }
+        }
+    </style>
+</head>
+<body>
+    <canvas id="particles"></canvas>
+    <div class="cursor-ring"></div>
+
+    <span class="corner tl">2026</span>
+    <span class="corner tr">INTERACTIVE</span>
+    <span class="corner bl">SEOUL</span>
+    <span class="corner br">KINETIC TYPE</span>
+
+    <div class="container">
+        <h1 class="title">Gravity<br>of Letters</h1>
+        <p class="subtitle">Move your cursor to distort</p>
+    </div>
+
+    <script>
+        const title = document.querySelector('.title');
+        const html = title.innerHTML;
+        title.innerHTML = html.replace(/<br>/g, '{{BR}}').split('').map(c => {
+            if (c === ' ') return ' ';
+            return `<span class="char">${c}</span>`;
+        }).join('').replace(/\{\{BR\}\}/g, '<br>');
+
+        const chars = document.querySelectorAll('.char');
+        const cursorRing = document.querySelector('.cursor-ring');
+
+        let mx = window.innerWidth / 2;
+        let my = window.innerHeight / 2;
+        let ringX = mx, ringY = my;
+
+        document.addEventListener('mousemove', e => {
+            mx = e.clientX;
+            my = e.clientY;
+        });
+
+        function updateChars() {
+            chars.forEach(char => {
+                const rect = char.getBoundingClientRect();
+                const cx = rect.left + rect.width / 2;
+                const cy = rect.top + rect.height / 2;
+                const dx = mx - cx;
+                const dy = my - cy;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                const maxDist = 250;
+
+                if (dist < maxDist) {
+                    const force = (1 - dist / maxDist) * 40;
+                    const angle = Math.atan2(dy, dx);
+                    const tx = -Math.cos(angle) * force;
+                    const ty = -Math.sin(angle) * force;
+                    const rotate = (dx / maxDist) * 15;
+                    const scale = 1 + (1 - dist / maxDist) * 0.3;
+                    char.style.transform = `translate(${tx}px, ${ty}px) rotate(${rotate}deg) scale(${scale})`;
+                    char.style.opacity = 0.6 + (dist / maxDist) * 0.4;
+                } else {
+                    char.style.transform = 'translate(0,0) rotate(0deg) scale(1)';
+                    char.style.opacity = 1;
+                }
+            });
+
+            ringX += (mx - ringX) * 0.08;
+            ringY += (my - ringY) * 0.08;
+            cursorRing.style.left = ringX - 20 + 'px';
+            cursorRing.style.top = ringY - 20 + 'px';
+
+            requestAnimationFrame(updateChars);
+        }
+        updateChars();
+
+        // Particle system
+        const canvas = document.getElementById('particles');
+        const ctx = canvas.getContext('2d');
+        let W, H;
+
+        function resize() {
+            W = canvas.width = window.innerWidth;
+            H = canvas.height = window.innerHeight;
+        }
+        resize();
+        window.addEventListener('resize', resize);
+
+        class Particle {
+            constructor() { this.reset(); }
+            reset() {
+                this.x = Math.random() * W;
+                this.y = Math.random() * H;
+                this.vx = (Math.random() - 0.5) * 0.3;
+                this.vy = (Math.random() - 0.5) * 0.3;
+                this.size = Math.random() * 1.5 + 0.5;
+                this.alpha = Math.random() * 0.3 + 0.05;
+            }
+            update() {
+                const dx = mx - this.x;
+                const dy = my - this.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+
+                if (dist < 150) {
+                    const force = (1 - dist / 150) * 0.8;
+                    this.vx += (dx / dist) * force;
+                    this.vy += (dy / dist) * force;
+                }
+
+                this.vx *= 0.96;
+                this.vy *= 0.96;
+                this.x += this.vx;
+                this.y += this.vy;
+
+                if (this.x < 0 || this.x > W || this.y < 0 || this.y > H) this.reset();
+            }
+            draw() {
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(255, 77, 0, ${this.alpha})`;
+                ctx.fill();
+            }
+        }
+
+        const particles = Array.from({ length: 120 }, () => new Particle());
+
+        function drawParticles() {
+            ctx.clearRect(0, 0, W, H);
+
+            particles.forEach(p => {
+                p.update();
+                p.draw();
+            });
+
+            // Draw connections
+            for (let i = 0; i < particles.length; i++) {
+                for (let j = i + 1; j < particles.length; j++) {
+                    const dx = particles[i].x - particles[j].x;
+                    const dy = particles[i].y - particles[j].y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    if (dist < 80) {
+                        ctx.beginPath();
+                        ctx.moveTo(particles[i].x, particles[i].y);
+                        ctx.lineTo(particles[j].x, particles[j].y);
+                        ctx.strokeStyle = `rgba(255, 77, 0, ${0.06 * (1 - dist / 80)})`;
+                        ctx.lineWidth = 0.5;
+                        ctx.stroke();
+                    }
+                }
+            }
+
+            requestAnimationFrame(drawParticles);
+        }
+        drawParticles();
+    </script>
+</body>
+</html>
