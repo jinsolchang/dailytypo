@@ -9,124 +9,57 @@
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
-:root {
-  --felt: #1a472a;
-  --gold: #f0c040;
-}
-
 body {
-  background: #0a0a0a;
+  background: #080c08;
   min-height: 100vh;
   overflow: hidden;
   font-family: 'Press Start 2P', monospace;
-  color: #fff;
   user-select: none;
+  cursor: default;
 }
 
-/* CRT scanlines */
+/* CRT */
 body::before {
   content: '';
   position: fixed;
   inset: 0;
-  background: repeating-linear-gradient(
-    0deg,
-    rgba(0,0,0,0.04) 0px,
-    rgba(0,0,0,0.04) 1px,
-    transparent 1px,
-    transparent 3px
-  );
+  background: repeating-linear-gradient(0deg, rgba(0,0,0,0.03) 0px, rgba(0,0,0,0.03) 1px, transparent 1px, transparent 3px);
   pointer-events: none;
   z-index: 9999;
 }
-
 body::after {
   content: '';
   position: fixed;
   inset: 0;
-  background: radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.5) 100%);
+  background: radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.45) 100%);
   pointer-events: none;
   z-index: 9998;
 }
 
-canvas {
-  position: fixed;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  z-index: 1;
-}
+canvas { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 1; }
 
-.ui {
+.hint {
   position: fixed;
-  bottom: 20px;
+  bottom: 16px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 100;
-  display: flex;
-  gap: 10px;
-}
-
-.mode-btn {
-  font-family: 'Press Start 2P', monospace;
   font-size: 7px;
-  padding: 8px 14px;
-  border: 1.5px solid rgba(255,255,255,0.2);
-  background: rgba(0,0,0,0.6);
-  color: rgba(255,255,255,0.5);
-  cursor: pointer;
-  transition: all 0.2s;
-  letter-spacing: 0.5px;
-}
-
-.mode-btn:hover {
-  border-color: var(--gold);
-  color: var(--gold);
-}
-
-.mode-btn.active {
-  border-color: var(--gold);
-  color: var(--gold);
-  background: rgba(240,192,64,0.1);
-  box-shadow: 0 0 10px rgba(240,192,64,0.2);
-}
-
-.mode-label {
-  position: fixed;
-  top: 20px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 100;
-  font-size: 10px;
-  color: var(--gold);
-  text-shadow: 0 0 10px rgba(240,192,64,0.4);
-  letter-spacing: 2px;
-  transition: opacity 0.5s;
+  color: rgba(255,255,255,0.25);
+  letter-spacing: 1px;
+  text-align: center;
+  line-height: 1.8;
 }
 </style>
 </head>
 <body>
 
 <canvas id="c"></canvas>
-
-<div class="mode-label" id="modeLabel">SOLITAIRE CASCADE</div>
-
-<div class="ui">
-  <button class="mode-btn active" onclick="setMode(0)">CASCADE</button>
-  <button class="mode-btn" onclick="setMode(1)">WATERFALL</button>
-  <button class="mode-btn" onclick="setMode(2)">SWARM</button>
-  <button class="mode-btn" onclick="setMode(3)">TORNADO</button>
-  <button class="mode-btn" onclick="setMode(4)">AUTO</button>
-</div>
+<div class="hint">click to scatter · hold to attract · spacebar to explode</div>
 
 <script>
-// ==========================================
-// Card Chaos — 4 modes of flying cards
-// ==========================================
-
 const canvas = document.getElementById('c');
 const ctx = canvas.getContext('2d');
-const modeLabel = document.getElementById('modeLabel');
-const modeBtns = document.querySelectorAll('.mode-btn');
 
 const DPR = Math.min(devicePixelRatio || 1, 2);
 let W, H;
@@ -140,428 +73,334 @@ function resize() {
 resize();
 window.addEventListener('resize', resize);
 
-// Mouse
+// === Input ===
 let mx = W / 2, my = H / 2;
-document.addEventListener('mousemove', e => {
-  mx = e.clientX * DPR;
-  my = e.clientY * DPR;
-});
-document.addEventListener('touchmove', e => {
-  mx = e.touches[0].clientX * DPR;
-  my = e.touches[0].clientY * DPR;
+let mouseDown = false;
+let mouseClicked = false;
+
+document.addEventListener('mousemove', e => { mx = e.clientX * DPR; my = e.clientY * DPR; });
+document.addEventListener('touchmove', e => { e.preventDefault(); mx = e.touches[0].clientX * DPR; my = e.touches[0].clientY * DPR; }, { passive: false });
+document.addEventListener('mousedown', () => { mouseDown = true; mouseClicked = true; });
+document.addEventListener('mouseup', () => { mouseDown = false; });
+document.addEventListener('touchstart', e => { mouseDown = true; mouseClicked = true; mx = e.touches[0].clientX * DPR; my = e.touches[0].clientY * DPR; });
+document.addEventListener('touchend', () => { mouseDown = false; });
+
+document.addEventListener('keydown', e => {
+  if (e.code === 'Space') { e.preventDefault(); explode(); }
 });
 
-// Card data
+// === Card rendering ===
 const SUITS = ['♠','♥','♦','♣'];
 const RANKS = ['A','2','3','4','5','6','7','8','9','10','J','Q','K'];
 
-const CARD_W = 60 * DPR;
-const CARD_H = 86 * DPR;
-const CARD_R = 5 * DPR;
+const CW = Math.round(70 * DPR);
+const CH = Math.round(100 * DPR);
+const CR = 6 * DPR;
 
-// Pre-render card faces to offscreen canvases
-const cardCanvases = [];
+// Pre-render high quality cards
+const cardImages = [];
+const cardBackImg = createCardBack();
 
-function prerenderCards() {
-  for (let s = 0; s < 4; s++) {
-    for (let r = 0; r < 13; r++) {
-      const cv = document.createElement('canvas');
-      cv.width = CARD_W;
-      cv.height = CARD_H;
-      const cx = cv.getContext('2d');
-      
-      // Card body
-      cx.fillStyle = '#fff';
-      cx.beginPath();
-      cx.roundRect(0, 0, CARD_W, CARD_H, CARD_R);
-      cx.fill();
-      
-      // Border
-      cx.strokeStyle = '#ccc';
-      cx.lineWidth = 1 * DPR;
-      cx.stroke();
-      
-      // Inner border
-      cx.strokeStyle = '#eee';
-      cx.lineWidth = 0.5 * DPR;
-      cx.beginPath();
-      cx.roundRect(3 * DPR, 3 * DPR, CARD_W - 6 * DPR, CARD_H - 6 * DPR, CARD_R - 1);
-      cx.stroke();
-      
-      const isRed = s === 1 || s === 2;
-      const color = isRed ? '#d32f2f' : '#1a1a1a';
-      const suit = SUITS[s];
-      const rank = RANKS[r];
-      
-      cx.fillStyle = color;
-      cx.textBaseline = 'top';
-      
-      // Top-left rank
-      cx.font = `bold ${14 * DPR}px Georgia, serif`;
-      cx.textAlign = 'left';
-      cx.fillText(rank, 5 * DPR, 4 * DPR);
-      
-      // Top-left suit
-      cx.font = `${11 * DPR}px sans-serif`;
-      cx.fillText(suit, 6 * DPR, 18 * DPR);
-      
-      // Center suit
-      cx.font = `${30 * DPR}px sans-serif`;
-      cx.textAlign = 'center';
-      cx.textBaseline = 'middle';
-      cx.fillText(suit, CARD_W / 2, CARD_H / 2);
-      
-      // Bottom-right (rotated)
-      cx.save();
-      cx.translate(CARD_W - 5 * DPR, CARD_H - 4 * DPR);
-      cx.rotate(Math.PI);
-      cx.font = `bold ${14 * DPR}px Georgia, serif`;
-      cx.textAlign = 'left';
-      cx.textBaseline = 'top';
-      cx.fillText(rank, 0, 0);
-      cx.font = `${11 * DPR}px sans-serif`;
-      cx.fillText(suit, 1 * DPR, 14 * DPR);
-      cx.restore();
-      
-      cardCanvases.push(cv);
-    }
-  }
-}
-
-// Card back
-const cardBack = document.createElement('canvas');
-cardBack.width = CARD_W;
-cardBack.height = CARD_H;
-(function() {
-  const cx = cardBack.getContext('2d');
-  cx.fillStyle = '#1a3070';
+function createCardBack() {
+  const cv = new OffscreenCanvas(CW, CH);
+  const cx = cv.getContext('2d');
+  
+  // Base
   cx.beginPath();
-  cx.roundRect(0, 0, CARD_W, CARD_H, CARD_R);
+  cx.roundRect(0, 0, CW, CH, CR);
+  cx.fillStyle = '#1c2d6b';
   cx.fill();
   
-  // Pattern
+  // Inner border
+  const m = 4 * DPR;
+  cx.beginPath();
+  cx.roundRect(m, m, CW - m*2, CH - m*2, CR - 2);
+  cx.strokeStyle = '#b8963c';
+  cx.lineWidth = 1.5 * DPR;
+  cx.stroke();
+  
+  // Diamond pattern
   cx.save();
   cx.beginPath();
-  cx.roundRect(3 * DPR, 3 * DPR, CARD_W - 6 * DPR, CARD_H - 6 * DPR, CARD_R - 1);
+  cx.roundRect(m + 2*DPR, m + 2*DPR, CW - m*2 - 4*DPR, CH - m*2 - 4*DPR, CR - 3);
   cx.clip();
   
-  cx.strokeStyle = 'rgba(192,160,64,0.3)';
-  cx.lineWidth = 1 * DPR;
-  for (let i = -CARD_H; i < CARD_W + CARD_H; i += 6 * DPR) {
-    cx.beginPath();
-    cx.moveTo(i, 0);
-    cx.lineTo(i + CARD_H, CARD_H);
-    cx.stroke();
-    cx.beginPath();
-    cx.moveTo(i, CARD_H);
-    cx.lineTo(i + CARD_H, 0);
-    cx.stroke();
+  const patSize = 10 * DPR;
+  cx.strokeStyle = 'rgba(184,150,60,0.2)';
+  cx.lineWidth = 0.8 * DPR;
+  for (let y = -patSize; y < CH + patSize; y += patSize) {
+    for (let x = -patSize; x < CW + patSize; x += patSize) {
+      cx.beginPath();
+      cx.moveTo(x, y - patSize/2);
+      cx.lineTo(x + patSize/2, y);
+      cx.lineTo(x, y + patSize/2);
+      cx.lineTo(x - patSize/2, y);
+      cx.closePath();
+      cx.stroke();
+    }
   }
   cx.restore();
   
-  // Border
-  cx.strokeStyle = '#c0a040';
-  cx.lineWidth = 2 * DPR;
-  cx.beginPath();
-  cx.roundRect(3 * DPR, 3 * DPR, CARD_W - 6 * DPR, CARD_H - 6 * DPR, CARD_R - 1);
-  cx.stroke();
-  
-  // Center emblem
-  cx.fillStyle = '#c0a040';
-  cx.font = `${20 * DPR}px sans-serif`;
+  // Center ornament
+  cx.fillStyle = '#b8963c';
+  cx.font = `${18 * DPR}px serif`;
   cx.textAlign = 'center';
   cx.textBaseline = 'middle';
-  cx.fillText('✦', CARD_W / 2, CARD_H / 2);
-})();
-
-prerenderCards();
-
-// === Particle cards ===
-const NUM_CARDS = 52;
-const cards = [];
-
-function createCard(i) {
-  return {
-    x: W / 2,
-    y: -CARD_H,
-    vx: 0,
-    vy: 0,
-    angle: 0,
-    va: 0, // angular velocity
-    faceIdx: i % 52,
-    showFace: Math.random() > 0.3,
-    scale: 1,
-    alpha: 1,
-    // For trail/afterimage
-    trail: [],
-  };
+  cx.fillText('♛', CW/2, CH/2);
+  
+  // Outer shadow edge
+  cx.beginPath();
+  cx.roundRect(0, 0, CW, CH, CR);
+  cx.strokeStyle = 'rgba(0,0,0,0.4)';
+  cx.lineWidth = 1 * DPR;
+  cx.stroke();
+  
+  return cv;
 }
 
-for (let i = 0; i < NUM_CARDS; i++) {
-  const c = createCard(i);
-  c.x = Math.random() * W;
-  c.y = Math.random() * H;
-  c.angle = (Math.random() - 0.5) * 0.5;
-  cards.push(c);
-}
-
-// === Modes ===
-let currentMode = 0;
-let autoMode = false;
-let autoTimer = 0;
-const AUTO_INTERVAL = 6000; // ms per mode in auto
-const MODE_NAMES = ['SOLITAIRE CASCADE', 'CARD WATERFALL', 'CARD SWARM', 'CARD TORNADO'];
-
-function setMode(m) {
-  if (m === 4) {
-    autoMode = true;
-    autoTimer = performance.now();
-    currentMode = 0;
-  } else {
-    autoMode = false;
-    currentMode = m;
+function createCardFace(suitIdx, rankIdx) {
+  const cv = new OffscreenCanvas(CW, CH);
+  const cx = cv.getContext('2d');
+  
+  const isRed = suitIdx === 1 || suitIdx === 2;
+  const color = isRed ? '#c62828' : '#1a1a1a';
+  const suit = SUITS[suitIdx];
+  const rank = RANKS[rankIdx];
+  
+  // White card body with subtle gradient
+  const bodyGrad = cx.createLinearGradient(0, 0, 0, CH);
+  bodyGrad.addColorStop(0, '#ffffff');
+  bodyGrad.addColorStop(1, '#f8f6f0');
+  cx.beginPath();
+  cx.roundRect(0, 0, CW, CH, CR);
+  cx.fillStyle = bodyGrad;
+  cx.fill();
+  
+  // Subtle inner shadow
+  cx.beginPath();
+  cx.roundRect(0, 0, CW, CH, CR);
+  cx.strokeStyle = 'rgba(0,0,0,0.12)';
+  cx.lineWidth = 1 * DPR;
+  cx.stroke();
+  
+  // Inner decorative border
+  const m = 3 * DPR;
+  cx.beginPath();
+  cx.roundRect(m, m, CW - m*2, CH - m*2, CR - 1);
+  cx.strokeStyle = 'rgba(0,0,0,0.04)';
+  cx.lineWidth = 0.5 * DPR;
+  cx.stroke();
+  
+  cx.fillStyle = color;
+  
+  // Top-left rank
+  cx.font = `bold ${16 * DPR}px Georgia, "Times New Roman", serif`;
+  cx.textAlign = 'left';
+  cx.textBaseline = 'top';
+  cx.fillText(rank, 6 * DPR, 5 * DPR);
+  
+  // Top-left suit (smaller)
+  cx.font = `${12 * DPR}px sans-serif`;
+  cx.fillText(suit, 7 * DPR, 21 * DPR);
+  
+  // Center suit (large)
+  cx.font = `${36 * DPR}px sans-serif`;
+  cx.textAlign = 'center';
+  cx.textBaseline = 'middle';
+  cx.fillText(suit, CW / 2, CH / 2);
+  
+  // For face cards, add extra flair
+  if (rankIdx >= 10) { // J, Q, K
+    cx.globalAlpha = 0.04;
+    cx.font = `${60 * DPR}px serif`;
+    cx.fillText(rank, CW / 2, CH / 2);
+    cx.globalAlpha = 1;
   }
   
-  modeBtns.forEach((btn, i) => btn.classList.toggle('active', i === m));
-  modeLabel.textContent = MODE_NAMES[currentMode];
+  // Bottom-right (rotated)
+  cx.save();
+  cx.translate(CW - 6 * DPR, CH - 5 * DPR);
+  cx.rotate(Math.PI);
+  cx.font = `bold ${16 * DPR}px Georgia, "Times New Roman", serif`;
+  cx.textAlign = 'left';
+  cx.textBaseline = 'top';
+  cx.fillText(rank, 0, 0);
+  cx.font = `${12 * DPR}px sans-serif`;
+  cx.fillText(suit, 1 * DPR, 16 * DPR);
+  cx.restore();
   
-  // Reset cards for new mode
-  if (m === 0 || (autoMode && currentMode === 0)) initCascade();
-  if (m === 1) initWaterfall();
+  return cv;
 }
 
-// Mode 0: Solitaire Cascade — cards bounce from top
-function initCascade() {
-  cards.forEach((c, i) => {
-    c.x = (i % 8) * (W / 8) + CARD_W;
-    c.y = -CARD_H - Math.random() * H;
-    c.vx = (Math.random() - 0.5) * 4 * DPR;
-    c.vy = Math.random() * 2 * DPR;
-    c.va = (Math.random() - 0.5) * 0.02;
-    c.trail = [];
+// Generate all 52 cards
+for (let s = 0; s < 4; s++) {
+  for (let r = 0; r < 13; r++) {
+    cardImages.push(createCardFace(s, r));
+  }
+}
+
+// === Card particles ===
+const NUM = 52;
+const cards = [];
+
+for (let i = 0; i < NUM; i++) {
+  cards.push({
+    x: W / 2 + (Math.random() - 0.5) * 200 * DPR,
+    y: H / 2 + (Math.random() - 0.5) * 200 * DPR,
+    vx: 0,
+    vy: 0,
+    angle: (Math.random() - 0.5) * 0.8,
+    va: 0,
+    faceIdx: i,
+    showFace: Math.random() > 0.25,
+    targetAngle: 0,
   });
 }
 
-function updateCascade(dt) {
-  const gravity = 0.3 * DPR;
-  const bounce = 0.7;
-  const floor = H - CARD_H / 2;
+// === Physics ===
+function explode() {
+  cards.forEach(c => {
+    const angle = Math.random() * Math.PI * 2;
+    const force = (8 + Math.random() * 12) * DPR;
+    c.vx += Math.cos(angle) * force;
+    c.vy += Math.sin(angle) * force;
+    c.va += (Math.random() - 0.5) * 0.3;
+  });
+}
+
+function update() {
+  const t = performance.now() * 0.001;
   
-  cards.forEach(c => {
-    c.vy += gravity;
-    c.x += c.vx;
-    c.y += c.vy;
-    c.angle += c.va;
-    
-    // Bounce off floor
-    if (c.y > floor) {
-      c.y = floor;
-      c.vy *= -bounce;
-      c.va = (Math.random() - 0.5) * 0.04;
-      if (Math.abs(c.vy) < 1) c.vy = 0;
-    }
-    
-    // Bounce off walls
-    if (c.x < CARD_W / 2) { c.x = CARD_W / 2; c.vx *= -0.8; }
-    if (c.x > W - CARD_W / 2) { c.x = W - CARD_W / 2; c.vx *= -0.8; }
-    
-    // Trail (afterimage)
-    c.trail.push({ x: c.x, y: c.y, angle: c.angle, alpha: 0.3 });
-    if (c.trail.length > 5) c.trail.shift();
-  });
-}
-
-// Mode 1: Waterfall — continuous stream from top
-function initWaterfall() {
   cards.forEach((c, i) => {
-    c.x = Math.random() * W;
-    c.y = -CARD_H - Math.random() * H * 2;
-    c.vx = (Math.random() - 0.5) * 1 * DPR;
-    c.vy = 2 * DPR + Math.random() * 3 * DPR;
-    c.va = (Math.random() - 0.5) * 0.015;
-    c.trail = [];
-  });
-}
-
-function updateWaterfall(dt) {
-  cards.forEach(c => {
-    c.x += c.vx;
-    c.y += c.vy;
-    c.angle += c.va;
+    // Gentle orbit target (slow swarm)
+    const phase = (i / NUM) * Math.PI * 2;
+    const orbitSpeed = 0.15 + (i % 7) * 0.02;
+    const orbitRadius = (120 + (i % 5) * 40) * DPR;
+    const wobble = Math.sin(t * 0.3 + i * 0.7) * 30 * DPR;
     
-    // Slight sway
-    c.vx += (Math.random() - 0.5) * 0.1 * DPR;
-    c.vx *= 0.99;
+    let targetX = W / 2 + Math.cos(t * orbitSpeed + phase) * (orbitRadius + wobble);
+    let targetY = H / 2 + Math.sin(t * orbitSpeed * 0.7 + phase) * (orbitRadius * 0.6 + wobble * 0.5);
     
-    // Reset when off screen
-    if (c.y > H + CARD_H) {
-      c.y = -CARD_H - Math.random() * 200 * DPR;
-      c.x = Math.random() * W;
-      c.vx = (Math.random() - 0.5) * 1 * DPR;
-      c.vy = 2 * DPR + Math.random() * 3 * DPR;
-      c.va = (Math.random() - 0.5) * 0.015;
-      c.showFace = Math.random() > 0.3;
-    }
-    
-    c.trail.push({ x: c.x, y: c.y, angle: c.angle, alpha: 0.15 });
-    if (c.trail.length > 3) c.trail.shift();
-  });
-}
-
-// Mode 2: Swarm — cards follow/avoid mouse
-function updateSwarm(dt) {
-  cards.forEach((c, i) => {
-    const dx = mx - c.x;
-    const dy = my - c.y;
+    // Mouse interaction
+    const dx = c.x - mx;
+    const dy = c.y - my;
     const dist = Math.sqrt(dx * dx + dy * dy) || 1;
     
-    // Orbit around mouse
-    const orbitRadius = 150 * DPR + (i % 5) * 30 * DPR;
-    const orbitAngle = (performance.now() * 0.001 + i * 0.12) * (1 + (i % 3) * 0.2);
-    const targetX = mx + Math.cos(orbitAngle) * orbitRadius;
-    const targetY = my + Math.sin(orbitAngle) * orbitRadius;
+    if (mouseDown) {
+      // Attract toward mouse
+      targetX = mx + Math.cos(t * 0.5 + phase) * 80 * DPR;
+      targetY = my + Math.sin(t * 0.5 + phase) * 80 * DPR;
+      const pullStrength = 0.03;
+      c.vx += (targetX - c.x) * pullStrength;
+      c.vy += (targetY - c.y) * pullStrength;
+    } else {
+      // Gentle drift toward orbit position
+      c.vx += (targetX - c.x) * 0.008;
+      c.vy += (targetY - c.y) * 0.008;
+    }
     
-    const tx = targetX - c.x;
-    const ty = targetY - c.y;
+    // Click scatter
+    if (mouseClicked && dist < 200 * DPR) {
+      const repel = (200 * DPR - dist) / (200 * DPR) * 15 * DPR;
+      c.vx += (dx / dist) * repel;
+      c.vy += (dy / dist) * repel;
+      c.va += (Math.random() - 0.5) * 0.15;
+    }
     
-    c.vx += tx * 0.02;
-    c.vy += ty * 0.02;
-    c.vx *= 0.92;
-    c.vy *= 0.92;
+    // Damping
+    c.vx *= 0.96;
+    c.vy *= 0.96;
+    c.va *= 0.95;
     
+    // Apply velocity
     c.x += c.vx;
     c.y += c.vy;
+    c.angle += c.va;
     
-    // Face toward movement direction
-    c.angle += (Math.atan2(c.vy, c.vx) * 0.3 - c.angle) * 0.05;
+    // Gentle angle toward movement direction when moving fast
+    const speed = Math.sqrt(c.vx * c.vx + c.vy * c.vy);
+    if (speed > 1 * DPR) {
+      const moveAngle = Math.atan2(c.vy, c.vx);
+      c.targetAngle = moveAngle * 0.15;
+    } else {
+      // Slow idle wobble
+      c.targetAngle = Math.sin(t * 0.4 + i * 0.5) * 0.08;
+    }
+    c.angle += (c.targetAngle - c.angle) * 0.02;
     
-    c.trail.push({ x: c.x, y: c.y, angle: c.angle, alpha: 0.1 });
-    if (c.trail.length > 3) c.trail.shift();
+    // Soft boundary
+    const margin = CW;
+    if (c.x < margin) c.vx += (margin - c.x) * 0.02;
+    if (c.x > W - margin) c.vx += (W - margin - c.x) * 0.02;
+    if (c.y < margin) c.vy += (margin - c.y) * 0.02;
+    if (c.y > H - margin) c.vy += (H - margin - c.y) * 0.02;
   });
-}
-
-// Mode 3: Tornado — spiral vortex
-function updateTornado(dt) {
-  const t = performance.now() * 0.001;
-  const cx = W / 2;
-  const cy = H / 2;
   
-  cards.forEach((c, i) => {
-    const phase = i / NUM_CARDS * Math.PI * 2;
-    const vertPhase = (t * 0.5 + i * 0.08) % 1; // 0 to 1, vertical position
-    
-    const radius = 50 * DPR + vertPhase * 250 * DPR;
-    const speed = 2 + (1 - vertPhase) * 3;
-    const angle = t * speed + phase;
-    
-    const targetX = cx + Math.cos(angle) * radius;
-    const targetY = cy - H * 0.4 + vertPhase * H * 0.8;
-    
-    c.vx += (targetX - c.x) * 0.06;
-    c.vy += (targetY - c.y) * 0.06;
-    c.vx *= 0.88;
-    c.vy *= 0.88;
-    
-    c.x += c.vx;
-    c.y += c.vy;
-    
-    c.angle = angle + Math.PI / 4;
-    c.va = 0;
-    
-    c.trail.push({ x: c.x, y: c.y, angle: c.angle, alpha: 0.12 });
-    if (c.trail.length > 4) c.trail.shift();
-  });
+  mouseClicked = false;
 }
 
 // === Render ===
-function drawCard(c, alpha = 1) {
-  ctx.save();
-  ctx.globalAlpha = alpha * c.alpha;
-  ctx.translate(c.x, c.y);
-  ctx.rotate(c.angle);
-  
-  const img = c.showFace ? cardCanvases[c.faceIdx] : cardBack;
-  ctx.drawImage(img, -CARD_W / 2, -CARD_H / 2, CARD_W, CARD_H);
-  
-  // Foil shimmer
-  const shimmerPhase = (performance.now() * 0.002 + c.faceIdx * 0.5) % (Math.PI * 2);
-  const shimmerX = Math.cos(shimmerPhase) * CARD_W * 0.3;
-  const grad = ctx.createLinearGradient(shimmerX - CARD_W * 0.2, 0, shimmerX + CARD_W * 0.2, 0);
-  grad.addColorStop(0, 'rgba(255,255,255,0)');
-  grad.addColorStop(0.5, `rgba(255,255,255,${0.08 * alpha})`);
-  grad.addColorStop(1, 'rgba(255,255,255,0)');
-  ctx.fillStyle = grad;
-  ctx.beginPath();
-  ctx.roundRect(-CARD_W / 2, -CARD_H / 2, CARD_W, CARD_H, CARD_R);
-  ctx.fill();
-  
-  ctx.restore();
-}
-
 function render() {
-  // Dark background with slight green tint
-  ctx.fillStyle = '#0a0f0a';
+  // Background
+  ctx.fillStyle = '#080c08';
   ctx.fillRect(0, 0, W, H);
   
-  // Subtle felt gradient
-  const feltGrad = ctx.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, W * 0.6);
-  feltGrad.addColorStop(0, 'rgba(26,71,42,0.15)');
-  feltGrad.addColorStop(1, 'rgba(0,0,0,0)');
-  ctx.fillStyle = feltGrad;
+  // Felt glow
+  const glow = ctx.createRadialGradient(W/2, H/2, 0, W/2, H/2, W * 0.5);
+  glow.addColorStop(0, 'rgba(20,60,30,0.2)');
+  glow.addColorStop(0.5, 'rgba(15,45,25,0.1)');
+  glow.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = glow;
   ctx.fillRect(0, 0, W, H);
   
-  // Draw trails first (behind cards)
-  cards.forEach(c => {
-    c.trail.forEach((t, i) => {
-      const trailAlpha = t.alpha * (i / c.trail.length) * 0.5;
-      ctx.save();
-      ctx.globalAlpha = trailAlpha;
-      ctx.translate(t.x, t.y);
-      ctx.rotate(t.angle);
-      const img = c.showFace ? cardCanvases[c.faceIdx] : cardBack;
-      ctx.drawImage(img, -CARD_W / 2, -CARD_H / 2, CARD_W, CARD_H);
-      ctx.restore();
-    });
+  // Sort by y for depth
+  const sorted = [...cards].sort((a, b) => a.y - b.y);
+  
+  sorted.forEach(c => {
+    ctx.save();
+    ctx.translate(c.x, c.y);
+    ctx.rotate(c.angle);
+    
+    // Drop shadow
+    ctx.shadowColor = 'rgba(0,0,0,0.35)';
+    ctx.shadowBlur = 12 * DPR;
+    ctx.shadowOffsetX = 3 * DPR;
+    ctx.shadowOffsetY = 5 * DPR;
+    
+    const img = c.showFace ? cardImages[c.faceIdx] : cardBackImg;
+    ctx.drawImage(img, -CW/2, -CH/2, CW, CH);
+    
+    // Reset shadow for shimmer
+    ctx.shadowColor = 'transparent';
+    ctx.shadowBlur = 0;
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 0;
+    
+    // Holographic shimmer
+    const shimT = (performance.now() * 0.001 + c.faceIdx * 0.3);
+    const shimX = Math.sin(shimT) * CW * 0.4;
+    const grad = ctx.createLinearGradient(shimX - CW*0.15, -CH/2, shimX + CW*0.15, CH/2);
+    grad.addColorStop(0, 'rgba(255,255,255,0)');
+    grad.addColorStop(0.4, 'rgba(255,255,255,0)');
+    grad.addColorStop(0.5, 'rgba(255,255,255,0.07)');
+    grad.addColorStop(0.6, 'rgba(255,255,255,0)');
+    grad.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.roundRect(-CW/2, -CH/2, CW, CH, CR);
+    ctx.fill();
+    
+    ctx.restore();
   });
-  
-  // Draw cards
-  cards.forEach(c => drawCard(c));
 }
 
-// === Main loop ===
-let lastTime = performance.now();
-
-function loop(now) {
-  const dt = Math.min(32, now - lastTime);
-  lastTime = now;
-  
-  // Auto mode cycling
-  if (autoMode) {
-    if (now - autoTimer > AUTO_INTERVAL) {
-      autoTimer = now;
-      currentMode = (currentMode + 1) % 4;
-      modeLabel.textContent = MODE_NAMES[currentMode];
-      modeLabel.style.opacity = '1';
-      setTimeout(() => { modeLabel.style.opacity = '0.6'; }, 1500);
-      
-      if (currentMode === 0) initCascade();
-      if (currentMode === 1) initWaterfall();
-    }
-  }
-  
-  // Update
-  switch (currentMode) {
-    case 0: updateCascade(dt); break;
-    case 1: updateWaterfall(dt); break;
-    case 2: updateSwarm(dt); break;
-    case 3: updateTornado(dt); break;
-  }
-  
+// === Loop ===
+function loop() {
+  update();
   render();
   requestAnimationFrame(loop);
 }
 
-initCascade();
 requestAnimationFrame(loop);
 </script>
 
