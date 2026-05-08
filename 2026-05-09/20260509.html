@@ -94,10 +94,10 @@ function listenLoop() {
   const data = new Uint8Array(analyser.frequencyBinCount);
   analyser.getByteFrequencyData(data);
 
-  // 두드리는 소리 대역만 분석 (200Hz ~ 2000Hz)
-  // fftSize=256, sampleRate=44100 → 각 bin = 44100/256 ≈ 172Hz
-  // bin 1 ≈ 172Hz, bin 12 ≈ 2064Hz
-  const startBin = 1, endBin = 12;
+  // 두드리는 소리 대역만 분석 (200Hz ~ 500Hz)
+  // fftSize=256, sampleRate=44100 → 각 bin ≈ 172Hz
+  // bin 1 ≈ 172Hz, bin 3 ≈ 516Hz
+  const startBin = 1, endBin = 3;
   let sum = 0;
   for (let i = startBin; i <= endBin; i++) sum += data[i];
   const avg = sum / (endBin - startBin + 1);
@@ -105,6 +105,7 @@ function listenLoop() {
   prevAvg = avg;
 
   const now = Date.now();
+  if (now < muteUntil) { requestAnimationFrame(listenLoop); return; }
   if (spike > SPIKE_THRESHOLD && now - lastHitTime > HIT_DEBOUNCE) {
     lastHitTime = now;
     onHit();
@@ -136,6 +137,8 @@ function onHit() {
   }, SILENCE_TIMEOUT);
 }
 
+let muteUntil = 0; // 야옹 재생 중 마이크 무시
+
 function onSilence() {
   catBack.style.display = 'none';
   catLook.style.display = 'block';
@@ -143,6 +146,7 @@ function onSilence() {
   flipped = false;
   howlSound.currentTime = 0;
   howlSound.play();
+  muteUntil = Date.now() + 500; // 0.5초간 마이크 무시 (피드백 방지)
 }
 
 const howlSound = new Audio('howl.mp3');
@@ -150,7 +154,9 @@ const howlSound = new Audio('howl.mp3');
 // iOS 오디오 unlock: 첫 터치 시 무음 재생으로 잠금 해제
 document.getElementById('start-overlay').addEventListener('click', function() {
   this.style.display = 'none';
-  howlSound.play().then(() => { howlSound.pause(); howlSound.currentTime = 0; }).catch(()=>{});
+  // iOS 오디오 unlock (볼륨 0으로 재생 후 즉시 정지)
+  howlSound.volume = 0;
+  howlSound.play().then(() => { howlSound.pause(); howlSound.currentTime = 0; howlSound.volume = 1; }).catch(()=>{ howlSound.volume = 1; });
   startMic();
 });
 
