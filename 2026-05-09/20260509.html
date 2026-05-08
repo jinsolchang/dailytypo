@@ -73,7 +73,7 @@ let prevAvg = 0;
 let lastHitTime = 0;
 const HIT_DEBOUNCE = 100;
 const SILENCE_TIMEOUT = 1700;
-const SPIKE_THRESHOLD = 12;
+const SPIKE_THRESHOLD = 25;
 
 async function startMic() {
   try {
@@ -154,9 +154,9 @@ const howlSound = new Audio('howl.mp3');
 // iOS 오디오 unlock: 첫 터치 시 무음 재생으로 잠금 해제
 document.getElementById('start-overlay').addEventListener('click', function() {
   this.style.display = 'none';
-  // iOS 오디오 unlock (볼륨 0으로 재생 후 즉시 정지)
-  howlSound.volume = 0;
-  howlSound.play().then(() => { howlSound.pause(); howlSound.currentTime = 0; howlSound.volume = 1; }).catch(()=>{ howlSound.volume = 1; });
+  // iOS AudioContext unlock (소리 없이)
+  const unlockCtx = new (window.AudioContext || window.webkitAudioContext)();
+  unlockCtx.resume().then(() => unlockCtx.close()).catch(()=>{});
   startMic();
 });
 
