@@ -48,6 +48,14 @@ html, body {
 </style>
 </head>
 <body>
+<div id="start-overlay" style="position:fixed;inset:0;background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center;z-index:100;cursor:pointer">
+  <div style="text-align:center;color:#fff;font-family:-apple-system,sans-serif">
+    <div style="font-size:48px;margin-bottom:16px">🐱</div>
+    <div style="font-size:18px;font-weight:700;margin-bottom:8px">고양이 궁디 팡팡</div>
+    <div style="font-size:13px;color:#aaa;margin-bottom:24px">화면을 두드려서 고양이를 놀래키세요</div>
+    <div style="font-size:12px;color:#666;border:1px solid #444;display:inline-block;padding:8px 20px;border-radius:20px">탭하여 시작</div>
+  </div>
+</div>
 <img id="catBack" class="cat-img" src="front.webp" alt="">
 <img id="catLook" class="cat-img" src="back.webp" alt="" style="display:none;">
 <img class="bg-img" src="bg.webp" alt="">
@@ -140,12 +148,12 @@ function onSilence() {
 const howlSound = new Audio('howl.mp3');
 
 // iOS 오디오 unlock: 첫 터치 시 무음 재생으로 잠금 해제
-document.addEventListener('touchstart', function unlockAudio() {
+document.getElementById('start-overlay').addEventListener('click', function() {
+  this.style.display = 'none';
   howlSound.play().then(() => { howlSound.pause(); howlSound.currentTime = 0; }).catch(()=>{});
-  document.removeEventListener('touchstart', unlockAudio);
-}, { once: true });
+  startMic();
+});
 
-startMic();
 </script>
 </body>
 </html>
