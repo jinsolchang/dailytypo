@@ -86,9 +86,13 @@ function listenLoop() {
   const data = new Uint8Array(analyser.frequencyBinCount);
   analyser.getByteFrequencyData(data);
 
+  // 두드리는 소리 대역만 분석 (200Hz ~ 2000Hz)
+  // fftSize=256, sampleRate=44100 → 각 bin = 44100/256 ≈ 172Hz
+  // bin 1 ≈ 172Hz, bin 12 ≈ 2064Hz
+  const startBin = 1, endBin = 12;
   let sum = 0;
-  for (let i = 0; i < data.length; i++) sum += data[i];
-  const avg = sum / data.length;
+  for (let i = startBin; i <= endBin; i++) sum += data[i];
+  const avg = sum / (endBin - startBin + 1);
   const spike = avg - prevAvg;
   prevAvg = avg;
 
