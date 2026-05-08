@@ -135,6 +135,12 @@ function onSilence() {
 
 const howlSound = new Audio('howl.mp3');
 
+// iOS 오디오 unlock: 첫 터치 시 무음 재생으로 잠금 해제
+document.addEventListener('touchstart', function unlockAudio() {
+  howlSound.play().then(() => { howlSound.pause(); howlSound.currentTime = 0; }).catch(()=>{});
+  document.removeEventListener('touchstart', unlockAudio);
+}, { once: true });
+
 startMic();
 </script>
 </body>
