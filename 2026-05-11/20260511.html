@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>로맨스 스캠 체험 — NEWSROOM</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap');
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a0a;font-family:'Noto Sans KR',sans-serif;color:#fff;height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:hidden}
+.container{text-align:center;padding:40px 24px;max-width:500px}
+h1{font-size:clamp(2rem,7vw,3.5rem);font-weight:900;margin-bottom:12px;line-height:1.2}
+h1 span{color:#ff3b5c}
+.desc{color:rgba(255,255,255,0.5);font-size:0.9rem;margin-bottom:32px;line-height:1.6}
+.btn{display:inline-block;background:#ff3b5c;color:#fff;text-decoration:none;padding:16px 40px;font-size:1rem;font-weight:700;border-radius:8px;transition:all 0.2s}
+.btn:hover{background:#ff5577;transform:scale(1.03)}
+.warning{margin-top:24px;font-size:0.7rem;color:rgba(255,255,255,0.25)}
+.particles{position:fixed;inset:0;pointer-events:none;z-index:-1}
+</style>
+</head>
+<body>
+
+<canvas class="particles" id="particles"></canvas>
+
+<div class="container">
+  <h1>로맨스 <span>스캠</span><br>체험 시뮬레이터</h1>
+  <p class="desc">
+    당신의 정보를 입력하면, AI가 당신만을 위한<br>
+    가장 정교한 스캐머를 만들어냅니다.<br>
+    실제 수법을 체험하고 경각심을 가지세요.
+  </p>
+  <!-- Apps Script 배포 후 URL 교체 -->
+  <a class="btn" href="https://script.google.com/macros/s/AKfycbwawnqR33ygYASEbBJ3N-yRKNo_XYc-mkZMdvukqXLWcGYgfdL79fm3stQYqJIb494m/exec" id="launchBtn">
+    체험 시작하기 →
+  </a>
+  <p class="warning">⚠️ 교육 목적 시뮬레이션입니다. 실제 개인정보는 저장되지 않습니다.</p>
+</div>
+
+<script>
+// 배경 파티클 — 하트가 깨지는 느낌
+const cv = document.getElementById('particles');
+const ctx = cv.getContext('2d');
+let W, H;
+function resize(){ W = cv.width = innerWidth; H = cv.height = innerHeight; }
+resize(); addEventListener('resize', resize);
+
+const particles = [];
+for(let i = 0; i < 40; i++){
+  particles.push({
+    x: Math.random()*2000, y: Math.random()*2000,
+    vx: (Math.random()-0.5)*0.3, vy: 0.2+Math.random()*0.5,
+    size: 8+Math.random()*14, opacity: 0.03+Math.random()*0.06,
+    char: ['♡','♥','💔','❤️‍🩹','💕'][Math.floor(Math.random()*5)],
+    rot: Math.random()*Math.PI*2, rotSpeed: (Math.random()-0.5)*0.02
+  });
+}
+
+function loop(){
+  ctx.clearRect(0,0,W,H);
+  for(const p of particles){
+    p.x += p.vx; p.y += p.vy; p.rot += p.rotSpeed;
+    if(p.y > H+20){ p.y = -20; p.x = Math.random()*W; }
+    if(p.x < -20) p.x = W+20;
+    if(p.x > W+20) p.x = -20;
+    ctx.save();
+    ctx.translate(p.x, p.y);
+    ctx.rotate(p.rot);
+    ctx.globalAlpha = p.opacity;
+    ctx.font = `${p.size}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.fillText(p.char, 0, 0);
+    ctx.restore();
+  }
+  requestAnimationFrame(loop);
+}
+loop();
+</script>
+</body>
+</html>
