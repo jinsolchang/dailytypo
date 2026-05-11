@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>INTIMITIES</title>
+<style>
+  :root {
+    --bg: #f3f1e7;
+    --green: #2f8f3a;
+    --green-dark: #277830;
+    --tube: #2db4ff;
+    --tube-deep: #0a8fdc;
+    --tube-shadow: rgba(10, 143, 220, 0.35);
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg);
+    font-family: "Helvetica Neue", Arial, sans-serif;
+    overflow: hidden;
+    height: 100%;
+    user-select: none;
+  }
+  #stage { position: fixed; inset: 0; width: 100vw; height: 100vh; }
+  svg { display: block; width: 100%; height: 100%; }
+
+  .credits {
+    position: fixed;
+    bottom: 14px; left: 22px; right: 22px;
+    font-size: 9.5px;
+    letter-spacing: 0.08em;
+    color: var(--tube-deep);
+    text-transform: uppercase;
+    pointer-events: none;
+    z-index: 10;
+    line-height: 1.5;
+  }
+  .refresh {
+    position: fixed;
+    top: 16px; right: 18px;
+    background: var(--bg);
+    color: var(--tube-deep);
+    border: 1.5px solid var(--tube-deep);
+    border-radius: 999px;
+    padding: 7px 16px;
+    font-weight: 700;
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    cursor: pointer;
+    z-index: 20;
+    transition: background 0.15s, color 0.15s;
+    font-family: inherit;
+  }
+  .refresh:hover { background: var(--tube-deep); color: var(--bg); }
+
+  .flower {
+    transform-origin: center;
+    transform-box: fill-box;
+    animation: bloom 0.55s cubic-bezier(.2,.9,.3,1.3) backwards;
+  }
+  @keyframes bloom {
+    0%   { transform: scale(0) rotate(-40deg); opacity: 0; }
+    60%  { transform: scale(1.2) rotate(6deg); opacity: 1; }
+    100% { transform: scale(1) rotate(0deg); opacity: 1; }
+  }
+
+  /* (2) breathing — subtle slow scale pulse */
+  .blob {
+    transform-origin: center;
+    transform-box: fill-box;
+    animation: breathe 6s ease-in-out infinite;
+  }
+  @keyframes breathe {
+    0%, 100% { transform: scale(1) }
+    50%      { transform: scale(1.012) }
+  }
+
+  /* (3) splash at arrival */
+  .splash {
+    transform-origin: center;
+    transform-box: fill-box;
+    animation: splash 0.5s ease-out forwards;
+  }
+  @keyframes splash {
+    0%   { transform: scale(0.2); opacity: 1; }
+    100% { transform: scale(2.4); opacity: 0; }
+  }
+
+  /* (4) tube with faint ink-bleed shadow */
+  .tube {
+    fill: none;
+    stroke: var(--tube);
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    filter: drop-shadow(0 1.5px 0 var(--tube-shadow));
+  }
+</style>
+</head>
+<body>
+
+<button class="refresh" onclick="regenerate()">↻ 다시</button>
+
+<div class="credits">
+  INTIMITIES 2026 · JAZZ FESTIVAL WILLISAU · KONZERTE IN DER STADTMÜHLE
+</div>
+
+<div id="stage">
+  <svg id="svg" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet"></svg>
+</div>
+
+<script>
+const rand  = (a, b) => a + Math.random() * (b - a);
+const irand = (a, b) => Math.floor(rand(a, b + 1));
+const dist  = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+const TAU = Math.PI * 2;
+
+// ============================================================
+// BLOBS — free organic placement with varied sizes
+// (Letter forms are evoked, not enforced.)
+// ============================================================
+function placeBlobs(W, H) {
+  const blobs = [];
+  const margin = 80, topM = 70, botM = 90;
+
+  // Target a small number of generously-spaced blobs
+  const targetCount = Math.max(9, Math.min(13, Math.round(W * H / 110000)));
+  const nLarge = irand(2, 3);
+  const nSmall = irand(2, 3);
+  const nMed   = targetCount - nLarge - nSmall;
+  const sizes = [];
+  for (let i = 0; i < nLarge; i++) sizes.push(rand(85, 115));
+  for (let i = 0; i < nMed; i++)   sizes.push(rand(55, 80));
+  for (let i = 0; i < nSmall; i++) sizes.push(rand(30, 45));
+  sizes.sort((a,b) => b - a); // largest first for better packing
+
+  let tries = 0;
+  for (const r of sizes) {
+    let placed = false;
+    while (!placed && tries < 10000) {
+      tries++;
+      const x = rand(margin + r, W - margin - r);
+      const y = rand(topM + r, H - botM - r);
+      let ok = true;
+      // generous gap so tubes have room to curl & sweep
+      for (const b of blobs) {
+        if (dist({x,y}, b) < r + b.r + 75) { ok = false; break; }
+      }
+      if (!ok) continue;
+      const pts = [];
+      const np = 14;
+      for (let k = 0; k < np; k++) {
+        pts.push({ ang: (k/np) * TAU, r: r * rand(0.92, 1.06) });
+      }
+      blobs.push({
+        x, y, r, pts,
+        id: blobs.length,
+        breathDelay: rand(-6, 0),
+        breathDur: rand(5.5, 7.5),
+      });
+      placed = true;
+    }
+  }
+  return blobs;
+}
+
+function blobPath(b) {
+  const pts = b.pts.map(p => ({
+    x: b.x + Math.cos(p.ang) * p.r,
+    y: b.y + Math.sin(p.ang) * p.r
+  }));
+  const n = pts.length;
+  let d = `M ${pts[0].x.toFixed(2)} ${pts[0].y.toFixed(2)}`;
+  for (let i = 0; i < n; i++) {
+    const p0 = pts[(i-1+n)%n], p1 = pts[i], p2 = pts[(i+1)%n], p3 = pts[(i+2)%n];
+    const c1x = p1.x + (p2.x - p0.x)/6;
+    const c1y = p1.y + (p2.y - p0.y)/6;
+    const c2x = p2.x - (p3.x - p1.x)/6;
+    const c2y = p2.y - (p3.y - p1.y)/6;
+    d += ` C ${c1x.toFixed(2)} ${c1y.toFixed(2)}, ${c2x.toFixed(2)} ${c2y.toFixed(2)}, ${p2.x.toFixed(2)} ${p2.y.toFixed(2)}`;
+  }
+  return d + ' Z';
+}
+
+function radiusAt(b, ang) {
+  ang = ((ang % TAU) + TAU) % TAU;
+  let best = b.pts[0], bestD = Infinity;
+  for (const p of b.pts) {
+    let dd = Math.abs(p.ang - ang);
+    if (dd > Math.PI) dd = TAU - dd;
+    if (dd < bestD) { bestD = dd; best = p; }
+  }
+  return best.r;
+}
+
+function blobPointAt(b, ang) {
+  const r = radiusAt(b, ang);
+  return { x: b.x + Math.cos(ang) * r, y: b.y + Math.sin(ang) * r };
+}
+
+// ============================================================
+// EDGES — nearest-parent-from-above; multiple tubes for large blobs
+// ============================================================
+function pickFlowEdges(blobs) {
+  const edges = [];
+  if (blobs.length < 2) return edges;
+  const sorted = [...blobs].sort((a,b) => a.y - b.y);
+
+  // each non-top blob: one parent from above (nearest)
+  for (let i = 1; i < sorted.length; i++) {
+    const b = sorted[i];
+    const above = sorted.slice(0, i);
+    const cands = above
+      .map(a => ({ a, d: dist(a, b) }))
+      .sort((x,y) => x.d - y.d);
+    edges.push({ from: cands[0].a, to: b });
+  }
+  return edges;
+}
+
+// ============================================================
+// (1) CURL VARIETY
+// ============================================================
+const CURL_STYLES = ['singleLoop', 'doubleLoop', 'jHook', 'tightSpiral'];
+
+function buildCurl(pa, outA, loopR, style, side) {
+  const perpA = { x: -outA.y * side, y: outA.x * side };
+  if (style === 'singleLoop') {
+    const cx = pa.x + outA.x * loopR + perpA.x * loopR;
+    const cy = pa.y + outA.y * loopR + perpA.y * loopR;
+    const opp = { x: 2*cx - pa.x, y: 2*cy - pa.y };
+    const exit = { x: cx + outA.x * loopR, y: cy + outA.y * loopR };
+    const sweep = side > 0 ? 1 : 0;
+    const cmds = [
+      `A ${loopR} ${loopR} 0 0 ${sweep} ${opp.x.toFixed(2)} ${opp.y.toFixed(2)}`,
+      `A ${loopR} ${loopR} 0 0 ${sweep} ${exit.x.toFixed(2)} ${exit.y.toFixed(2)}`,
+    ].join(' ');
+    return { cmds, end: exit };
+  }
+  if (style === 'doubleLoop') {
+    const r1 = loopR * 0.85;
+    const c1x = pa.x + outA.x * r1 + perpA.x * r1;
+    const c1y = pa.y + outA.y * r1 + perpA.y * r1;
+    const opp1 = { x: 2*c1x - pa.x, y: 2*c1y - pa.y };
+    const exit1 = { x: c1x + outA.x * r1, y: c1y + outA.y * r1 };
+    const sweep = side > 0 ? 1 : 0;
+    const r2 = loopR * 0.85;
+    const c2x = exit1.x + outA.x * r2 - perpA.x * r2;
+    const c2y = exit1.y + outA.y * r2 - perpA.y * r2;
+    const opp2 = { x: 2*c2x - exit1.x, y: 2*c2y - exit1.y };
+    const exit2 = { x: c2x + outA.x * r2, y: c2y + outA.y * r2 };
+    const sweep2 = side > 0 ? 0 : 1;
+    const cmds = [
+      `A ${r1} ${r1} 0 0 ${sweep} ${opp1.x.toFixed(2)} ${opp1.y.toFixed(2)}`,
+      `A ${r1} ${r1} 0 0 ${sweep} ${exit1.x.toFixed(2)} ${exit1.y.toFixed(2)}`,
+      `A ${r2} ${r2} 0 0 ${sweep2} ${opp2.x.toFixed(2)} ${opp2.y.toFixed(2)}`,
+      `A ${r2} ${r2} 0 0 ${sweep2} ${exit2.x.toFixed(2)} ${exit2.y.toFixed(2)}`,
+    ].join(' ');
+    return { cmds, end: exit2 };
+  }
+  if (style === 'jHook') {
+    const cx = pa.x + outA.x * loopR + perpA.x * loopR;
+    const cy = pa.y + outA.y * loopR + perpA.y * loopR;
+    const opp = { x: 2*cx - pa.x, y: 2*cy - pa.y };
+    const sweep = side > 0 ? 1 : 0;
+    const cmds = `A ${loopR} ${loopR} 0 0 ${sweep} ${opp.x.toFixed(2)} ${opp.y.toFixed(2)}`;
+    return { cmds, end: opp };
+  }
+  if (style === 'tightSpiral') {
+    const r = loopR * 0.65;
+    const cx = pa.x + outA.x * r + perpA.x * r;
+    const cy = pa.y + outA.y * r + perpA.y * r;
+    const opp = { x: 2*cx - pa.x, y: 2*cy - pa.y };
+    const exit = { x: cx + outA.x * r, y: cy + outA.y * r };
+    const sweep = side > 0 ? 1 : 0;
+    const cmds = [
+      `A ${r} ${r} 0 0 ${sweep} ${opp.x.toFixed(2)} ${opp.y.toFixed(2)}`,
+      `A ${r} ${r} 0 0 ${sweep} ${exit.x.toFixed(2)} ${exit.y.toFixed(2)}`,
+    ].join(' ');
+    return { cmds, end: exit };
+  }
+}
+
+// reverse of buildCurl: path from end back to pb (flip sweep flags)
+function reverseCurl(pb, outB, loopR, style, side) {
+  const perpB = { x: -outB.y * side, y: outB.x * side };
+  if (style === 'singleLoop') {
+    const cx = pb.x + outB.x * loopR + perpB.x * loopR;
+    const cy = pb.y + outB.y * loopR + perpB.y * loopR;
+    const opp = { x: 2*cx - pb.x, y: 2*cy - pb.y };
+    const sweep = side > 0 ? 0 : 1;
+    return [
+      `A ${loopR} ${loopR} 0 0 ${sweep} ${opp.x.toFixed(2)} ${opp.y.toFixed(2)}`,
+      `A ${loopR} ${loopR} 0 0 ${sweep} ${pb.x.toFixed(2)} ${pb.y.toFixed(2)}`,
+    ].join(' ');
+  }
+  if (style === 'doubleLoop') {
+    const r1 = loopR * 0.85;
+    const c1x = pb.x + outB.x * r1 + perpB.x * r1;
+    const c1y = pb.y + outB.y * r1 + perpB.y * r1;
+    const opp1 = { x: 2*c1x - pb.x, y: 2*c1y - pb.y };
+    const exit1 = { x: c1x + outB.x * r1, y: c1y + outB.y * r1 };
+    const sweep = side > 0 ? 0 : 1;
+    const r2 = loopR * 0.85;
+    const c2x = exit1.x + outB.x * r2 - perpB.x * r2;
+    const c2y = exit1.y + outB.y * r2 - perpB.y * r2;
+    const opp2 = { x: 2*c2x - exit1.x, y: 2*c2y - exit1.y };
+    const exit2 = { x: c2x + outB.x * r2, y: c2y + outB.y * r2 };
+    const sweep2 = side > 0 ? 1 : 0;
+    return [
+      `A ${r2} ${r2} 0 0 ${sweep2} ${opp2.x.toFixed(2)} ${opp2.y.toFixed(2)}`,
+      `A ${r2} ${r2} 0 0 ${sweep2} ${exit1.x.toFixed(2)} ${exit1.y.toFixed(2)}`,
+      `A ${r1} ${r1} 0 0 ${sweep} ${opp1.x.toFixed(2)} ${opp1.y.toFixed(2)}`,
+      `A ${r1} ${r1} 0 0 ${sweep} ${pb.x.toFixed(2)} ${pb.y.toFixed(2)}`,
+    ].join(' ');
+  }
+  if (style === 'jHook') {
+    const sweep = side > 0 ? 0 : 1;
+    return `A ${loopR} ${loopR} 0 0 ${sweep} ${pb.x.toFixed(2)} ${pb.y.toFixed(2)}`;
+  }
+  if (style === 'tightSpiral') {
+    const r = loopR * 0.65;
+    const cx = pb.x + outB.x * r + perpB.x * r;
+    const cy = pb.y + outB.y * r + perpB.y * r;
+    const opp = { x: 2*cx - pb.x, y: 2*cy - pb.y };
+    const sweep = side > 0 ? 0 : 1;
+    return [
+      `A ${r} ${r} 0 0 ${sweep} ${opp.x.toFixed(2)} ${opp.y.toFixed(2)}`,
+      `A ${r} ${r} 0 0 ${sweep} ${pb.x.toFixed(2)} ${pb.y.toFixed(2)}`,
+    ].join(' ');
+  }
+}
+
+function buildTube(a, b) {
+  const baseAng = Math.atan2(b.y - a.y, b.x - a.x);
+  const angAExit  = baseAng + rand(-0.12, 0.12);
+  const angBEnter = baseAng + Math.PI + rand(-0.12, 0.12);
+
+  const pa = blobPointAt(a, angAExit);
+  const pb = blobPointAt(b, angBEnter);
+  const outA = { x: Math.cos(angAExit),  y: Math.sin(angAExit) };
+  const outB = { x: Math.cos(angBEnter), y: Math.sin(angBEnter) };
+  const sideA = Math.random() < 0.5 ? 1 : -1;
+  const sideB = Math.random() < 0.5 ? 1 : -1;
+
+  // (NEW) tube width scales with average blob size
+  const avgR = (a.r + b.r) / 2;
+  const tubeW = Math.max(7, Math.min(14, avgR * 0.16));
+  const loopR = Math.max(5.5, tubeW * 0.7);
+
+  const styleA = CURL_STYLES[irand(0, CURL_STYLES.length - 1)];
+  const styleB = CURL_STYLES[irand(0, CURL_STYLES.length - 1)];
+  const curlA = buildCurl(pa, outA, loopR, styleA, sideA);
+  const curlBReversed = reverseCurl(pb, outB, loopR, styleB, sideB);
+
+  // we need bEnd for the middle curve. compute it via buildCurl on B too
+  const curlB = buildCurl(pb, outB, loopR, styleB, sideB);
+  const aEnd = curlA.end;
+  const bEnd = curlB.end;
+  const dx = bEnd.x - aEnd.x;
+  const dy = bEnd.y - aEnd.y;
+  const segLen = Math.hypot(dx, dy);
+  const tension = Math.min(0.45, 80 / Math.max(segLen, 1) + 0.18);
+  const c1 = {
+    x: aEnd.x + outA.x * segLen * tension,
+    y: aEnd.y + outA.y * segLen * tension
+  };
+  const c2 = {
+    x: bEnd.x + outB.x * segLen * tension,
+    y: bEnd.y + outB.y * segLen * tension
+  };
+
+  const d = [
+    `M ${pa.x.toFixed(2)} ${pa.y.toFixed(2)}`,
+    curlA.cmds,
+    `C ${c1.x.toFixed(2)} ${c1.y.toFixed(2)}, ${c2.x.toFixed(2)} ${c2.y.toFixed(2)}, ${bEnd.x.toFixed(2)} ${bEnd.y.toFixed(2)}`,
+    curlBReversed,
+  ].join(' ');
+
+  return { d, pa, pb, from: a, to: b, tubeW };
+}
+
+// ============================================================
+// STATE
+// ============================================================
+let blobs = [], tubes = [];
+let svg, runId = 0;
+let bloomed = new Set();
+
+function regenerate() {
+  runId++;
+  const myRun = runId;
+  const W = window.innerWidth, H = window.innerHeight;
+  svg = document.getElementById('svg');
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  svg.innerHTML = '';
+  bloomed = new Set();
+
+  blobs = placeBlobs(W, H);
+  const edges = pickFlowEdges(blobs);
+  tubes = edges.map(e => buildTube(e.from, e.to));
+
+  const outgoing = new Map();
+  blobs.forEach(b => outgoing.set(b.id, []));
+  tubes.forEach((t, i) => outgoing.get(t.from.id).push(i));
+
+  draw();
+  sequentialDFS(myRun, outgoing);
+}
+
+function draw() {
+  const tubeStrokes = tubes.map((t, i) =>
+    `<path id="tube-${i}" class="tube" d="${t.d}" stroke-width="${t.tubeW.toFixed(2)}" />`
+  ).join('');
+
+  const blobShapes = blobs.map(b =>
+    `<path class="blob" data-id="${b.id}" d="${blobPath(b)}"
+        fill="var(--green)"
+        style="animation-delay:${b.breathDelay}s; animation-duration:${b.breathDur}s" />`
+  ).join('');
+
+  const pins = tubes.map(t =>
+    `<circle cx="${t.pa.x.toFixed(2)}" cy="${t.pa.y.toFixed(2)}" r="3"
+        fill="var(--bg)" stroke="var(--tube)" stroke-width="1.2" />
+     <circle cx="${t.pb.x.toFixed(2)}" cy="${t.pb.y.toFixed(2)}" r="3"
+        fill="var(--bg)" stroke="var(--tube)" stroke-width="1.2" />`
+  ).join('');
+
+  svg.innerHTML = `
+    <g id="tubes">${tubeStrokes}</g>
+    <g id="blobs">${blobShapes}</g>
+    <g id="pins">${pins}</g>
+    <g id="flowers"></g>
+    <g id="drops"></g>
+    <g id="splashes"></g>
+  `;
+
+  tubes.forEach((t, i) => {
+    const el = document.getElementById('tube-' + i);
+    const len = el.getTotalLength();
+    t.length = len;
+    el.setAttribute('stroke-dasharray', len);
+    el.setAttribute('stroke-dashoffset', len);
+  });
+}
+
+// ============================================================
+// SEQUENTIAL DFS — water flows to next blob, then it blooms
+// ============================================================
+function wait(ms) { return new Promise(res => setTimeout(res, ms)); }
+
+async function sequentialDFS(myRun, outgoing) {
+  const hasIncoming = new Set();
+  tubes.forEach(t => hasIncoming.add(t.to.id));
+  const sources = blobs.filter(b => !hasIncoming.has(b.id)).sort((a,b) => a.y - b.y);
+
+  const visited = new Set();
+  async function visit(blobId) {
+    if (myRun !== runId) return;
+    if (visited.has(blobId)) return;
+    visited.add(blobId);
+
+    await bloomBlob(myRun, blobId);
+    if (myRun !== runId) return;
+    await wait(180);
+
+    const outs = outgoing.get(blobId) || [];
+    for (const tubeIdx of outs) {
+      if (myRun !== runId) return;
+      await pourTube(myRun, tubeIdx);
+      if (myRun !== runId) return;
+      const toId = tubes[tubeIdx].to.id;
+      spawnSplash(tubes[tubeIdx].pb);
+      await visit(toId);
+    }
+  }
+
+  for (const src of sources) {
+    if (myRun !== runId) return;
+    await visit(src.id);
+  }
+}
+
+// (11) variable speed; (3) teardrop drop; (4) shimmer
+function pourTube(myRun, tubeIdx) {
+  return new Promise(resolve => {
+    if (myRun !== runId) { resolve(); return; }
+    const tube = tubes[tubeIdx];
+    const el = document.getElementById('tube-' + tubeIdx);
+    const len = tube.length;
+    const dur = Math.min(2200, Math.max(450, len * 3.0));
+    const start = performance.now();
+
+    const dropsG = document.getElementById('drops');
+    const ns = 'http://www.w3.org/2000/svg';
+    const drop = document.createElementNS(ns, 'g');
+    const dropShape = document.createElementNS(ns, 'ellipse');
+    dropShape.setAttribute('rx', '4');
+    dropShape.setAttribute('ry', '6.5');
+    dropShape.setAttribute('fill', '#e8f7ff');
+    dropShape.setAttribute('opacity', '0.95');
+    drop.appendChild(dropShape);
+    dropsG.appendChild(drop);
+
+    const baseW = tube.tubeW;
+    let prevPt = el.getPointAtLength(0);
+
+    function frame(now) {
+      if (myRun !== runId) { drop.remove(); resolve(); return; }
+      const t = Math.min(1, (now - start) / dur);
+      const eased = t * t * (3 - 2*t);
+      el.setAttribute('stroke-dashoffset', len * (1 - eased));
+      const widthPulse = baseW + Math.sin(t * Math.PI) * 0.6;
+      el.setAttribute('stroke-width', widthPulse.toFixed(2));
+
+      const pt = el.getPointAtLength(eased * len);
+      const dx = pt.x - prevPt.x, dy = pt.y - prevPt.y;
+      let angleDeg = 0;
+      if (Math.hypot(dx, dy) > 0.1) {
+        angleDeg = Math.atan2(dy, dx) * 180 / Math.PI + 90;
+      }
+      drop.setAttribute('transform', `translate(${pt.x} ${pt.y}) rotate(${angleDeg})`);
+      prevPt = pt;
+      if (t < 1) requestAnimationFrame(frame);
+      else {
+        el.setAttribute('stroke-width', baseW);
+        drop.remove();
+        resolve();
+      }
+    }
+    requestAnimationFrame(frame);
+  });
+}
+
+function spawnSplash(at) {
+  const splashes = document.getElementById('splashes');
+  const ns = 'http://www.w3.org/2000/svg';
+  const g = document.createElementNS(ns, 'g');
+  g.setAttribute('class', 'splash');
+  g.setAttribute('transform', `translate(${at.x} ${at.y})`);
+  const ring = document.createElementNS(ns, 'circle');
+  ring.setAttribute('r', '6');
+  ring.setAttribute('fill', 'none');
+  ring.setAttribute('stroke', '#9fd9f7');
+  ring.setAttribute('stroke-width', '1.5');
+  g.appendChild(ring);
+  for (let i = 0; i < 5; i++) {
+    const ang = (i / 5) * TAU + rand(0, 0.3);
+    const r = rand(7, 12);
+    const c = document.createElementNS(ns, 'circle');
+    c.setAttribute('cx', Math.cos(ang) * r);
+    c.setAttribute('cy', Math.sin(ang) * r);
+    c.setAttribute('r', rand(1.2, 2));
+    c.setAttribute('fill', '#bfe6fa');
+    g.appendChild(c);
+  }
+  splashes.appendChild(g);
+  setTimeout(() => g.remove(), 600);
+}
+
+// ============================================================
+// FLOWERS
+// ============================================================
+const palettes = [
+  { petal: '#ff7eb6', center: '#ffd84a' },
+  { petal: '#ffd84a', center: '#e0573a' },
+  { petal: '#fff4e0', center: '#ffb347' },
+  { petal: '#ffb3c1', center: '#fff4e0' },
+  { petal: '#f8e16c', center: '#e0573a' },
+  { petal: '#ffffff', center: '#ffd84a' },
+  { petal: '#ff9d76', center: '#ffe9a1' },
+  { petal: '#e8b4ff', center: '#ffd84a' },
+];
+
+function makeFlowerHTML(cx, cy, size, pal, delay) {
+  const N = irand(5, 7);
+  const rot = rand(0, 360);
+  const petals = [];
+  for (let i = 0; i < N; i++) {
+    const ang = (i / N) * 360 + rot;
+    petals.push(
+      `<ellipse cx="${cx.toFixed(2)}" cy="${(cy - size*0.55).toFixed(2)}"
+        rx="${(size*0.30).toFixed(2)}" ry="${(size*0.55).toFixed(2)}"
+        fill="${pal.petal}" transform="rotate(${ang.toFixed(1)} ${cx.toFixed(2)} ${cy.toFixed(2)})"
+        stroke="rgba(0,0,0,0.10)" stroke-width="0.8"/>`
+    );
+  }
+  return `<g class="flower" style="animation-delay:${delay}ms">
+    ${petals.join('')}
+    <circle cx="${cx.toFixed(2)}" cy="${cy.toFixed(2)}" r="${(size*0.32).toFixed(2)}"
+      fill="${pal.center}" stroke="rgba(0,0,0,0.12)" stroke-width="0.8"/>
+    <circle cx="${(cx - size*0.1).toFixed(2)}" cy="${(cy - size*0.08).toFixed(2)}"
+      r="${(size*0.07).toFixed(2)}" fill="rgba(255,255,255,0.55)"/>
+  </g>`;
+}
+
+function bloomBlob(myRun, blobId) {
+  return new Promise(resolve => {
+    if (myRun !== runId) { resolve(); return; }
+    if (bloomed.has(blobId)) { resolve(); return; }
+    bloomed.add(blobId);
+    const b = blobs[blobId];
+    const flowersLayer = document.getElementById('flowers');
+
+    const positions = [];
+    const target = Math.max(3, Math.round((b.r * b.r) / 350));
+    let attempts = 0;
+    while (positions.length < target && attempts < 600) {
+      attempts++;
+      const ang = rand(0, TAU);
+      const rMax = radiusAt(b, ang) * 0.78;
+      const rr = Math.sqrt(Math.random()) * rMax;
+      const x = b.x + Math.cos(ang) * rr;
+      const y = b.y + Math.sin(ang) * rr;
+      let ok = true;
+      for (const p of positions) {
+        if (Math.hypot(p.x - x, p.y - y) < p.size * 1.3 + 4) { ok = false; break; }
+      }
+      if (!ok) continue;
+      const sizeRange = b.r < 50 ? [7, 12] : b.r < 80 ? [9, 16] : [11, 20];
+      const size = rand(sizeRange[0], sizeRange[1]);
+      positions.push({ x, y, size });
+    }
+    positions.sort(() => Math.random() - 0.5);
+
+    const totalDelay = positions.length * 35;
+    const parts = positions.map((p, i) => {
+      const pal = palettes[irand(0, palettes.length - 1)];
+      return makeFlowerHTML(p.x, p.y, p.size, pal, i * 35);
+    });
+    flowersLayer.insertAdjacentHTML('beforeend', parts.join(''));
+    setTimeout(resolve, totalDelay + 250);
+  });
+}
+
+window.addEventListener('load', regenerate);
+window.addEventListener('resize', () => { regenerate(); });
+</script>
+
+</body>
+</html>

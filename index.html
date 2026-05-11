@@ -51,6 +51,7 @@ body{background:#0a0a0a;font-family:'Noto Sans KR',sans-serif;color:#fff;min-hei
   <div class="ticker-label">속보</div>
   <div class="ticker-track">
     <div class="ticker-text">
+      관수 튜브 — 튜브를 따라 그려 꽃을 피우는 인터랙티브 실험 &nbsp;│&nbsp;
       Letter Domino — 타이핑한 글자가 도미노가 되어 쓰러지는 아이소메트릭 실험 &nbsp;│&nbsp;
       The Ocean Doesn't Stop — 끝없는 파도 위 서핑 인터랙티브 실험 &nbsp;│&nbsp;
       Living Grid — 타이핑하면 격자가 글자를 피해 출렁이는 타이포 실험 &nbsp;│&nbsp;
@@ -71,21 +72,29 @@ body{background:#0a0a0a;font-family:'Noto Sans KR',sans-serif;color:#fff;min-hei
 
 <div class="main">
 
-  <!-- 히어로: 최신 기사 (5/9) 고양이 궁디 팡팡 -->
-  <a class="hero" href="2026-05-09/20260509.html">
+  <!-- 히어로: 최신 기사 (5/11) 관수 튜브 -->
+  <a class="hero" href="2026-05-11/20260511.html">
     <div class="hero-visual">
-      <img class="hero-img" src="2026-05-09/thumbnail.png" alt="">
+      <canvas id="hero-tube" style="position:absolute;inset:0;width:100%;height:100%"></canvas>
     </div>
     <div class="hero-body">
       <div class="hero-tag">실험·인터랙티브</div>
-      <div class="hero-title">고양이 궁디 팡팡<br><span style="font-size:.6em;font-weight:700">3D 고양이와 인터랙션하는 실험</span></div>
-      <div class="hero-meta">2026.05.09 · 인터랙티브 · CAT BUTT PAT</div>
+      <div class="hero-title">관수 튜브<br><span style="font-size:.6em;font-weight:700">튜브를 따라 그려 꽃을 피우는 인터랙티브 실험</span></div>
+      <div class="hero-meta">2026.05.11 · 인터랙티브 · WATERING TUBES</div>
     </div>
   </a>
 
   <!-- 이전 기사 -->
   <div class="section-label">이전 기사</div>
   <div class="grid">
+    <a class="card" href="2026-05-09/20260509.html">
+      <div class="card-body">
+        <div class="card-tag">실험·인터랙티브</div>
+        <div class="card-title">고양이 궁디 팡팡 — 3D 고양이와 인터랙션하는 실험</div>
+        <div class="card-date">2026.05.09</div>
+      </div>
+      <div class="card-thumb"><canvas id="thumb-cat" width="100" height="72"></canvas></div>
+    </a>
     <a class="card" href="2026-05-08/20260508.html">
       <div class="card-body">
         <div class="card-tag">실험·인터랙티브</div>
@@ -782,6 +791,96 @@ body{background:#0a0a0a;font-family:'Noto Sans KR',sans-serif;color:#fff;min-hei
     cx.lineTo(W, H); cx.lineTo(0, H); cx.closePath();
     cx.fillStyle = 'rgba(0,204,102,0.08)'; cx.fill();
     offset += 0.05;
+    requestAnimationFrame(loop);
+  }
+  loop();
+})();
+
+// ── 히어로: 관수 튜브 (blob + tube 미니어처) ──
+(function(){
+  const cv = document.getElementById('hero-tube');
+  if (!cv) return;
+  const rect = cv.parentElement.getBoundingClientRect();
+  const DPR = Math.min(devicePixelRatio||1, 2);
+  cv.width = rect.width * DPR; cv.height = rect.height * DPR;
+  const ctx = cv.getContext('2d');
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+  const W = rect.width, H = rect.height;
+  const GREEN = '#009a3e', BLUE = '#4db8e8';
+  const blobs = [];
+  for (let i = 0; i < 10; i++) {
+    blobs.push({x: Math.random()*W, y: Math.random()*H, rx: 20+Math.random()*40, ry: 18+Math.random()*30, seed: Math.random()*99});
+  }
+  const tubes = [];
+  for (let i = 0; i < blobs.length - 1; i++) {
+    const a = blobs[i], b = blobs[i+1];
+    const mx=(a.x+b.x)/2, my=(a.y+b.y)/2;
+    const d=Math.hypot(b.x-a.x,b.y-a.y);
+    const px=-(b.y-a.y)/d, py=(b.x-a.x)/d;
+    const bulge=(Math.random()-0.5)*d*0.5;
+    tubes.push({ax:a.x,ay:a.y,bx:b.x,by:b.y,cx:mx+px*bulge,cy:my+py*bulge});
+  }
+  function loop(){
+    const t = performance.now()*0.001;
+    ctx.clearRect(0,0,W,H);
+    ctx.fillStyle='#fff'; ctx.fillRect(0,0,W,H);
+    // tubes
+    ctx.strokeStyle=BLUE; ctx.lineWidth=W*0.025; ctx.lineCap='round';
+    for(const tb of tubes){
+      ctx.beginPath(); ctx.moveTo(tb.ax,tb.ay); ctx.quadraticCurveTo(tb.cx,tb.cy,tb.bx,tb.by); ctx.stroke();
+    }
+    // blobs
+    for(const b of blobs){
+      ctx.beginPath();
+      const N=8;
+      for(let i=0;i<N;i++){
+        const a2=(i/N)*Math.PI*2;
+        const w=1+Math.sin(b.seed+i*2.7)*0.12;
+        const px=b.x+Math.cos(a2)*b.rx*w, py=b.y+Math.sin(a2)*b.ry*w;
+        i===0?ctx.moveTo(px,py):ctx.lineTo(px,py);
+      }
+      ctx.closePath(); ctx.fillStyle=GREEN; ctx.fill();
+    }
+    // slow drift
+    for(const b of blobs){ b.x+=Math.sin(t+b.seed)*0.15; b.y+=Math.cos(t*0.7+b.seed)*0.1; }
+    requestAnimationFrame(loop);
+  }
+  loop();
+})();
+
+// ── 썸네일: 고양이 궁디 팡팡 ──
+(function(){
+  const cv = document.getElementById('thumb-cat');
+  if (!cv) return;
+  cv.width = 200; cv.height = 144;
+  const cx = cv.getContext('2d');
+  const W = 200, H = 144;
+  function loop(){
+    const t = performance.now()*0.001;
+    cx.fillStyle='#fff'; cx.fillRect(0,0,W,H);
+    // simple cat silhouette
+    const wiggle = Math.sin(t*3)*2;
+    cx.save(); cx.translate(W/2, H/2+wiggle);
+    // body
+    cx.beginPath(); cx.ellipse(0,10,28,22,0,0,Math.PI*2);
+    cx.fillStyle='#f5a623'; cx.fill();
+    // head
+    cx.beginPath(); cx.arc(0,-18,16,0,Math.PI*2);
+    cx.fill();
+    // ears
+    cx.beginPath(); cx.moveTo(-12,-30); cx.lineTo(-6,-40); cx.lineTo(-2,-28); cx.fill();
+    cx.beginPath(); cx.moveTo(12,-30); cx.lineTo(6,-40); cx.lineTo(2,-28); cx.fill();
+    // eyes
+    cx.fillStyle='#333';
+    cx.beginPath(); cx.arc(-5,-18,2.5,0,Math.PI*2); cx.fill();
+    cx.beginPath(); cx.arc(5,-18,2.5,0,Math.PI*2); cx.fill();
+    // tail
+    cx.strokeStyle='#f5a623'; cx.lineWidth=5; cx.lineCap='round';
+    cx.beginPath(); cx.moveTo(20,15); cx.quadraticCurveTo(40+Math.sin(t*2)*5, 0, 35,-10); cx.stroke();
+    cx.restore();
+    // tap indicator
+    cx.font='bold 10px sans-serif'; cx.fillStyle='#999'; cx.textAlign='center';
+    cx.fillText('🐾 tap!', W/2, H-12);
     requestAnimationFrame(loop);
   }
   loop();
