@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Snack Pour</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { overflow: hidden; background: #1a1a2e; font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
+    #canvas { display: block; width: 100vw; height: 100vh; cursor: pointer; }
+    #ui { position: fixed; bottom: 40px; left: 50%; transform: translateX(-50%); pointer-events: none; z-index: 10; }
+    #hint { color: rgba(255,255,255,0.8); font-size: 15px; background: rgba(0,0,0,0.5); padding: 10px 20px; border-radius: 20px; backdrop-filter: blur(4px); transition: opacity 0.6s; }
+    #hint.hidden { opacity: 0; }
+    #loading { position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%); color: rgba(255,255,255,0.5); font-size: 14px; }
+    #hud { position: fixed; top: 20px; right: 20px; color: #fff; font-size: 18px; font-weight: bold; text-align: right; pointer-events: none; z-index: 10; text-shadow: 0 1px 4px rgba(0,0,0,0.6); }
+    #hud .timer { font-size: 28px; }
+    #hud .score { font-size: 16px; opacity: 0.8; margin-top: 4px; }
+    #result { position: fixed; top: 0; left: 0; width: 100%; height: 100%; display: none; z-index: 20; background: rgba(0,0,0,0.7); backdrop-filter: blur(4px); }
+    #result .inner { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); text-align: center; color: #fff; }
+    #result h1 { font-size: 96px; font-weight: 900; margin-bottom: 5px; background: linear-gradient(135deg, #ff6b35, #ffd700, #ff6b35); background-size: 200% 200%; -webkit-background-clip: text; -webkit-text-fill-color: transparent; animation: score-glow 2s ease infinite; }
+    @keyframes score-glow { 0%,100%{background-position:0% 50%} 50%{background-position:100% 50%} }
+    #result p { font-size: 20px; opacity: 0.8; margin-bottom: 24px; }
+    #result button { padding: 12px 32px; font-size: 18px; border: none; border-radius: 8px; background: #ff6b35; color: #fff; cursor: pointer; }
+    #result button:hover { background: #e55a2b; }
+    #super-banner { position: fixed; top: 0; left: 0; width: 100%; text-align: center; pointer-events: none; z-index: 15; display: none; }
+    #super-banner h1 { font-size: 90px; font-weight: 900; letter-spacing: 6px; margin-top: 15px; background: linear-gradient(90deg, #ff0, #f0f, #0ff, #ff0, #f0f); background-size: 400% 100%; -webkit-background-clip: text; -webkit-text-fill-color: transparent; animation: holo-text 2s linear infinite; text-shadow: none; }
+    @keyframes holo-text { 0%{background-position:0% 50%} 100%{background-position:400% 50%} }
+    #super-bg { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: -1; display: none; }
+    #super-bg::before { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 0%, rgba(255,215,0,0.15) 0%, transparent 60%); animation: pulse-bg 1.5s ease-in-out infinite alternate; }
+    #super-bg::after { content: ''; position: absolute; inset: 0; background: conic-gradient(from 0deg, transparent, rgba(255,0,255,0.05), transparent, rgba(0,255,255,0.05), transparent); animation: spin-bg 4s linear infinite; }
+    @keyframes pulse-bg { 0%{opacity:0.5} 100%{opacity:1} }
+    @keyframes spin-bg { 0%{transform:rotate(0deg)} 100%{transform:rotate(360deg)} }
+    #pour-fx { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 5; display: none; overflow: hidden; }
+    #pour-fx .ray { position: absolute; top: 50%; left: 50%; width: 3px; height: 120vh; transform-origin: center top; opacity: 0; animation: ray-burst 0.8s ease-out forwards; }
+    @keyframes ray-burst { 0%{opacity:0.8;transform:scaleY(0) rotate(var(--angle))} 50%{opacity:0.6;transform:scaleY(1) rotate(var(--angle))} 100%{opacity:0;transform:scaleY(1) rotate(var(--angle))} }
+    #pour-fx .ring { position: absolute; top: 50%; left: 50%; width: 0; height: 0; border-radius: 50%; transform: translate(-50%,-50%); border: 3px solid rgba(255,215,0,0.6); animation: ring-expand 1s ease-out forwards; }
+    @keyframes ring-expand { 0%{width:0;height:0;opacity:1} 100%{width:80vw;height:80vw;opacity:0} }
+  </style>
+</head>
+<body>
+  <canvas id="canvas"></canvas>
+  <div id="super-bg"></div>
+  <div id="super-banner"><h1>SUPER<br>CHEEZE IT</h1></div>
+  <div id="pour-fx"></div>
+  <div id="loading">loading...</div>
+  <div id="hud" style="display:none"><div class="timer">30</div><div class="score">0 crackers</div></div>
+  <div id="result"><div class="inner"><h1></h1><p></p><button onclick="retry()">다시 하기</button></div></div>
+  <div id="ui"><p id="hint" class="hidden"></p></div>
+  <script type="importmap">
+  { "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/",
+    "cannon-es": "https://cdn.jsdelivr.net/npm/cannon-es@0.20.0/dist/cannon-es.js"
+  }}
+  </script>
+  <script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import * as CANNON from 'cannon-es';
+
+const canvas = document.getElementById('canvas');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.2;
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x1a1a2e);
+const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 100);
+camera.position.set(0, 1.5, 4);
+camera.lookAt(0, 0.8, 0);
+scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
+dirLight.position.set(3, 5, 4); dirLight.castShadow = true;
+dirLight.shadow.mapSize.set(1024, 1024); scene.add(dirLight);
+const fl = new THREE.DirectionalLight(0x8888ff, 0.3);
+fl.position.set(-3, 2, -2); scene.add(fl);
+
+const world = new CANNON.World();
+world.gravity.set(0, -9.82, 0);
+world.broadphase = new CANNON.NaiveBroadphase();
+world.solver.iterations = 10;
+const gndBody = new CANNON.Body({ type: CANNON.Body.STATIC, shape: new CANNON.Plane() });
+gndBody.quaternion.setFromEuler(-Math.PI / 2, 0, 0);
+world.addBody(gndBody);
+
+function splitByY(mesh, cutY) {
+  const geo = mesh.geometry.clone();
+  geo.applyMatrix4(mesh.matrixWorld);
+  const pos = geo.attributes.position, norm = geo.attributes.normal, uv = geo.attributes.uv;
+  const idx = geo.index ? Array.from(geo.index.array) : null;
+  const tc = idx ? idx.length / 3 : pos.count / 3;
+  const T = { v: [], n: [], u: [] }, B = { v: [], n: [], u: [] };
+  for (let t = 0; t < tc; t++) {
+    const i0 = idx ? idx[t*3] : t*3, i1 = idx ? idx[t*3+1] : t*3+1, i2 = idx ? idx[t*3+2] : t*3+2;
+    const ay = (pos.getY(i0) + pos.getY(i1) + pos.getY(i2)) / 3;
+    const d = ay >= cutY ? T : B;
+    for (const i of [i0, i1, i2]) {
+      d.v.push(pos.getX(i), pos.getY(i), pos.getZ(i));
+      d.n.push(norm ? norm.getX(i) : 0, norm ? norm.getY(i) : 1, norm ? norm.getZ(i) : 0);
+      d.u.push(uv ? uv.getX(i) : 0, uv ? uv.getY(i) : 0);
+    }
+  }
+  function mk(d) {
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(d.v, 3));
+    g.setAttribute('normal', new THREE.Float32BufferAttribute(d.n, 3));
+    if (d.u.length) g.setAttribute('uv', new THREE.Float32BufferAttribute(d.u, 2));
+    return g;
+  }
+  return { topGeo: mk(T), botGeo: mk(B) };
+}
+
+const loader = new GLTFLoader();
+const hint = document.getElementById('hint');
+
+// --- Sound Effects (mp3) ---
+let audioCtx = null;
+function getAudio() { if (!audioCtx) audioCtx = new AudioContext(); return audioCtx; }
+
+const soundBuffers = {};
+async function loadSound(name, url) {
+  try {
+    const resp = await fetch(url);
+    const buf = await resp.arrayBuffer();
+    soundBuffers[name] = await getAudio().decodeAudioData(buf);
+  } catch(e) { console.warn('Sound load failed:', name, e); }
+}
+
+function playSound(name, duration) {
+  const ctx = getAudio();
+  const buf = soundBuffers[name];
+  if (!buf) return;
+  const src = ctx.createBufferSource();
+  src.buffer = buf;
+  const gain = ctx.createGain();
+  gain.gain.value = 0.7;
+  src.connect(gain).connect(ctx.destination);
+  src.start();
+  if (duration) {
+    gain.gain.setValueAtTime(0.7, ctx.currentTime + duration - 0.05);
+    gain.gain.linearRampToValueAtTime(0, ctx.currentTime + duration);
+    src.stop(ctx.currentTime + duration);
+  }
+}
+
+function playTear() { playSound('tear'); }
+let bgmSource = null;
+let bgmGain = null;
+
+function playBgm() {
+  const ctx = getAudio();
+  const buf = soundBuffers['jackpot'];
+  if (!buf) return;
+  bgmSource = ctx.createBufferSource();
+  bgmSource.buffer = buf;
+  bgmSource.loop = true;
+  bgmGain = ctx.createGain();
+  bgmGain.gain.value = 0.5;
+  bgmSource.connect(bgmGain).connect(ctx.destination);
+  bgmSource.start();
+}
+
+function fadeOutBgm() {
+  if (!bgmGain || !bgmSource) return;
+  const ctx = getAudio();
+  bgmGain.gain.setValueAtTime(bgmGain.gain.value, ctx.currentTime);
+  bgmGain.gain.linearRampToValueAtTime(0, ctx.currentTime + 1.5);
+  setTimeout(() => { try { bgmSource.stop(); } catch(e){} bgmSource = null; bgmGain = null; }, 1600);
+}
+function playCrackle() {
+  const ctx = getAudio();
+  const dur = 0.06;
+  const buf = ctx.createBuffer(1, ctx.sampleRate * dur, ctx.sampleRate);
+  const data = buf.getChannelData(0);
+  for (let i = 0; i < data.length; i++) {
+    const t = i / ctx.sampleRate;
+    const env = Math.max(0, 1 - t / dur);
+    data[i] = (Math.random() * 2 - 1) * env * 0.12;
+  }
+  const src = ctx.createBufferSource();
+  src.buffer = buf;
+  src.connect(ctx.destination);
+  src.start();
+}
+function playThrow() { playSound('throw', 0.6); }
+
+loadSound('tear', './assets/tear.mp3');
+loadSound('crackle', './assets/crackle.mp3');
+loadSound('throw', './assets/throw.mp3');
+loadSound('jackpot', './assets/jackpot.mp3');
+loadSound('coin', './assets/coin.mp3');
+
+const snacks = [];
+const MAX_SNACKS = 80;
+let crackerTpl = null;
+let state = 'idle';
+let bagTopY = 1.5, cutY = 0;
+let targetRotZ = 0, spawning = false, spawnTimer = 0;
+let isDragging = false, dragStartX = 0;
+let bagLoaded = false;
+let pourCount = 0;
+let isSuper = false;
+let maxPour = 40;
+let holoTime = 0;
+
+let bagGroup = null;
+let botMesh = null;
+let topPieces = [];
+let crumpleTime = 0;
+let particles = []; // tear particles
+
+function showHint(t) { hint.textContent = t; hint.classList.remove('hidden'); }
+
+function spawnTearParticles() {
+  const count = 12;
+  for (let i = 0; i < count; i++) {
+    const size = 0.02 + Math.random() * 0.03;
+    const geo = new THREE.PlaneGeometry(size, size);
+    const mat = new THREE.MeshBasicMaterial({
+      color: new THREE.Color().setHSL(0.05 + Math.random() * 0.05, 0.8, 0.5),
+      side: THREE.DoubleSide, transparent: true, opacity: 1,
+    });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.set((Math.random()-0.5)*0.4, cutY + Math.random()*0.2, (Math.random()-0.5)*0.2);
+    mesh.rotation.set(Math.random()*Math.PI, Math.random()*Math.PI, Math.random()*Math.PI);
+    scene.add(mesh);
+    particles.push({
+      mesh,
+      vel: new THREE.Vector3((Math.random()-0.5)*2, 1+Math.random()*2, (Math.random()-0.5)*1.5),
+      life: 1.0,
+    });
+  }
+}
+
+function spawnCrumbs(x, z) {
+  const count = 4;
+  for (let i = 0; i < count; i++) {
+    const size = 0.01 + Math.random() * 0.015;
+    const geo = new THREE.PlaneGeometry(size, size);
+    const mat = new THREE.MeshBasicMaterial({
+      color: new THREE.Color().setHSL(0.08 + Math.random() * 0.04, 0.7, 0.55),
+      side: THREE.DoubleSide, transparent: true, opacity: 0.9,
+    });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.set(x + (Math.random()-0.5)*0.1, 0.02, z + (Math.random()-0.5)*0.1);
+    mesh.rotation.set(Math.random()*Math.PI, Math.random()*Math.PI, 0);
+    scene.add(mesh);
+    particles.push({
+      mesh,
+      vel: new THREE.Vector3((Math.random()-0.5)*0.5, 0.3+Math.random()*0.5, (Math.random()-0.5)*0.5),
+      life: 0.6,
+    });
+  }
+}
+
+// --- Timer ---
+const hudEl = document.getElementById('hud');
+const resultEl = document.getElementById('result');
+let gameTimer = 30;
+let gameStarted = false;
+let score = 0;
+
+function startTimer() {
+  if (gameStarted) return;
+  gameStarted = true;
+  hudEl.style.display = 'block';
+  score = 0;
+  gameTimer = 30;
+}
+
+function endGame() {
+  state = 'gameover';
+  spawning = false;
+  targetRotZ = 0;
+  fadeOutBgm();
+  resultEl.style.display = 'block';
+  resultEl.querySelector('h1').textContent = `${score}`;
+  resultEl.querySelector('p').textContent = isSuper ? 'SUPER CHEEZE IT!!' : 'crackers poured';
+  hint.classList.add('hidden');
+  hudEl.style.display = 'none';
+  document.getElementById('super-banner').style.display = 'none';
+  document.getElementById('super-bg').style.display = 'none';
+}
+
+window.retry = function() {
+  resultEl.style.display = 'none';
+  gameStarted = false;
+  gameTimer = 30;
+  score = 0;
+  pourCount = 0;
+  // Clear all snacks
+  for (const s of snacks) { scene.remove(s.mesh); world.removeBody(s.body); }
+  snacks.length = 0;
+  // Clear particles
+  for (const p of particles) { scene.remove(p.mesh); p.mesh.geometry.dispose(); p.mesh.material.dispose(); }
+  particles.length = 0;
+  // Reset bag
+  if (botMesh) { scene.remove(botMesh); botMesh.geometry?.dispose(); botMesh.material?.dispose(); botMesh = null; }
+  for (const p of topPieces) { scene.remove(p); p.geometry?.dispose(); p.material?.dispose(); }
+  topPieces = [];
+  state = 'idle';
+  loadBag();
+};
+
+loader.load('./assets/cracker.glb', g => {
+  crackerTpl = g.scene;
+  const b = new THREE.Box3().setFromObject(crackerTpl);
+  const mx = Math.max(...b.getSize(new THREE.Vector3()).toArray());
+  crackerTpl.scale.setScalar(1 / mx);
+  crackerTpl.traverse(c => { if (c.isMesh) c.castShadow = true; });
+}, undefined, () => {});
+
+function loadBag() {
+  if (bagGroup) { scene.remove(bagGroup); }
+  bagGroup = new THREE.Group();
+  bagGroup.visible = false;
+  scene.add(bagGroup);
+  loader.load('./assets/cheezit-bag.glb', gltf => {
+    const model = gltf.scene;
+    const box = new THREE.Box3().setFromObject(model);
+    const size = box.getSize(new THREE.Vector3());
+    const center = box.getCenter(new THREE.Vector3());
+    const s = 1.5 / size.y;
+    model.scale.setScalar(s);
+    model.position.set(-center.x * s, -box.min.y * s, -center.z * s);
+    model.updateMatrixWorld(true);
+    model.traverse(c => { if (c.isMesh) c.castShadow = true; });
+
+    // 10% chance: SUPER CHEEZ-IT
+    isSuper = Math.random() < 0.15;
+    maxPour = isSuper ? 300 : 40;
+    if (isSuper) {
+      model.traverse(c => {
+        if (c.isMesh) {
+          c.material = c.material.clone();
+          c.material.metalness = 0.9;
+          c.material.roughness = 0.1;
+          c.material.envMapIntensity = 2.0;
+          c.material.emissive = new THREE.Color(0x222244);
+          c.material.emissiveIntensity = 0.3;
+        }
+      });
+    }
+
+    bagGroup.add(model);
+    bagGroup.visible = true;
+    bagLoaded = true;
+    const nb = new THREE.Box3().setFromObject(bagGroup);
+    bagTopY = nb.max.y;
+    cutY = bagTopY * 0.82;
+    const el = document.getElementById('loading');
+    if (el) el.remove();
+    showHint(isSuper ? '✨ 슈퍼 치즈잇!! ✨' : '봉지를 클릭해서 찢어보세요');
+    if (isSuper) {
+      document.getElementById('super-banner').style.display = 'block';
+      document.getElementById('super-bg').style.display = 'block';
+    } else {
+      document.getElementById('super-banner').style.display = 'none';
+      document.getElementById('super-bg').style.display = 'none';
+    }
+  }, undefined, () => {
+    const el = document.getElementById('loading');
+    if (el) el.textContent = 'assets/cheezit-bag.glb 필요';
+  });
+}
+loadBag();
+
+function tearBag() {
+  state = 'torn';
+  startTimer();
+  if (isSuper) playBgm();
+  const meshes = [];
+  bagGroup.traverse(c => { if (c.isMesh) meshes.push(c); });
+
+  let allTopVerts = { v: [], n: [], u: [] };
+  let allBotVerts = { v: [], n: [], u: [] };
+  let material = null;
+
+  for (const mesh of meshes) {
+    mesh.updateMatrixWorld(true);
+    if (!material) material = mesh.material;
+    const { topGeo, botGeo } = splitByY(mesh, cutY);
+    const tp = topGeo.attributes.position, bp = botGeo.attributes.position;
+    const tn = topGeo.attributes.normal, bn = botGeo.attributes.normal;
+    const tu = topGeo.attributes.uv, bu = botGeo.attributes.uv;
+    for (let i = 0; i < tp.count; i++) { allTopVerts.v.push(tp.getX(i), tp.getY(i), tp.getZ(i)); allTopVerts.n.push(tn.getX(i), tn.getY(i), tn.getZ(i)); if (tu) allTopVerts.u.push(tu.getX(i), tu.getY(i)); }
+    for (let i = 0; i < bp.count; i++) { allBotVerts.v.push(bp.getX(i), bp.getY(i), bp.getZ(i)); allBotVerts.n.push(bn.getX(i), bn.getY(i), bn.getZ(i)); if (bu) allBotVerts.u.push(bu.getX(i), bu.getY(i)); }
+  }
+
+  const botGeo = new THREE.BufferGeometry();
+  botGeo.setAttribute('position', new THREE.Float32BufferAttribute(allBotVerts.v, 3));
+  botGeo.setAttribute('normal', new THREE.Float32BufferAttribute(allBotVerts.n, 3));
+  if (allBotVerts.u.length) botGeo.setAttribute('uv', new THREE.Float32BufferAttribute(allBotVerts.u, 2));
+  botMesh = new THREE.Mesh(botGeo, material ? material.clone() : new THREE.MeshStandardMaterial({ color: 0xff6b35 }));
+  botMesh.castShadow = true;
+  scene.add(botMesh);
+
+  if (allTopVerts.v.length > 0) {
+    const topGeo = new THREE.BufferGeometry();
+    topGeo.setAttribute('position', new THREE.Float32BufferAttribute(allTopVerts.v, 3));
+    topGeo.setAttribute('normal', new THREE.Float32BufferAttribute(allTopVerts.n, 3));
+    if (allTopVerts.u.length) topGeo.setAttribute('uv', new THREE.Float32BufferAttribute(allTopVerts.u, 2));
+    const topMesh = new THREE.Mesh(topGeo, material ? material.clone() : new THREE.MeshStandardMaterial({ color: 0xff6b35 }));
+    topMesh.castShadow = true;
+    topMesh.userData.vel = new THREE.Vector3(0.8, 3, (Math.random() - 0.5) * 0.5);
+    topMesh.userData.angVel = new THREE.Vector3((Math.random()-0.5)*6, (Math.random()-0.5)*6, (Math.random()-0.5)*4);
+    scene.add(topMesh);
+    topPieces.push(topMesh);
+  }
+
+  while (bagGroup.children.length) { const c = bagGroup.children[0]; bagGroup.remove(c); }
+  bagGroup.visible = false;
+  playTear();
+  spawnTearParticles();
+  showHint('좌우로 드래그해서 기울여보세요');
+}
+
+function spawnSnack() {
+  if (pourCount >= maxPour) return;
+  const sz = 0.08 + Math.random() * 0.04;
+  let mesh, shape;
+  if (crackerTpl) {
+    mesh = crackerTpl.clone();
+    mesh.scale.setScalar(sz);
+    shape = new CANNON.Box(new CANNON.Vec3(sz * 0.45, sz * 0.1, sz * 0.45));
+  } else {
+    mesh = new THREE.Mesh(new THREE.BoxGeometry(sz, sz * 0.2, sz), new THREE.MeshStandardMaterial({ color: 0xdaa520, roughness: 0.7 }));
+    mesh.castShadow = true;
+    shape = new CANNON.Box(new CANNON.Vec3(sz * 0.5, sz * 0.1, sz * 0.5));
+  }
+  scene.add(mesh);
+
+  const tilt = botMesh ? botMesh.rotation.z : 0;
+  const absTilt = Math.abs(tilt);
+  const pourDir = tilt < 0 ? 1 : -1;
+  const rimX = -Math.sin(tilt) * cutY + pourDir * Math.cos(tilt) * 0.2;
+  const rimY = Math.cos(tilt) * cutY + Math.sin(tilt) * pourDir * 0.2;
+  const speed = 0.5 + absTilt * 3;
+
+  const body = new CANNON.Body({
+    mass: 0.02, shape,
+    position: new CANNON.Vec3(rimX, rimY, (Math.random() - 0.5) * 0.08),
+    linearDamping: 0.2, angularDamping: 0.3,
+  });
+  body.velocity.set(pourDir * speed + (Math.random()-0.5)*0.3, -speed*0.5 + Math.random()*0.3, (Math.random()-0.5)*0.4);
+  body.angularVelocity.set((Math.random()-0.5)*8, (Math.random()-0.5)*8, (Math.random()-0.5)*8);
+  world.addBody(body);
+  snacks.push({ mesh, body });
+  pourCount++;
+  if (pourCount % 3 === 0) { isSuper ? playSound('coin', 0.5) : playCrackle(); }
+}
+
+function crumpleBag() {
+  state = 'crumpling';
+  crumpleTime = 0;
+  hint.classList.add('hidden');
+  playThrow();
+  if (botMesh) {
+    botMesh.userData.throwVel = new THREE.Vector3((Math.random()-0.5)*2, 3, -5 - Math.random()*2);
+  }
+}
+
+function resetBag() {
+  if (botMesh) { scene.remove(botMesh); botMesh.geometry?.dispose(); botMesh.material?.dispose(); botMesh = null; }
+  for (const p of topPieces) { scene.remove(p); p.geometry?.dispose(); p.material?.dispose(); }
+  topPieces = [];
+  spawning = false; spawnTimer = 0; targetRotZ = 0;
+  pourCount = 0;
+  state = 'idle';
+  loadBag();
+}
+
+function hitBag(e) {
+  const mouse = new THREE.Vector2((e.clientX/window.innerWidth)*2-1, -(e.clientY/window.innerHeight)*2+1);
+  const rc = new THREE.Raycaster();
+  rc.setFromCamera(mouse, camera);
+  const targets = [];
+  if (bagGroup && bagGroup.visible) targets.push(...bagGroup.children);
+  if (botMesh) targets.push(botMesh);
+  return rc.intersectObjects(targets, true).length > 0;
+}
+
+canvas.addEventListener('pointerdown', e => {
+  if (!bagLoaded || state === 'gameover') return;
+  console.log('pointerdown, state:', state, 'pourCount:', pourCount);
+  if (state === 'idle') { if (hitBag(e)) tearBag(); }
+  else if (state === 'torn') { isDragging = true; dragStartX = e.clientX; canvas.style.cursor = 'grabbing'; }
+  else if (state === 'done') { console.log('crumpleBag!', botMesh); crumpleBag(); }
+});
+canvas.addEventListener('pointermove', e => {
+  if (!isDragging) return;
+  const dx = e.clientX - dragStartX;
+  targetRotZ = THREE.MathUtils.clamp(-dx * 0.012, -Math.PI * 0.55, Math.PI * 0.55);
+  if (Math.abs(targetRotZ) > 0.15 && !spawning) spawning = true;
+  else if (Math.abs(targetRotZ) <= 0.15 && spawning) spawning = false;
+});
+canvas.addEventListener('pointerup', () => {
+  if (isDragging) {
+    isDragging = false; canvas.style.cursor = 'pointer'; targetRotZ = 0; spawning = false;
+  }
+});
+
+let lastTime = performance.now();
+function animate() {
+  requestAnimationFrame(animate);
+  const now = performance.now();
+  const dt = Math.min((now - lastTime) / 1000, 1 / 30);
+  lastTime = now;
+
+  if (botMesh && state === 'torn') {
+    botMesh.rotation.z += (targetRotZ - botMesh.rotation.z) * dt * 8;
+  }
+
+  // Super hologram shimmer
+  if (isSuper && bagGroup && bagGroup.visible) {
+    holoTime += dt;
+    bagGroup.traverse(c => {
+      if (c.isMesh && c.material) {
+        c.material.emissive.setHSL((holoTime * 0.5) % 1, 0.8, 0.15);
+      }
+    });
+  }
+  if (isSuper && botMesh && state === 'torn') {
+    holoTime += dt;
+    botMesh.material.emissive = botMesh.material.emissive || new THREE.Color();
+    botMesh.material.emissive.setHSL((holoTime * 0.5) % 1, 0.8, 0.15);
+    botMesh.material.metalness = 0.9;
+    botMesh.material.roughness = 0.1;
+  }
+
+  for (let i = topPieces.length - 1; i >= 0; i--) {
+    const p = topPieces[i];
+    p.userData.vel.y -= 9.8 * dt;
+    p.position.add(p.userData.vel.clone().multiplyScalar(dt));
+    p.rotation.x += p.userData.angVel.x * dt;
+    p.rotation.y += p.userData.angVel.y * dt;
+    p.rotation.z += p.userData.angVel.z * dt;
+    if (p.position.y < -3) { scene.remove(p); p.geometry?.dispose(); p.material?.dispose(); topPieces.splice(i, 1); }
+  }
+
+  // Tear particles
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.vel.y -= 5 * dt;
+    p.mesh.position.add(p.vel.clone().multiplyScalar(dt));
+    p.mesh.rotation.x += dt * 3;
+    p.mesh.rotation.z += dt * 2;
+    p.life -= dt * 1.5;
+    p.mesh.material.opacity = Math.max(0, p.life);
+    if (p.life <= 0) { scene.remove(p.mesh); p.mesh.geometry.dispose(); p.mesh.material.dispose(); particles.splice(i, 1); }
+  }
+
+  if (state === 'crumpling' && botMesh && botMesh.userData.throwVel) {
+    crumpleTime += dt;
+    const shrink = Math.max(0.15, 1 - crumpleTime * 2);
+    botMesh.scale.set(shrink, shrink * 0.5, shrink);
+    botMesh.userData.throwVel.y -= 9.8 * dt;
+    botMesh.position.add(botMesh.userData.throwVel.clone().multiplyScalar(dt));
+    botMesh.rotation.x += dt * 8;
+    botMesh.rotation.y += dt * 5;
+    if (crumpleTime > 1.2) {
+      botMesh = null;
+      topPieces = [];
+      spawning = false; spawnTimer = 0; targetRotZ = 0;
+      pourCount = 0;
+      state = 'idle';
+      loadBag();
+    }
+  }
+
+  // Timer (pauses during done/crumpling states)
+  if (gameStarted && state !== 'gameover' && state !== 'done' && state !== 'crumpling') {
+    gameTimer -= dt;
+    if (gameTimer <= 0) {
+      gameTimer = 0;
+      endGame();
+    }
+  }
+  if (gameStarted && state !== 'gameover') {
+    hudEl.querySelector('.timer').textContent = Math.ceil(Math.max(0, gameTimer));
+    hudEl.querySelector('.score').textContent = `${score} crackers`;
+  }
+
+  // Spawn snacks
+  if (spawning && botMesh && state !== 'gameover') {
+    const absTilt = Math.abs(botMesh.rotation.z);
+    const freq = Math.max(1, Math.floor(6 - absTilt * 5));
+    spawnTimer++;
+    if (spawnTimer % freq === 0) spawnSnack();
+  }
+
+  if (state === 'torn' && pourCount >= maxPour) {
+    state = 'done';
+    spawning = false;
+    targetRotZ = 0;
+    fadeOutBgm();
+    showHint('클릭해서 봉지를 던져버리세요');
+    console.log('-> done!');
+  }
+
+  world.step(1 / 60, dt, 3);
+  for (const s of snacks) { s.mesh.position.copy(s.body.position); s.mesh.quaternion.copy(s.body.quaternion); }
+
+  // Detect ground hits and spawn crumbs
+  for (const s of snacks) {
+    if (!s.landed && s.body.position.y < 0.05 && Math.abs(s.body.velocity.y) > 0.5) {
+      s.landed = true;
+      score++;
+      spawnCrumbs(s.body.position.x, s.body.position.z);
+    }
+  }
+
+  for (let i = snacks.length - 1; i >= 0; i--) {
+    if (snacks[i].body.position.y < -5) {
+      scene.remove(snacks[i].mesh); world.removeBody(snacks[i].body);
+      snacks[i].mesh.traverse?.(c => { if (c.isMesh) { c.geometry?.dispose(); c.material?.dispose(); } });
+      snacks.splice(i, 1);
+    }
+  }
+
+  if (spawning && !hint.classList.contains('hidden')) hint.classList.add('hidden');
+  renderer.render(scene, camera);
+}
+animate();
+
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+  </script>
+</body>
+</html>
