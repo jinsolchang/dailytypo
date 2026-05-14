@@ -2,659 +2,490 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Digital Darkroom</title>
-<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap" rel="stylesheet">
+<title>RAPID PACK — Warehouse Sim</title>
 <style>
-* { margin: 0; padding: 0; box-sizing: border-box; }
-
-body {
-  background: #000;
-  font-family: 'Noto Sans KR', sans-serif;
-  height: 100vh;
-  overflow: hidden;
-}
-
-/* === 인화조: 전체화면 === */
-.tank {
-  position: fixed;
-  inset: 0;
-  background: #040608;
-  overflow: hidden;
-  cursor: pointer;
-}
-
-/* 깊은 물 그라데이션 오버레이 */
-.depth-overlay {
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(
-    ellipse 70% 50% at 50% 45%,
-    rgba(4,20,40,0.0) 0%,
-    rgba(2,10,25,0.7) 40%,
-    rgba(0,3,10,0.95) 100%
-  );
-  pointer-events: none;
-  z-index: 2;
-}
-
-/* 수면 코스틱 (빛 일렁임) */
-.caustics {
-  position: absolute;
-  inset: 0;
-  opacity: 0.08;
-  pointer-events: none;
-  z-index: 3;
-  mix-blend-mode: screen;
-}
-
-/* 업로드 영역 */
-.upload-zone {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 16px;
-  z-index: 10;
-  cursor: pointer;
-}
-
-.upload-zone .icon {
-  width: 80px;
-  height: 80px;
-  border: 2px dashed rgba(180,200,220,0.3);
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 2rem;
-  color: rgba(180,200,220,0.4);
-  transition: all 0.3s;
-}
-
-.upload-zone:hover .icon {
-  border-color: rgba(180,200,220,0.6);
-  color: rgba(180,200,220,0.7);
-}
-
-.upload-zone p {
-  font-size: 0.85rem;
-  color: rgba(180,200,220,0.4);
-}
-
-.upload-zone.hidden { display: none; }
-
-/* 사진 (물속 깊이에서 떠오름) */
-.photo-container {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%) scale(0.7);
-  z-index: 1;
-  opacity: 0;
-  transition: none;
-}
-
-.photo-frame {
-  background: #f5f5f0;
-  padding: 16px 16px 52px 16px;
-  box-shadow: 0 8px 60px rgba(0,0,0,0.8);
-}
-
-.photo-inner {
-  position: relative;
-  overflow: hidden;
-}
-
-.photo-inner img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-
-/* 물결 오버레이 — 사진 위에 직접 */
-.ripple-overlay {
-  position: absolute;
-  inset: 0;
-  z-index: 10;
-  pointer-events: none;
-}
-
-/* 인화 레이어 */
-.layer-fog {
-  position: absolute;
-  inset: 0;
-  background: rgba(240,238,230,1);
-  z-index: 4;
-}
-
-.layer-edges {
-  position: absolute;
-  inset: 0;
-  z-index: 3;
-  opacity: 0;
-}
-
-.layer-edges img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  filter: grayscale(1) contrast(3) brightness(0.3) sepia(0.8);
-}
-
-.layer-mid {
-  position: absolute;
-  inset: 0;
-  z-index: 2;
-  opacity: 0;
-}
-
-.layer-mid img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  filter: grayscale(0.6) contrast(1.3) brightness(0.6) saturate(0.4);
-}
-
-.layer-full {
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  opacity: 0;
-}
-
-.layer-full img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-/* 빨랫줄 (하단 고정) */
-.clothesline {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 100px;
-  padding: 0 20px;
-  overflow-x: auto;
-  overflow-y: hidden;
-  white-space: nowrap;
-  z-index: 20;
-  background: linear-gradient(transparent, rgba(0,0,0,0.8));
-  display: flex;
-  align-items: flex-end;
-  padding-bottom: 12px;
-}
-
-.clothesline::before {
-  content: '';
-  position: absolute;
-  top: 40px;
-  left: 0;
-  right: 0;
-  height: 1px;
-  background: rgba(150,120,80,0.4);
-}
-
-.clothesline-item {
-  display: inline-block;
-  position: relative;
-  margin: 0 10px;
-  cursor: pointer;
-  transition: transform 0.3s;
-  flex-shrink: 0;
-}
-
-.clothesline-item:hover {
-  transform: scale(1.15) rotate(-3deg);
-}
-
-.clothesline-item::before {
-  content: '';
-  position: absolute;
-  top: -6px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 8px;
-  height: 12px;
-  background: #6b4423;
-  border-radius: 1px 1px 3px 3px;
-}
-
-.clothesline-item img {
-  width: 52px;
-  height: 52px;
-  object-fit: cover;
-  border: 2px solid #f5f5f0;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.6);
-}
-
-/* 컨트롤 */
-.controls {
-  position: fixed;
-  top: 20px;
-  right: 20px;
-  display: flex;
-  gap: 8px;
-  z-index: 20;
-}
-
-.btn {
-  padding: 8px 14px;
-  border: 1px solid rgba(200,200,200,0.2);
-  background: rgba(0,0,0,0.4);
-  color: rgba(200,200,200,0.7);
-  font-size: 0.75rem;
-  border-radius: 4px;
-  cursor: pointer;
-  transition: all 0.2s;
-  font-family: inherit;
-  backdrop-filter: blur(4px);
-}
-
-.btn:hover {
-  background: rgba(40,40,40,0.6);
-  border-color: rgba(200,200,200,0.4);
-  color: #fff;
-}
-
-.btn:disabled {
-  opacity: 0.2;
-  cursor: not-allowed;
-}
-
-/* 진행 표시 */
-.progress-ring {
-  position: fixed;
-  bottom: 120px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 20;
-  opacity: 0;
-  transition: opacity 0.3s;
-}
-
-.progress-ring.active { opacity: 1; }
-
-.progress-ring circle {
-  fill: none;
-  stroke-width: 2;
-}
-
-.progress-ring .bg { stroke: rgba(255,255,255,0.1); }
-.progress-ring .fg { stroke: rgba(200,170,100,0.6); stroke-linecap: round; transition: stroke-dashoffset 0.1s linear; }
-
-#fileInput { display: none; }
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;800&family=Bebas+Neue&display=swap');
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{width:100%;height:100%;overflow:hidden;background:#0a0a0a;font-family:'JetBrains Mono',monospace;color:#e8e6df;user-select:none;cursor:default}
+  #app{position:fixed;inset:0}canvas{display:block}
+  .hud{position:fixed;top:0;left:0;right:0;padding:20px 28px;display:flex;justify-content:space-between;align-items:flex-start;pointer-events:none;z-index:10;background:linear-gradient(180deg,rgba(0,0,0,0.7) 0%,rgba(0,0,0,0) 100%)}
+  .hud-left,.hud-right,.hud-center{display:flex;flex-direction:column;gap:6px}
+  .hud-center{align-items:center}
+  .label{font-size:10px;letter-spacing:0.25em;color:#888076;text-transform:uppercase}
+  .value{font-family:'Bebas Neue',sans-serif;font-size:38px;line-height:0.9;color:#ffb800;letter-spacing:0.02em}
+  .value.small{font-size:24px;color:#e8e6df}
+  .timer-bar{width:280px;height:6px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.1);margin-top:4px;overflow:hidden}
+  .timer-fill{height:100%;background:linear-gradient(90deg,#ffb800,#ff5722);width:100%;transition:width 0.1s linear}
+  .combo{color:#ff5722;font-family:'Bebas Neue',sans-serif;font-size:22px;opacity:0;transition:opacity 0.3s}
+  .combo.show{opacity:1}
+  .step-panel{position:fixed;bottom:28px;left:50%;transform:translateX(-50%);background:rgba(15,14,12,0.85);border:1px solid rgba(255,184,0,0.3);padding:14px 28px;display:flex;align-items:center;gap:24px;z-index:10;backdrop-filter:blur(8px);pointer-events:none}
+  .step-num{font-family:'Bebas Neue',sans-serif;font-size:32px;color:#ffb800;line-height:1}
+  .step-text{font-size:13px;letter-spacing:0.08em;color:#e8e6df}
+  .step-text .sub{font-size:10px;color:#888076;letter-spacing:0.15em;margin-top:2px;text-transform:uppercase}
+  .overlay{position:fixed;inset:0;background:rgba(8,8,8,0.92);z-index:100;display:flex;flex-direction:column;justify-content:center;align-items:center;backdrop-filter:blur(10px)}
+  .overlay h1{font-family:'Bebas Neue',sans-serif;font-size:96px;letter-spacing:0.05em;background:linear-gradient(180deg,#ffb800 0%,#ff5722 100%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;line-height:1}
+  .overlay .tag{font-size:11px;letter-spacing:0.4em;color:#888076;margin-top:6px;text-transform:uppercase}
+  .overlay .desc{margin-top:28px;max-width:420px;text-align:center;font-size:13px;line-height:1.8;color:#b8b3a8}
+  .overlay .desc strong{color:#ffb800;font-weight:600}
+  .start-btn{margin-top:36px;background:#ffb800;color:#0a0a0a;border:none;padding:16px 48px;font-family:'JetBrains Mono',monospace;font-weight:800;font-size:14px;letter-spacing:0.2em;cursor:pointer;text-transform:uppercase;transition:all 0.2s}
+  .start-btn:hover{background:#ff5722;color:#fff;transform:translateY(-2px);box-shadow:0 8px 24px rgba(255,87,34,0.4)}
+  .float-score{position:absolute;font-family:'Bebas Neue',sans-serif;font-size:32px;color:#ffb800;pointer-events:none;animation:floatUp 1s ease-out forwards;text-shadow:0 2px 8px rgba(0,0,0,0.8);z-index:50}
+  @keyframes floatUp{0%{opacity:1;transform:translateY(0)}100%{opacity:0;transform:translateY(-60px)}}
+  .toast{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);font-family:'Bebas Neue',sans-serif;font-size:64px;color:#ff5722;text-shadow:0 4px 24px rgba(0,0,0,0.8);pointer-events:none;opacity:0;z-index:60;letter-spacing:0.05em}
+  .toast.show{animation:toastPop 0.8s ease-out}
+  @keyframes toastPop{0%{opacity:0;transform:translate(-50%,-50%) scale(0.5)}20%{opacity:1;transform:translate(-50%,-50%) scale(1.1)}80%{opacity:1;transform:translate(-50%,-50%) scale(1)}100%{opacity:0;transform:translate(-50%,-50%) scale(1)}}
+  .gameover h1{font-size:72px}
+  .stats{display:grid;grid-template-columns:1fr 1fr;gap:20px 60px;margin-top:28px}
+  .stat{text-align:center}
+  .stat .v{font-family:'Bebas Neue',sans-serif;font-size:42px;color:#ffb800}
+  .stat .l{font-size:10px;letter-spacing:0.25em;color:#888076;text-transform:uppercase}
+  body.grabbing{cursor:grabbing}
 </style>
 </head>
 <body>
-
-<div class="tank" id="tank">
-  <div class="depth-overlay"></div>
-  <canvas class="caustics" id="caustics"></canvas>
-
-  <div class="upload-zone" id="uploadZone">
-    <div class="icon">◎</div>
-    <p>클릭하여 사진을 현상액에 담그세요</p>
-  </div>
-
-  <div class="photo-container" id="photoContainer">
-    <div class="photo-frame" id="photoFrame">
-      <div class="photo-inner" id="photoInner">
-        <div class="layer-fog" id="layerFog"></div>
-        <div class="layer-edges" id="layerEdges"></div>
-        <div class="layer-mid" id="layerMid"></div>
-        <div class="layer-full" id="layerFull"></div>
-        <div class="ripple-overlay" id="rippleOverlay"></div>
-      </div>
-    </div>
-  </div>
+<div id="app"></div>
+<div class="hud" id="hud" style="display:none;">
+  <div class="hud-left"><div class="label">Score</div><div class="value" id="score">0</div><div class="combo" id="combo">×1</div></div>
+  <div class="hud-center"><div class="label">Time</div><div class="value small" id="timer">60.0</div><div class="timer-bar"><div class="timer-fill" id="timer-fill"></div></div></div>
+  <div class="hud-right" style="align-items:flex-end;"><div class="label">Packed</div><div class="value" id="packed">0</div></div>
 </div>
-
-<div class="clothesline" id="clothesline"></div>
-
-<div class="controls">
-  <button class="btn" id="btnDownload" disabled>저장</button>
-  <button class="btn" id="btnReset">새 사진</button>
+<div class="step-panel" id="step-panel" style="display:none;">
+  <div class="step-num" id="step-num">1</div>
+  <div class="step-text"><div id="step-title">OPEN</div><div class="sub" id="step-sub">Click the flat box</div></div>
 </div>
-
-<svg class="progress-ring" id="progressRing" width="40" height="40">
-  <circle class="bg" cx="20" cy="20" r="16"/>
-  <circle class="fg" id="progressCircle" cx="20" cy="20" r="16"
-    stroke-dasharray="100.53" stroke-dashoffset="100.53"
-    transform="rotate(-90 20 20)"/>
-</svg>
-
-<input type="file" id="fileInput" accept="image/*">
-
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.ripples/0.5.3/jquery.ripples.min.js"></script>
+<div class="toast" id="toast"></div>
+<div class="overlay" id="start">
+  <h1>RAPID PACK</h1>
+  <div class="tag">— Warehouse Sim —</div>
+  <div class="desc">A flat box arrives. You have <strong>60 seconds</strong>.<br>Open → fold top → tape → flip → load → fold bottom → tape → ship.<br><br><strong>Faster = bigger combo.</strong></div>
+  <button class="start-btn" id="start-btn">▶ Clock In</button>
+</div>
+<div class="overlay gameover" id="gameover" style="display:none;">
+  <h1>SHIFT OVER</h1><div class="tag">— Report —</div>
+  <div class="stats">
+    <div class="stat"><div class="v" id="final-score">0</div><div class="l">Score</div></div>
+    <div class="stat"><div class="v" id="final-packed">0</div><div class="l">Shipped</div></div>
+    <div class="stat"><div class="v" id="final-combo">0</div><div class="l">Max Combo</div></div>
+    <div class="stat"><div class="v" id="final-rank">D</div><div class="l">Rank</div></div>
+  </div>
+  <button class="start-btn" id="restart-btn">↻ Next Shift</button>
+</div>
+<script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
+<script src="https://unpkg.co/gsap@3/dist/gsap.min.js"></script>
 <script>
-const tankEl = document.getElementById('tank');
-const uploadZone = document.getElementById('uploadZone');
-const fileInput = document.getElementById('fileInput');
-const photoContainer = document.getElementById('photoContainer');
-const photoInner = document.getElementById('photoInner');
-const layerFog = document.getElementById('layerFog');
-const layerEdges = document.getElementById('layerEdges');
-const layerMid = document.getElementById('layerMid');
-const layerFull = document.getElementById('layerFull');
-const progressRing = document.getElementById('progressRing');
-const progressCircle = document.getElementById('progressCircle');
-const btnDownload = document.getElementById('btnDownload');
-const btnReset = document.getElementById('btnReset');
-const clothesline = document.getElementById('clothesline');
+const {Scene, PerspectiveCamera, WebGLRenderer, Color, Mesh, Group, BoxGeometry, PlaneGeometry,
+  CylinderGeometry, RingGeometry, MeshStandardMaterial, MeshBasicMaterial, HemisphereLight,
+  DirectionalLight, PointLight, Fog, CanvasTexture, RepeatWrapping, PCFSoftShadowMap,
+  ACESFilmicToneMapping, Raycaster, Vector2, Vector3, Plane, DoubleSide} = THREE;
 
-const CIRCUMFERENCE = 2 * Math.PI * 16; // ~100.53
-let currentImageSrc = null;
+// ===== SCENE SETUP =====
+const app = document.getElementById('app');
+const renderer = new WebGLRenderer({antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.setSize(innerWidth,innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = PCFSoftShadowMap;
+renderer.toneMapping = ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.1;
+app.appendChild(renderer.domElement);
 
-// === 코스틱 (수면 빛 일렁임) ===
-(function(){
-  const cv = document.getElementById('caustics');
-  cv.width = window.innerWidth;
-  cv.height = window.innerHeight;
-  const ctx = cv.getContext('2d');
-  const W = cv.width, H = cv.height;
+const scene = new Scene();
+scene.background = new Color(0x1a1815);
+scene.fog = new Fog(0x1a1815, 18, 45);
 
-  function draw(){
-    const t = performance.now() * 0.0008;
-    ctx.clearRect(0, 0, W, H);
+const camera = new PerspectiveCamera(45, innerWidth/innerHeight, 0.1, 100);
+camera.position.set(0, 9, 6);
+camera.lookAt(0, 0, 0.5);
 
-    for (let i = 0; i < 6; i++) {
-      ctx.beginPath();
-      for (let x = 0; x < W; x += 8) {
-        const y = H * 0.2 + i * (H * 0.12) +
-          Math.sin(x * 0.005 + t + i * 1.2) * 30 +
-          Math.sin(x * 0.012 + t * 1.5 + i) * 15;
-        x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
-      }
-      ctx.strokeStyle = `rgba(120,180,220,${0.15 - i * 0.02})`;
-      ctx.lineWidth = 1.5;
-      ctx.stroke();
-    }
+addEventListener('resize', () => {
+  camera.aspect = innerWidth/innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
 
-    requestAnimationFrame(draw);
+// ===== LIGHTING =====
+scene.add(new HemisphereLight(0xfff5e0, 0x1a1815, 0.45));
+const keyLight = new DirectionalLight(0xfff0d0, 1.6);
+keyLight.position.set(6, 12, 6);
+keyLight.castShadow = true;
+keyLight.shadow.mapSize.set(2048, 2048);
+keyLight.shadow.camera.left = -10; keyLight.shadow.camera.right = 10;
+keyLight.shadow.camera.top = 10; keyLight.shadow.camera.bottom = -10;
+keyLight.shadow.bias = -0.0005;
+scene.add(keyLight);
+const fill = new DirectionalLight(0x6688aa, 0.5);
+fill.position.set(-6, 4, -4); scene.add(fill);
+const rim = new PointLight(0xffaa44, 1.2, 15);
+rim.position.set(-3, 5, -2); scene.add(rim);
+
+// ===== TEXTURES =====
+function makeConcreteTexture() {
+  const c = document.createElement('canvas'); c.width=c.height=512;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle='#3a3530'; ctx.fillRect(0,0,512,512);
+  for(let i=0;i<8000;i++){const v=Math.random()*60;ctx.fillStyle=`rgba(${v+40},${v+38},${v+35},${Math.random()*0.5})`;ctx.fillRect(Math.random()*512,Math.random()*512,1,1);}
+  const tex=new CanvasTexture(c);tex.wrapS=tex.wrapT=RepeatWrapping;tex.repeat.set(8,8);return tex;
+}
+function makeMetalTexture() {
+  const c = document.createElement('canvas'); c.width=c.height=256;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle='#4a4540'; ctx.fillRect(0,0,256,256);
+  for(let i=0;i<256;i++){ctx.fillStyle=`rgba(${100+Math.random()*30},${95+Math.random()*30},${88+Math.random()*30},0.3)`;ctx.fillRect(0,i,256,1);}
+  return new CanvasTexture(c);
+}
+const concreteTex = makeConcreteTexture();
+const metalTex = makeMetalTexture();
+
+// ===== ENVIRONMENT =====
+// Floor
+const floor = new Mesh(new PlaneGeometry(60,60), new MeshStandardMaterial({map:concreteTex,roughness:0.9,metalness:0.05}));
+floor.rotation.x=-Math.PI/2; floor.position.y=-0.5; floor.receiveShadow=true; scene.add(floor);
+
+// Floor lines
+function floorLine(x,z,w,d){const m=new Mesh(new PlaneGeometry(w,d),new MeshStandardMaterial({color:0xffb800,roughness:0.7,emissive:0xffb800,emissiveIntensity:0.05}));m.rotation.x=-Math.PI/2;m.position.set(x,-0.49,z);scene.add(m);}
+floorLine(0,5,14,0.08);floorLine(0,-5,14,0.08);floorLine(-7,0,0.08,10);floorLine(7,0,0.08,10);
+
+// Conveyor
+const convG=new Group();
+const beltMesh=new Mesh(new BoxGeometry(14,0.15,2.4),new MeshStandardMaterial({color:0x1a1a1a,roughness:0.6,metalness:0.3}));
+beltMesh.position.set(0,-0.1,-3.5);beltMesh.receiveShadow=true;beltMesh.castShadow=true;convG.add(beltMesh);
+for(let i=-6.5;i<=6.5;i+=0.5){const r=new Mesh(new BoxGeometry(0.04,0.18,2.45),new MeshStandardMaterial({color:0x0a0a0a}));r.position.set(i,-0.09,-3.5);convG.add(r);}
+scene.add(convG);
+
+// Table
+const table=new Mesh(new BoxGeometry(8,0.2,4),new MeshStandardMaterial({color:0x3a2f25,roughness:0.8}));
+table.position.set(0,-0.2,0.5);table.receiveShadow=true;table.castShadow=true;scene.add(table);
+[[-3.7,-1.2],[3.7,-1.2],[-3.7,2.2],[3.7,2.2]].forEach(([x,z])=>{const l=new Mesh(new BoxGeometry(0.18,0.5,0.18),new MeshStandardMaterial({map:metalTex,roughness:0.5,metalness:0.6}));l.position.set(x,-0.55,z);l.castShadow=true;scene.add(l);});
+
+// Ship zone
+const shipZone=new Mesh(new PlaneGeometry(3,3),new MeshStandardMaterial({color:0x00aa44,transparent:true,opacity:0.18,emissive:0x00aa44,emissiveIntensity:0.3,side:DoubleSide}));
+shipZone.rotation.x=-Math.PI/2;shipZone.position.set(5,-0.09,1.5);scene.add(shipZone);
+const shipBorder=new Mesh(new RingGeometry(1.4,1.5,32),new MeshBasicMaterial({color:0x00ff66,transparent:true,opacity:0.8}));
+shipBorder.rotation.x=-Math.PI/2;shipBorder.position.set(5,-0.08,1.5);scene.add(shipBorder);
+
+// Shelves
+function makeShelf(x,z){const g=new Group();const f=new Mesh(new BoxGeometry(3,4,0.6),new MeshStandardMaterial({color:0x554435,roughness:0.8}));f.position.y=1.5;g.add(f);for(let y=0;y<3;y++)for(let i=0;i<3;i++){const b=new Mesh(new BoxGeometry(0.7,0.7,0.5),new MeshStandardMaterial({color:new Color().setHSL(0.08+Math.random()*0.05,0.4,0.3+Math.random()*0.2),roughness:0.9}));b.position.set(-1+i,0.4+y*1.3,0);g.add(b);}g.position.set(x,0,z);return g;}
+scene.add(makeShelf(-9,-7));scene.add(makeShelf(-5,-7));scene.add(makeShelf(5,-7));scene.add(makeShelf(9,-7));
+
+// Back wall
+const backWall=new Mesh(new PlaneGeometry(40,12),new MeshStandardMaterial({color:0x252220,roughness:0.95}));
+backWall.position.set(0,4,-10);scene.add(backWall);
+
+// Tape dispenser
+const tapeGroup=new Group();
+tapeGroup.add(new Mesh(new BoxGeometry(0.35,0.25,0.55),new MeshStandardMaterial({color:0x1a1a1a,roughness:0.5})));
+const roll=new Mesh(new CylinderGeometry(0.18,0.18,0.2,24),new MeshStandardMaterial({color:0xdcc89c,roughness:0.6}));
+roll.rotation.x=Math.PI/2;roll.position.set(0,0.05,0.1);tapeGroup.add(roll);
+tapeGroup.position.set(-3.2,-0.05,1.6);
+tapeGroup.userData.kind='tape';
+scene.add(tapeGroup);
+const TAPE_HOME=tapeGroup.position.clone();
+
+// ===== BOX (Codrops-style, scaled to warehouse) =====
+const P = {w: 0.8, l: 1.4, d: 0.9, t: 0.02};
+const cMat = new MeshStandardMaterial({color: 0x9C8D7B, side: DoubleSide});
+
+let box = null, bState = null;
+
+function makeBox() {
+  const g = new Group(); g.userData.isBox = true;
+  const els = {fW:{}, fL:{}, bW:{}, bL:{}};
+  const configs = [
+    {key:'fW', sw:P.w}, {key:'bW', sw:P.w},
+    {key:'fL', sw:P.l}, {key:'bL', sw:P.l},
+  ];
+  for (const c of configs) {
+    const flapH = 0.5*P.w - 0.02;
+    const flapW = c.sw - 0.04;
+    const side = new Mesh(new BoxGeometry(c.sw, P.d, P.t), cMat.clone());
+    side.castShadow = true;
+    const topGeo = new BoxGeometry(flapW, flapH, P.t); topGeo.translate(0, flapH/2, 0);
+    const top = new Mesh(topGeo, cMat.clone()); top.position.y = P.d/2; top.castShadow = true;
+    top.userData.kind = 'flap'; top.userData.flapType = 'top'; top.userData.key = c.key;
+    side.add(top);
+    const btmGeo = new BoxGeometry(flapW, flapH, P.t); btmGeo.translate(0, -flapH/2, 0);
+    const btm = new Mesh(btmGeo, cMat.clone()); btm.position.y = -P.d/2; btm.castShadow = true;
+    btm.userData.kind = 'flap'; btm.userData.flapType = 'bottom'; btm.userData.key = c.key;
+    side.add(btm);
+    els[c.key] = {side, top, btm}; g.add(side);
   }
-  draw();
+  g.userData.els = els;
+  g.position.set(0, P.d/2, 0.5);
+  return g;
+}
 
-  window.addEventListener('resize', () => {
-    cv.width = window.innerWidth;
-    cv.height = window.innerHeight;
+function freshState() {
+  return {phase:'flat', openAngle:0.02*Math.PI,
+    flaps:{fW:{t:0,b:0},bW:{t:0,b:0},fL:{t:0,b:0},bL:{t:0,b:0}},
+    flipped:false, bottomTaped:false, topTaped:false,
+    bottomClosed:0, topClosed:0, itemsLoaded:0, itemsNeeded:2+Math.floor(Math.random()*2)};
+}
+
+function updateBox() {
+  if (!box||!bState) return;
+  const els = box.userData.els, a = bState.openAngle;
+  const cos = Math.cos(a), sin = Math.sin(a);
+  els.fW.side.position.set(0.5*P.l, 0, 0); els.fW.side.rotation.y = a;
+  els.bW.side.position.set(-0.5*P.l, 0, 0); els.bW.side.rotation.y = a;
+  els.fL.side.position.set(-0.5*cos*P.w, 0, 0.5*sin*P.w);
+  els.bL.side.position.set(0.5*cos*P.w, 0, -0.5*sin*P.w);
+  const f = bState.flaps;
+  els.fW.top.rotation.x=-f.fW.t; els.fW.btm.rotation.x=f.fW.b;
+  els.bW.top.rotation.x=f.bW.t; els.bW.btm.rotation.x=-f.bW.b;
+  els.fL.top.rotation.x=-f.fL.t; els.fL.btm.rotation.x=f.fL.b;
+  els.bL.top.rotation.x=f.bL.t; els.bL.btm.rotation.x=-f.bL.b;
+}
+
+// ===== ITEMS =====
+const itemColors = [0xc94c3a, 0x4a7fc9, 0xe8b020, 0x5cb874, 0xb86bc9];
+const waitingItems = [];
+function spawnItems(count) {
+  waitingItems.forEach(i=>scene.remove(i)); waitingItems.length=0;
+  for (let i=0;i<count;i++) {
+    const s=0.2+Math.random()*0.15;
+    const m=new Mesh(new BoxGeometry(s,s*0.8,s*0.9),new MeshStandardMaterial({color:itemColors[i%5]}));
+    m.position.set(-2.5+i*0.7, -0.1+s*0.4, -0.5);
+    m.castShadow=true; m.userData.kind='item'; m.userData.size=s;
+    scene.add(m); waitingItems.push(m);
+  }
+}
+
+// ===== GAME STATE =====
+const game = {active:false, score:0, packed:0, combo:1, maxCombo:1, timeLeft:60, boxStart:0};
+
+// ===== INTERACTION =====
+const raycaster = new Raycaster(), mouse = new Vector2();
+let dragging = null;
+const dragPlane = new Plane(new Vector3(0,1,0), 0);
+const dragOffset = new Vector3();
+
+function getMouse(e){mouse.x=(e.clientX/innerWidth)*2-1;mouse.y=-(e.clientY/innerHeight)*2+1;}
+
+function isPartOfTape(o){let c=o;while(c){if(c===tapeGroup)return true;c=c.parent;}return false;}
+
+function getClickTargets() {
+  if(!bState||!box)return[];
+  const arr=[], els=box.userData.els, ph=bState.phase;
+  if(ph==='flat'){Object.values(els).forEach(e=>arr.push(e.side));}
+  else if(ph==='bottom'){Object.values(els).forEach(e=>{if(!e.top.userData.closed)arr.push(e.top);});}
+  else if(ph==='bottom-tape'){arr.push(tapeGroup);}
+  else if(ph==='load'){waitingItems.forEach(i=>arr.push(i));}
+  else if(ph==='top'){Object.values(els).forEach(e=>{if(!e.btm.userData.closed)arr.push(e.btm);});}
+  else if(ph==='top-tape'){arr.push(tapeGroup);}
+  else if(ph==='ship'){Object.values(els).forEach(e=>arr.push(e.side));}
+  return arr;
+}
+
+renderer.domElement.addEventListener('pointerdown', e=>{
+  if(!game.active)return;
+  getMouse(e); raycaster.setFromCamera(mouse, camera);
+  const hits=raycaster.intersectObjects(getClickTargets(),true);
+  if(!hits.length)return;
+  const obj=hits[0].object, ph=bState.phase;
+  if(ph==='flat'){doUnfold();return;}
+  if((ph==='top'||ph==='bottom')&&obj.userData.kind==='flap'){
+    dragging={type:'flap',obj,startX:e.clientX,startY:e.clientY};
+    document.body.classList.add('grabbing');
+  } else if(ph==='load'&&obj.userData.kind==='item'){
+    dragging={type:'item',obj};
+    dragPlane.set(new Vector3(0,1,0),0);
+    const pt=new Vector3();raycaster.ray.intersectPlane(dragPlane,pt);
+    dragOffset.copy(pt).sub(obj.position); obj.position.y=0.5;
+    document.body.classList.add('grabbing');
+  } else if((ph==='bottom-tape'||ph==='top-tape')&&isPartOfTape(obj)){
+    dragging={type:'tape',target:ph};
+    dragPlane.set(new Vector3(0,1,0),0);
+    const pt=new Vector3();raycaster.ray.intersectPlane(dragPlane,pt);
+    dragOffset.copy(pt).sub(tapeGroup.position);
+    document.body.classList.add('grabbing');
+  } else if(ph==='ship'){
+    dragging={type:'box'};
+    dragPlane.set(new Vector3(0,1,0),0);
+    const pt=new Vector3();raycaster.ray.intersectPlane(dragPlane,pt);
+    dragOffset.copy(pt).sub(box.position);
+    document.body.classList.add('grabbing');
+  }
+});
+
+renderer.domElement.addEventListener('pointermove', e=>{
+  if(!dragging)return;
+  getMouse(e); raycaster.setFromCamera(mouse, camera);
+  if(dragging.type==='flap'){
+    const dx=e.clientX-dragging.startX, dy=e.clientY-dragging.startY;
+    if(Math.sqrt(dx*dx+dy*dy)>40&&!dragging.obj.userData.closed){
+      doFoldFlap(dragging.obj); dragging=null; document.body.classList.remove('grabbing');
+    }
+  } else if(dragging.type==='item'){
+    const pt=new Vector3();raycaster.ray.intersectPlane(dragPlane,pt);
+    dragging.obj.position.x=pt.x-dragOffset.x;
+    dragging.obj.position.z=pt.z-dragOffset.z;
+    dragging.obj.position.y=0.5;
+  } else if(dragging.type==='tape'){
+    const pt=new Vector3();raycaster.ray.intersectPlane(dragPlane,pt);
+    tapeGroup.position.x=pt.x-dragOffset.x;
+    tapeGroup.position.z=pt.z-dragOffset.z;
+  } else if(dragging.type==='box'){
+    const pt=new Vector3();raycaster.ray.intersectPlane(dragPlane,pt);
+    box.position.x=pt.x-dragOffset.x;
+    box.position.z=pt.z-dragOffset.z;
+  }
+});
+
+renderer.domElement.addEventListener('pointerup', e=>{
+  if(!dragging)return;
+  document.body.classList.remove('grabbing');
+  if(dragging.type==='item'){
+    const item=dragging.obj;
+    const dx=item.position.x-box.position.x, dz=item.position.z-box.position.z;
+    if(Math.abs(dx)<P.l/2+0.1&&Math.abs(dz)<P.w/2+0.1){
+      const idx=waitingItems.indexOf(item);if(idx!==-1)waitingItems.splice(idx,1);
+      scene.remove(item);
+      item.position.set((Math.random()-0.5)*0.3, P.d*0.3+bState.itemsLoaded*0.1, (Math.random()-0.5)*0.2);
+      box.add(item); bState.itemsLoaded++;
+      addScore(10,e.clientX,e.clientY); toast('LOADED!');
+      if(bState.itemsLoaded>=bState.itemsNeeded)setTimeout(()=>{setPhase('top');toast('ALL LOADED!');},300);
+    } else { item.position.set(-2.5+waitingItems.indexOf(item)*0.7, -0.1+item.userData.size*0.4, -0.5); }
+  } else if(dragging.type==='tape'){
+    const dx=tapeGroup.position.x-box.position.x, dz=tapeGroup.position.z-box.position.z;
+    const over=Math.abs(dx)<P.l/2+0.3&&Math.abs(dz)<P.w/2+0.3;
+    if(over&&dragging.target==='bottom-tape'&&bState.topClosed>=4){
+      bState.bottomTaped=true;
+      const strip=new Mesh(new BoxGeometry(P.l*0.8,0.02,0.1),new MeshStandardMaterial({color:0xdcc89c,transparent:true,opacity:0.9}));
+      strip.position.set(0,P.d/2+0.02,0); box.add(strip);
+      addScore(30,e.clientX,e.clientY); toast('BOTTOM SEALED!'); doAutoFlip();
+    } else if(over&&dragging.target==='top-tape'&&bState.bottomClosed>=4){
+      bState.topTaped=true;
+      const strip=new Mesh(new BoxGeometry(P.l*0.8,0.02,0.1),new MeshStandardMaterial({color:0xdcc89c,transparent:true,opacity:0.9}));
+      strip.position.set(0,P.d/2+0.02,0); box.add(strip);
+      addScore(50,e.clientX,e.clientY); toast('TOP SEALED!'); setPhase('ship');
+    }
+    tapeGroup.position.copy(TAPE_HOME);
+  } else if(dragging.type==='box'){
+    const dx=box.position.x-5, dz=box.position.z-1.5;
+    if(Math.abs(dx)<1.5&&Math.abs(dz)<1.5){completeBox();}
+    else{box.position.set(0,P.d/2,0.5);}
+  }
+  dragging=null;
+});
+
+// ===== ACTIONS =====
+function doUnfold(){
+  if(bState.phase!=='flat')return;
+  gsap.to(bState,{openAngle:Math.PI/2,duration:0.6,ease:'back.out(1.5)',onUpdate:updateBox});
+  ['fW','bW','fL','bL'].forEach(k=>{
+    gsap.to(bState.flaps[k],{t:-0.45*Math.PI,duration:0.5,delay:0.3,ease:'power2.out',onUpdate:updateBox});
+    gsap.to(bState.flaps[k],{b:-0.45*Math.PI,duration:0.5,delay:0.3,ease:'power2.out',onUpdate:updateBox});
   });
-})();
-
-// === 업로드 ===
-uploadZone.addEventListener('click', () => fileInput.click());
-tankEl.addEventListener('dragover', e => e.preventDefault());
-tankEl.addEventListener('drop', e => {
-  e.preventDefault();
-  if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
-});
-fileInput.addEventListener('change', e => {
-  if (e.target.files[0]) handleFile(e.target.files[0]);
-});
-
-function handleFile(file) {
-  if (!file.type.startsWith('image/')) return;
-  const reader = new FileReader();
-  reader.onload = e => {
-    currentImageSrc = e.target.result;
-    startDeveloping(currentImageSrc);
-  };
-  reader.readAsDataURL(file);
+  addScore(30,innerWidth/2,innerHeight/2-100); toast('OPENED!');
+  setTimeout(()=>setPhase('bottom'),850);
 }
 
-// === 인화 시작 ===
-function startDeveloping(src) {
-  uploadZone.classList.add('hidden');
-
-  const img = new Image();
-  img.onload = () => {
-    // 비율 계산 — 화면의 50~60% 차지
-    const maxW = window.innerWidth * 0.55;
-    const maxH = window.innerHeight * 0.6;
-    let w = img.naturalWidth;
-    let h = img.naturalHeight;
-    const scale = Math.min(maxW / w, maxH / h, 1);
-    w = Math.round(w * scale);
-    h = Math.round(h * scale);
-
-    photoInner.style.width = w + 'px';
-    photoInner.style.height = h + 'px';
-
-    // 레이어에 이미지 삽입
-    layerEdges.innerHTML = `<img src="${src}">`;
-    layerMid.innerHTML = `<img src="${src}">`;
-    layerFull.innerHTML = `<img src="${src}">`;
-
-    // 초기 상태: 깊은 물속, 작고 흐릿
-    photoContainer.style.opacity = '0';
-    photoContainer.style.transform = 'translate(-50%, -50%) scale(0.5)';
-    photoContainer.style.filter = 'blur(8px) brightness(0.3)';
-    layerFog.style.opacity = '1';
-    layerEdges.style.opacity = '0';
-    layerMid.style.opacity = '0';
-    layerFull.style.opacity = '0';
-
-    // 시작
-    requestAnimationFrame(() => {
-      photoContainer.style.opacity = '1';
-      // 사진이 보인 후 ripples 초기화
-      setTimeout(() => {
-        initRipples();
-        startDevelopRipples();
-      }, 100);
-      runDevelopAnimation();
-    });
-  };
-  img.src = src;
-}
-
-// === 인화 애니메이션 (10초, 마지막에야 드러남) ===
-function runDevelopAnimation() {
-  progressRing.classList.add('active');
-
-  const duration = 10000;
-  const start = performance.now();
-
-  function animate(now) {
-    const elapsed = now - start;
-    const p = Math.min(elapsed / duration, 1);
-
-    // 진행 링
-    progressCircle.style.strokeDashoffset = CIRCUMFERENCE * (1 - p);
-
-    // Phase 1 (0~0.2): 물속에서 서서히 떠오름, 아직 아무것도 안 보임
-    if (p < 0.2) {
-      const t = p / 0.2;
-      photoContainer.style.transform = `translate(-50%, -50%) scale(${0.5 + t * 0.15})`;
-      photoContainer.style.filter = `blur(${8 - t * 3}px) brightness(${0.3 + t * 0.1})`;
-      layerFog.style.opacity = `${1 - t * 0.3}`;
-    }
-    // Phase 2 (0.2~0.45): 안개 걷히며 어두운 윤곽선만 등장
-    else if (p < 0.45) {
-      const t = (p - 0.2) / 0.25;
-      photoContainer.style.transform = `translate(-50%, -50%) scale(${0.65 + t * 0.1})`;
-      photoContainer.style.filter = `blur(${5 - t * 2.5}px) brightness(${0.4 + t * 0.15})`;
-      layerFog.style.opacity = `${0.7 - t * 0.5}`;
-      layerEdges.style.opacity = `${t * 0.9}`;
-    }
-    // Phase 3 (0.45~0.75): 중간톤 등장, 형체가 보이기 시작
-    else if (p < 0.75) {
-      const t = (p - 0.45) / 0.3;
-      photoContainer.style.transform = `translate(-50%, -50%) scale(${0.75 + t * 0.1})`;
-      photoContainer.style.filter = `blur(${2.5 - t * 1.5}px) brightness(${0.55 + t * 0.2})`;
-      layerFog.style.opacity = `${0.2 - t * 0.2}`;
-      layerEdges.style.opacity = `${0.9 - t * 0.9}`;
-      layerMid.style.opacity = `${t}`;
-    }
-    // Phase 4 (0.75~1.0): 최종 — 컬러 완전 드러남
-    else {
-      const t = (p - 0.75) / 0.25;
-      photoContainer.style.transform = `translate(-50%, -50%) scale(${0.85 + t * 0.15})`;
-      photoContainer.style.filter = `blur(${1 - t}px) brightness(${0.75 + t * 0.25})`;
-      layerFog.style.opacity = '0';
-      layerEdges.style.opacity = '0';
-      layerMid.style.opacity = `${1 - t}`;
-      layerFull.style.opacity = `${t}`;
-    }
-
-    if (p < 1) {
-      requestAnimationFrame(animate);
-    } else {
-      finishDeveloping();
-    }
+function doFoldFlap(obj){
+  const key=obj.userData.key, type=obj.userData.flapType;
+  obj.userData.closed=true;
+  const pairs={fW:'bW',bW:'fW',fL:'bL',bL:'fL'};
+  const pk=pairs[key], els=box.userData.els;
+  (type==='top'?els[pk].top:els[pk].btm).userData.closed=true;
+  const prop=type==='top'?'t':'b';
+  gsap.to(bState.flaps[key],{[prop]:0.5*Math.PI,duration:0.3,ease:'power2.out',onUpdate:updateBox});
+  gsap.to(bState.flaps[pk],{[prop]:0.5*Math.PI,duration:0.3,ease:'power2.out',onUpdate:updateBox});
+  if(type==='top'){
+    bState.topClosed+=2;addScore(10,innerWidth/2,innerHeight/2);
+    if(bState.topClosed>=4)setTimeout(()=>{setPhase('bottom-tape');toast('FLAPS CLOSED!');},350);
+  } else {
+    bState.bottomClosed+=2;addScore(10,innerWidth/2,innerHeight/2);
+    if(bState.bottomClosed>=4)setTimeout(()=>{setPhase('top-tape');toast('FLAPS CLOSED!');},350);
   }
+}
 
+function doAutoFlip(){
+  bState.flipped=true;
+  gsap.to(box.rotation,{x:Math.PI,duration:0.7,ease:'power2.inOut',onComplete:()=>{
+    ['fW','bW','fL','bL'].forEach(k=>{gsap.to(bState.flaps[k],{b:-0.45*Math.PI,duration:0.4,ease:'power2.out',onUpdate:updateBox});});
+    setPhase('load'); toast('FLIPPED!'); addScore(20,innerWidth/2,innerHeight/2);
+  }});
+  gsap.to(box.position,{y:P.d/2+1,duration:0.35,ease:'power2.out',yoyo:true,repeat:1});
+}
+
+function completeBox(){
+  const t=(performance.now()-game.boxStart)/1000;
+  let bonus=t<10?200:t<15?100:t<20?50:25;
+  if(t>=20)game.combo=1;
+  if(bState.itemsLoaded>=bState.itemsNeeded)bonus+=50;
+  game.score+=bonus*game.combo;
+  game.combo=Math.min(game.combo+1,10);
+  game.maxCombo=Math.max(game.maxCombo,game.combo);
+  game.packed++; game.timeLeft=Math.min(game.timeLeft+4,60);
+  toast(t<10?'PERFECT!':t<15?'GREAT!':'SHIPPED');
+  gsap.to(box.position,{x:8,duration:0.5,ease:'power2.in',onComplete:()=>{
+    scene.remove(box);box=null;bState=null;
+    setTimeout(()=>{if(game.active)newBox();},300);
+  }});
+  document.getElementById('step-panel').style.display='none';
+}
+
+// ===== PHASE =====
+const phaseInfo={flat:{n:1,t:'OPEN THE BOX',s:'Click the flat box'},bottom:{n:2,t:'FOLD BOTTOM FLAPS',s:'Drag flaps to close'},
+  'bottom-tape':{n:3,t:'SEAL THE BOTTOM',s:'Drag tape onto box'},load:{n:4,t:'LOAD ITEMS',s:'Drag items into box'},
+  top:{n:5,t:'FOLD TOP FLAPS',s:'Drag flaps to close'},'top-tape':{n:6,t:'SEAL THE TOP',s:'Drag tape onto box'},
+  ship:{n:7,t:'SHIP IT',s:'Drag box to green zone'}};
+function setPhase(p){bState.phase=p;const i=phaseInfo[p];document.getElementById('step-num').textContent=i.n;document.getElementById('step-title').textContent=i.t;document.getElementById('step-sub').textContent=i.s;}
+
+// ===== GAME CONTROL =====
+function newBox(){
+  box=makeBox();bState=freshState();scene.add(box);
+  box.position.set(-6,P.d/2,-3.5);
+  gsap.to(box.position,{x:0,z:0.5,duration:0.8,ease:'power2.out'});
+  spawnItems(bState.itemsNeeded); game.boxStart=performance.now();
+  setPhase('flat'); document.getElementById('step-panel').style.display='flex'; updateBox();
+}
+function startGame(){
+  game.active=true;game.score=0;game.packed=0;game.combo=1;game.maxCombo=1;game.timeLeft=60;
+  if(box){scene.remove(box);box=null;bState=null;}
+  waitingItems.forEach(i=>scene.remove(i));waitingItems.length=0;
+  document.getElementById('start').style.display='none';
+  document.getElementById('gameover').style.display='none';
+  document.getElementById('hud').style.display='flex'; newBox();
+}
+function endGame(){
+  game.active=false;if(box){scene.remove(box);box=null;bState=null;}
+  waitingItems.forEach(i=>scene.remove(i));waitingItems.length=0;
+  document.getElementById('step-panel').style.display='none';
+  document.getElementById('hud').style.display='none';
+  document.getElementById('final-score').textContent=game.score;
+  document.getElementById('final-packed').textContent=game.packed;
+  document.getElementById('final-combo').textContent='×'+game.maxCombo;
+  const r=game.score>2000?'S':game.score>1200?'A':game.score>700?'B':game.score>300?'C':'D';
+  document.getElementById('final-rank').textContent=r;
+  document.getElementById('gameover').style.display='flex';
+}
+document.getElementById('start-btn').addEventListener('click',e=>{e.stopPropagation();startGame();});
+document.getElementById('restart-btn').addEventListener('click',e=>{e.stopPropagation();startGame();});
+
+// ===== UI =====
+function addScore(pts,x,y){game.score+=pts*game.combo;const el=document.createElement('div');el.className='float-score';el.textContent='+'+(pts*game.combo);el.style.left=x+'px';el.style.top=y+'px';document.body.appendChild(el);setTimeout(()=>el.remove(),1000);}
+function toast(text){const el=document.getElementById('toast');el.textContent=text;el.classList.remove('show');void el.offsetWidth;el.classList.add('show');}
+
+// ===== RENDER =====
+let lastT=performance.now();
+function animate(){
   requestAnimationFrame(animate);
-}
-
-function finishDeveloping() {
-  progressRing.classList.remove('active');
-  btnDownload.disabled = false;
-  stopDevelopRipples();
-  addToClothesline(currentImageSrc);
-}
-
-// === 빨랫줄 ===
-function addToClothesline(src) {
-  const item = document.createElement('div');
-  item.className = 'clothesline-item';
-  item.innerHTML = `<img src="${src}">`;
-  item.addEventListener('click', () => downloadImage(src));
-  clothesline.appendChild(item);
-  clothesline.scrollLeft = clothesline.scrollWidth;
-}
-
-// === 다운로드 ===
-btnDownload.addEventListener('click', () => {
-  if (currentImageSrc) downloadImage(currentImageSrc);
-});
-
-function downloadImage(src) {
-  const img = new Image();
-  img.onload = () => {
-    const pad = 24, bot = 60;
-    const cw = img.naturalWidth + pad * 2;
-    const ch = img.naturalHeight + pad + bot;
-    const canvas = document.createElement('canvas');
-    canvas.width = cw; canvas.height = ch;
-    const ctx = canvas.getContext('2d');
-    ctx.fillStyle = '#f5f5f0';
-    ctx.fillRect(0, 0, cw, ch);
-    ctx.drawImage(img, pad, pad, img.naturalWidth, img.naturalHeight);
-    const link = document.createElement('a');
-    link.download = `darkroom_${Date.now()}.png`;
-    link.href = canvas.toDataURL('image/png');
-    link.click();
-  };
-  img.src = src;
-}
-
-// === 리셋 ===
-btnReset.addEventListener('click', () => {
-  destroyRipples();
-  photoContainer.style.opacity = '0';
-  photoContainer.style.transform = 'translate(-50%, -50%) scale(0.5)';
-  photoContainer.style.filter = 'blur(8px) brightness(0.3)';
-  layerFog.style.opacity = '1';
-  layerEdges.style.opacity = '0';
-  layerMid.style.opacity = '0';
-  layerFull.style.opacity = '0';
-  layerEdges.innerHTML = '';
-  layerMid.innerHTML = '';
-  layerFull.innerHTML = '';
-  uploadZone.classList.remove('hidden');
-  btnDownload.disabled = true;
-  currentImageSrc = null;
-  fileInput.value = '';
-});
-
-// === jQuery Ripples — 사진 위에 직접 물결 ===
-let ripplesReady = false;
-let developingActive = false;
-let $rippleTarget = null;
-
-function initRipples() {
-  try {
-    $rippleTarget = $('#photoInner');
-    $rippleTarget.ripples({
-      resolution: 256,
-      dropRadius: 20,
-      perturbance: 0.04,
-      interactive: true
-    });
-    ripplesReady = true;
-  } catch(e) {
-    ripplesReady = false;
+  const now=performance.now(),dt=(now-lastT)/1000;lastT=now;
+  if(game.active){
+    game.timeLeft-=dt;if(game.timeLeft<=0){game.timeLeft=0;endGame();}
+    document.getElementById('timer').textContent=game.timeLeft.toFixed(1);
+    document.getElementById('timer-fill').style.width=(game.timeLeft/60*100)+'%';
+    document.getElementById('score').textContent=game.score;
+    document.getElementById('packed').textContent=game.packed;
+    const c=document.getElementById('combo');
+    if(game.combo>1){c.classList.add('show');c.textContent='×'+game.combo;}else c.classList.remove('show');
   }
+  shipBorder.material.opacity=0.5+Math.sin(now*0.005)*0.3;
+  camera.position.x=Math.sin(now*0.0003)*0.15;
+  camera.lookAt(0,0,0.5);
+  renderer.render(scene,camera);
 }
-
-function destroyRipples() {
-  if ($rippleTarget) {
-    try { $rippleTarget.ripples('destroy'); } catch(e) {}
-    $rippleTarget = null;
-    ripplesReady = false;
-  }
-}
-
-// 인화 시작 시 역동적 물결 시퀀스
-function startDevelopRipples() {
-  if (!ripplesReady || !$rippleTarget) return;
-  developingActive = true;
-  const w = $rippleTarget.outerWidth();
-  const h = $rippleTarget.outerHeight();
-  const cx = w / 2, cy = h / 2;
-
-  // Phase 1: 사진이 물에 빠지는 순간 — 큰 충격파
-  $rippleTarget.ripples('drop', cx, cy, 35, 0.08);
-  setTimeout(() => { if($rippleTarget) $rippleTarget.ripples('drop', cx - 20, cy + 15, 25, 0.05); }, 200);
-  setTimeout(() => { if($rippleTarget) $rippleTarget.ripples('drop', cx + 25, cy - 10, 20, 0.04); }, 400);
-
-  // Phase 2: 인화 중 지속적인 물결
-  let rippleInterval = setInterval(() => {
-    if (!developingActive || !$rippleTarget) { clearInterval(rippleInterval); return; }
-    const rx = cx + (Math.random() - 0.5) * w * 0.7;
-    const ry = cy + (Math.random() - 0.5) * h * 0.7;
-    const radius = 12 + Math.random() * 18;
-    const strength = 0.015 + Math.random() * 0.025;
-    $rippleTarget.ripples('drop', rx, ry, radius, strength);
-  }, 500);
-
-  // Phase 3: 중간 대파동
-  setTimeout(() => {
-    if (!developingActive || !$rippleTarget) return;
-    $rippleTarget.ripples('drop', cx, cy, 40, 0.07);
-  }, 3000);
-
-  setTimeout(() => {
-    if (!developingActive || !$rippleTarget) return;
-    $rippleTarget.ripples('drop', cx + w*0.2, cy - h*0.15, 30, 0.05);
-    $rippleTarget.ripples('drop', cx - w*0.2, cy + h*0.15, 25, 0.04);
-  }, 5500);
-
-  // Phase 4: 마무리 — 잔잔해짐
-  setTimeout(() => {
-    clearInterval(rippleInterval);
-    if (!$rippleTarget) return;
-    for (let i = 0; i < 5; i++) {
-      setTimeout(() => {
-        if (!$rippleTarget) return;
-        const rx = cx + (Math.random() - 0.5) * w * 0.4;
-        const ry = cy + (Math.random() - 0.5) * h * 0.4;
-        $rippleTarget.ripples('drop', rx, ry, 6 + Math.random() * 5, 0.004 + Math.random() * 0.004);
-      }, i * 350);
-    }
-  }, 8500);
-}
-
-function stopDevelopRipples() {
-  developingActive = false;
-}
+animate();
 </script>
 </body>
 </html>
