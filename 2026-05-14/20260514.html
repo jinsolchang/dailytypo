@@ -314,6 +314,8 @@ body {
 
 <input type="file" id="fileInput" accept="image/*">
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.ripples/0.5.3/jquery.ripples.min.js"></script>
 <script>
 const tank = document.getElementById('tank');
 const uploadZone = document.getElementById('uploadZone');
@@ -505,6 +507,31 @@ btnReset.addEventListener('click', () => {
   status.textContent = '대기 중';
   currentImageSrc = null;
   fileInput.value = '';
+});
+
+// jQuery Ripples 적용
+$(document).ready(function(){
+  try {
+    $('#tank').ripples({
+      resolution: 256,
+      dropRadius: 12,
+      perturbance: 0.04,
+      interactive: true
+    });
+    // 주기적으로 자동 물방울
+    setInterval(function(){
+      const $tank = $('#tank');
+      const w = $tank.outerWidth();
+      const h = $tank.outerHeight();
+      const x = Math.random() * w;
+      const y = Math.random() * h;
+      const dropRadius = 8 + Math.random() * 8;
+      const strength = 0.01 + Math.random() * 0.02;
+      $tank.ripples('drop', x, y, dropRadius, strength);
+    }, 1500);
+  } catch(e) {
+    // WebGL 미지원 시 무시
+  }
 });
 </script>
 </body>
