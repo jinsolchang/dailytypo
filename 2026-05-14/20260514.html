@@ -9,334 +9,380 @@
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
 body {
-  background: #1a1a1a;
-  color: #e0e0e0;
+  background: #000;
   font-family: 'Noto Sans KR', sans-serif;
   height: 100vh;
   overflow: hidden;
-  display: flex;
-  flex-direction: column;
 }
 
-/* === 빨랫줄 (Clothesline) === */
-.clothesline {
-  position: relative;
-  height: 140px;
-  min-height: 140px;
-  padding: 10px 20px;
-  overflow-x: auto;
-  overflow-y: hidden;
-  white-space: nowrap;
-  border-bottom: 1px solid #333;
-}
-
-.clothesline::before {
-  content: '';
-  position: absolute;
-  top: 30px;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: #666;
-}
-
-.clothesline-item {
-  display: inline-block;
-  position: relative;
-  top: 35px;
-  margin: 0 12px;
-  cursor: pointer;
-  transition: transform 0.3s;
-}
-
-.clothesline-item:hover {
-  transform: scale(1.1) rotate(-2deg);
-}
-
-.clothesline-item::before {
-  content: '';
-  position: absolute;
-  top: -8px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 12px;
-  height: 16px;
-  background: #8B4513;
-  border-radius: 2px 2px 4px 4px;
-  z-index: 1;
-}
-
-.clothesline-item img {
-  width: 70px;
-  height: 70px;
-  object-fit: cover;
-  border: 3px solid #f5f5f0;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.5);
-}
-
-.clothesline-empty {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  color: #555;
-  font-size: 0.85rem;
-}
-
-/* === 메인 작업 영역 === */
-.darkroom {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-}
-
-/* 인화조 (Tank) */
+/* === 인화조: 전체화면 === */
 .tank {
-  position: relative;
-  width: 420px;
-  height: 420px;
-  background: radial-gradient(ellipse at center, #2a1a0a 0%, #0d0d0d 100%);
-  border-radius: 16px;
-  border: 2px solid #3a2a1a;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  position: fixed;
+  inset: 0;
+  background: #040608;
   overflow: hidden;
+  cursor: pointer;
 }
 
-/* 물결 효과 오버레이 */
-.tank::after {
-  content: '';
+/* 깊은 물 그라데이션 오버레이 */
+.depth-overlay {
   position: absolute;
   inset: 0;
-  background: repeating-linear-gradient(
-    0deg,
-    transparent,
-    transparent 4px,
-    rgba(255,255,255,0.015) 4px,
-    rgba(255,255,255,0.015) 5px
+  background: radial-gradient(
+    ellipse 80% 60% at 50% 40%,
+    rgba(8,30,50,0.0) 0%,
+    rgba(4,15,30,0.6) 50%,
+    rgba(0,4,12,0.92) 100%
   );
-  animation: waterShift 3s ease-in-out infinite;
   pointer-events: none;
-  border-radius: 14px;
+  z-index: 2;
 }
 
-@keyframes waterShift {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(3px); }
+/* 수면 코스틱 (빛 일렁임) */
+.caustics {
+  position: absolute;
+  inset: 0;
+  opacity: 0.08;
+  pointer-events: none;
+  z-index: 3;
+  mix-blend-mode: screen;
 }
 
 /* 업로드 영역 */
 .upload-zone {
+  position: absolute;
+  inset: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
+  justify-content: center;
+  gap: 16px;
+  z-index: 10;
   cursor: pointer;
 }
 
 .upload-zone .icon {
-  font-size: 3rem;
-  opacity: 0.4;
+  width: 80px;
+  height: 80px;
+  border: 2px dashed rgba(180,200,220,0.3);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+  color: rgba(180,200,220,0.4);
+  transition: all 0.3s;
+}
+
+.upload-zone:hover .icon {
+  border-color: rgba(180,200,220,0.6);
+  color: rgba(180,200,220,0.7);
 }
 
 .upload-zone p {
   font-size: 0.85rem;
-  color: #888;
+  color: rgba(180,200,220,0.4);
 }
 
-/* 폴라로이드 */
-.polaroid {
+.upload-zone.hidden { display: none; }
+
+/* 사진 (물속 깊이에서 떠오름) */
+.photo-container {
   position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0.7);
+  z-index: 1;
+  opacity: 0;
+  transition: none;
+}
+
+.photo-frame {
   background: #f5f5f0;
-  padding: 12px 12px 40px 12px;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.6);
-  transform: rotate(-2deg);
-  transition: transform 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  padding: 16px 16px 52px 16px;
+  box-shadow: 0 8px 60px rgba(0,0,0,0.8);
 }
 
-.polaroid.developing {
-  animation: float 4s ease-in-out infinite;
-}
-
-@keyframes float {
-  0%, 100% { transform: rotate(-2deg) translateY(0); }
-  50% { transform: rotate(-1deg) translateY(-4px); }
-}
-
-.polaroid-image {
+.photo-inner {
   position: relative;
   overflow: hidden;
-  background: #fff;
 }
 
-.polaroid-image img {
+.photo-inner img {
   width: 100%;
   height: 100%;
   object-fit: cover;
   display: block;
 }
 
-/* 인화 레이어들 */
-.develop-layer {
+/* 인화 레이어 */
+.layer-fog {
   position: absolute;
   inset: 0;
+  background: rgba(240,238,230,1);
+  z-index: 4;
 }
 
-.layer-white {
-  background: #fff;
+.layer-edges {
+  position: absolute;
+  inset: 0;
   z-index: 3;
-}
-
-.layer-sepia {
-  z-index: 2;
-  mix-blend-mode: multiply;
   opacity: 0;
 }
 
-.layer-sepia img {
+.layer-edges img {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  filter: grayscale(1) contrast(2) sepia(1) brightness(0.4);
+  filter: grayscale(1) contrast(3) brightness(0.3) sepia(0.8);
 }
 
-.layer-color {
+.layer-mid {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  opacity: 0;
+}
+
+.layer-mid img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: grayscale(0.6) contrast(1.3) brightness(0.6) saturate(0.4);
+}
+
+.layer-full {
+  position: absolute;
+  inset: 0;
   z-index: 1;
   opacity: 0;
 }
 
-.layer-color img {
+.layer-full img {
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
 
-/* 진행 바 */
-.progress-bar {
+/* 빨랫줄 (하단 고정) */
+.clothesline {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 100px;
+  padding: 0 20px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  white-space: nowrap;
+  z-index: 20;
+  background: linear-gradient(transparent, rgba(0,0,0,0.8));
+  display: flex;
+  align-items: flex-end;
+  padding-bottom: 12px;
+}
+
+.clothesline::before {
+  content: '';
   position: absolute;
-  bottom: 20px;
+  top: 40px;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: rgba(150,120,80,0.4);
+}
+
+.clothesline-item {
+  display: inline-block;
+  position: relative;
+  margin: 0 10px;
+  cursor: pointer;
+  transition: transform 0.3s;
+  flex-shrink: 0;
+}
+
+.clothesline-item:hover {
+  transform: scale(1.15) rotate(-3deg);
+}
+
+.clothesline-item::before {
+  content: '';
+  position: absolute;
+  top: -6px;
   left: 50%;
   transform: translateX(-50%);
-  width: 200px;
-  height: 3px;
-  background: #333;
-  border-radius: 2px;
-  overflow: hidden;
-  opacity: 0;
-  transition: opacity 0.3s;
+  width: 8px;
+  height: 12px;
+  background: #6b4423;
+  border-radius: 1px 1px 3px 3px;
 }
 
-.progress-bar.active {
-  opacity: 1;
-}
-
-.progress-bar .fill {
-  height: 100%;
-  width: 0%;
-  background: #c9a96e;
-  transition: width 0.1s linear;
+.clothesline-item img {
+  width: 52px;
+  height: 52px;
+  object-fit: cover;
+  border: 2px solid #f5f5f0;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.6);
 }
 
 /* 컨트롤 */
 .controls {
-  position: absolute;
-  bottom: 30px;
-  right: 30px;
+  position: fixed;
+  top: 20px;
+  right: 20px;
   display: flex;
-  gap: 10px;
+  gap: 8px;
+  z-index: 20;
 }
 
 .btn {
-  padding: 8px 16px;
-  border: 1px solid #555;
-  background: transparent;
-  color: #ccc;
-  font-size: 0.8rem;
+  padding: 8px 14px;
+  border: 1px solid rgba(200,200,200,0.2);
+  background: rgba(0,0,0,0.4);
+  color: rgba(200,200,200,0.7);
+  font-size: 0.75rem;
   border-radius: 4px;
   cursor: pointer;
   transition: all 0.2s;
   font-family: inherit;
+  backdrop-filter: blur(4px);
 }
 
 .btn:hover {
-  background: #333;
-  border-color: #888;
+  background: rgba(40,40,40,0.6);
+  border-color: rgba(200,200,200,0.4);
+  color: #fff;
 }
 
 .btn:disabled {
-  opacity: 0.3;
+  opacity: 0.2;
   cursor: not-allowed;
 }
 
-/* 숨김 input */
-#fileInput { display: none; }
-
-/* 상태 텍스트 */
-.status {
-  position: absolute;
-  bottom: 30px;
-  left: 30px;
-  font-size: 0.75rem;
-  color: #666;
+/* 진행 표시 */
+.progress-ring {
+  position: fixed;
+  bottom: 120px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 20;
+  opacity: 0;
+  transition: opacity 0.3s;
 }
+
+.progress-ring.active { opacity: 1; }
+
+.progress-ring circle {
+  fill: none;
+  stroke-width: 2;
+}
+
+.progress-ring .bg { stroke: rgba(255,255,255,0.1); }
+.progress-ring .fg { stroke: rgba(200,170,100,0.6); stroke-linecap: round; transition: stroke-dashoffset 0.1s linear; }
+
+#fileInput { display: none; }
 </style>
 </head>
 <body>
 
-<!-- 빨랫줄 갤러리 -->
-<div class="clothesline" id="clothesline">
-  <span class="clothesline-empty">인화된 사진이 여기에 걸립니다</span>
-</div>
+<div class="tank" id="tank">
+  <div class="depth-overlay"></div>
+  <canvas class="caustics" id="caustics"></canvas>
 
-<!-- 메인 암실 -->
-<div class="darkroom">
-  <div class="tank" id="tank">
-    <div class="upload-zone" id="uploadZone">
-      <div class="icon">◎</div>
-      <p>클릭하여 사진을 넣으세요</p>
+  <div class="upload-zone" id="uploadZone">
+    <div class="icon">◎</div>
+    <p>클릭하여 사진을 현상액에 담그세요</p>
+  </div>
+
+  <div class="photo-container" id="photoContainer">
+    <div class="photo-frame" id="photoFrame">
+      <div class="photo-inner" id="photoInner">
+        <div class="layer-fog" id="layerFog"></div>
+        <div class="layer-edges" id="layerEdges"></div>
+        <div class="layer-mid" id="layerMid"></div>
+        <div class="layer-full" id="layerFull"></div>
+      </div>
     </div>
   </div>
-
-  <div class="progress-bar" id="progressBar">
-    <div class="fill" id="progressFill"></div>
-  </div>
-
-  <div class="controls">
-    <button class="btn" id="btnDownload" disabled>저장</button>
-    <button class="btn" id="btnReset">새 사진</button>
-  </div>
-
-  <div class="status" id="status">대기 중</div>
 </div>
+
+<div class="clothesline" id="clothesline"></div>
+
+<div class="controls">
+  <button class="btn" id="btnDownload" disabled>저장</button>
+  <button class="btn" id="btnReset">새 사진</button>
+</div>
+
+<svg class="progress-ring" id="progressRing" width="40" height="40">
+  <circle class="bg" cx="20" cy="20" r="16"/>
+  <circle class="fg" id="progressCircle" cx="20" cy="20" r="16"
+    stroke-dasharray="100.53" stroke-dashoffset="100.53"
+    transform="rotate(-90 20 20)"/>
+</svg>
 
 <input type="file" id="fileInput" accept="image/*">
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.ripples/0.5.3/jquery.ripples.min.js"></script>
 <script>
-const tank = document.getElementById('tank');
+const tankEl = document.getElementById('tank');
 const uploadZone = document.getElementById('uploadZone');
 const fileInput = document.getElementById('fileInput');
-const progressBar = document.getElementById('progressBar');
-const progressFill = document.getElementById('progressFill');
+const photoContainer = document.getElementById('photoContainer');
+const photoInner = document.getElementById('photoInner');
+const layerFog = document.getElementById('layerFog');
+const layerEdges = document.getElementById('layerEdges');
+const layerMid = document.getElementById('layerMid');
+const layerFull = document.getElementById('layerFull');
+const progressRing = document.getElementById('progressRing');
+const progressCircle = document.getElementById('progressCircle');
 const btnDownload = document.getElementById('btnDownload');
 const btnReset = document.getElementById('btnReset');
-const status = document.getElementById('status');
 const clothesline = document.getElementById('clothesline');
 
+const CIRCUMFERENCE = 2 * Math.PI * 16; // ~100.53
 let currentImageSrc = null;
-let gallery = [];
 
-// 업로드 트리거
+// === 코스틱 (수면 빛 일렁임) ===
+(function(){
+  const cv = document.getElementById('caustics');
+  cv.width = window.innerWidth;
+  cv.height = window.innerHeight;
+  const ctx = cv.getContext('2d');
+  const W = cv.width, H = cv.height;
+
+  function draw(){
+    const t = performance.now() * 0.0008;
+    ctx.clearRect(0, 0, W, H);
+
+    for (let i = 0; i < 6; i++) {
+      ctx.beginPath();
+      for (let x = 0; x < W; x += 8) {
+        const y = H * 0.2 + i * (H * 0.12) +
+          Math.sin(x * 0.005 + t + i * 1.2) * 30 +
+          Math.sin(x * 0.012 + t * 1.5 + i) * 15;
+        x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+      }
+      ctx.strokeStyle = `rgba(120,180,220,${0.15 - i * 0.02})`;
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    }
+
+    requestAnimationFrame(draw);
+  }
+  draw();
+
+  window.addEventListener('resize', () => {
+    cv.width = window.innerWidth;
+    cv.height = window.innerHeight;
+  });
+})();
+
+// === 업로드 ===
 uploadZone.addEventListener('click', () => fileInput.click());
-tank.addEventListener('dragover', e => { e.preventDefault(); tank.style.borderColor = '#c9a96e'; });
-tank.addEventListener('dragleave', () => { tank.style.borderColor = '#3a2a1a'; });
-tank.addEventListener('drop', e => {
+tankEl.addEventListener('dragover', e => e.preventDefault());
+tankEl.addEventListener('drop', e => {
   e.preventDefault();
-  tank.style.borderColor = '#3a2a1a';
   if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
 });
 fileInput.addEventListener('change', e => {
@@ -353,143 +399,139 @@ function handleFile(file) {
   reader.readAsDataURL(file);
 }
 
+// === 인화 시작 ===
 function startDeveloping(src) {
-  // 업로드 존 숨기기
-  uploadZone.style.display = 'none';
-  status.textContent = '인화 중...';
+  uploadZone.classList.add('hidden');
 
-  // 이미지 로드 후 비율 계산
   const img = new Image();
   img.onload = () => {
-    const ratio = img.naturalWidth / img.naturalHeight;
-    let w, h;
-    if (ratio > 1.2) { w = 280; h = 200; }
-    else if (ratio < 0.8) { w = 200; h = 280; }
-    else { w = 240; h = 240; }
+    // 비율 계산 — 화면의 50~60% 차지
+    const maxW = window.innerWidth * 0.55;
+    const maxH = window.innerHeight * 0.6;
+    let w = img.naturalWidth;
+    let h = img.naturalHeight;
+    const scale = Math.min(maxW / w, maxH / h, 1);
+    w = Math.round(w * scale);
+    h = Math.round(h * scale);
 
-    // 폴라로이드 생성
-    const polaroid = document.createElement('div');
-    polaroid.className = 'polaroid developing';
-    polaroid.innerHTML = `
-      <div class="polaroid-image" style="width:${w}px;height:${h}px;">
-        <div class="develop-layer layer-white"></div>
-        <div class="develop-layer layer-sepia"><img src="${src}"></div>
-        <div class="develop-layer layer-color"><img src="${src}"></div>
-      </div>
-    `;
-    tank.appendChild(polaroid);
+    photoInner.style.width = w + 'px';
+    photoInner.style.height = h + 'px';
 
-    // 인화 애니메이션 시작
-    runDevelopAnimation(polaroid);
+    // 레이어에 이미지 삽입
+    layerEdges.innerHTML = `<img src="${src}">`;
+    layerMid.innerHTML = `<img src="${src}">`;
+    layerFull.innerHTML = `<img src="${src}">`;
+
+    // 초기 상태: 깊은 물속, 작고 흐릿
+    photoContainer.style.opacity = '0';
+    photoContainer.style.transform = 'translate(-50%, -50%) scale(0.5)';
+    photoContainer.style.filter = 'blur(8px) brightness(0.3)';
+    layerFog.style.opacity = '1';
+    layerEdges.style.opacity = '0';
+    layerMid.style.opacity = '0';
+    layerFull.style.opacity = '0';
+
+    // 시작
+    requestAnimationFrame(() => {
+      photoContainer.style.opacity = '1';
+      runDevelopAnimation();
+    });
   };
   img.src = src;
 }
 
-function runDevelopAnimation(polaroid) {
-  const layerWhite = polaroid.querySelector('.layer-white');
-  const layerSepia = polaroid.querySelector('.layer-sepia');
-  const layerColor = polaroid.querySelector('.layer-color');
+// === 인화 애니메이션 (10초, 마지막에야 드러남) ===
+function runDevelopAnimation() {
+  progressRing.classList.add('active');
 
-  progressBar.classList.add('active');
-
-  const duration = 6000; // 6초
+  const duration = 10000;
   const start = performance.now();
 
   function animate(now) {
     const elapsed = now - start;
-    const progress = Math.min(elapsed / duration, 1);
-    progressFill.style.width = (progress * 100) + '%';
+    const p = Math.min(elapsed / duration, 1);
 
-    // Phase 1 (0~0.3): 흰색이 사라지며 세피아 윤곽 등장
-    if (progress < 0.3) {
-      const p = progress / 0.3;
-      layerWhite.style.opacity = 1 - p;
-      layerSepia.style.opacity = p * 0.8;
+    // 진행 링
+    progressCircle.style.strokeDashoffset = CIRCUMFERENCE * (1 - p);
+
+    // Phase 1 (0~0.2): 물속에서 서서히 떠오름, 아직 아무것도 안 보임
+    if (p < 0.2) {
+      const t = p / 0.2;
+      photoContainer.style.transform = `translate(-50%, -50%) scale(${0.5 + t * 0.15})`;
+      photoContainer.style.filter = `blur(${8 - t * 3}px) brightness(${0.3 + t * 0.1})`;
+      layerFog.style.opacity = `${1 - t * 0.3}`;
     }
-    // Phase 2 (0.3~0.7): 세피아 유지, 컬러가 서서히 등장
-    else if (progress < 0.7) {
-      const p = (progress - 0.3) / 0.4;
-      layerWhite.style.opacity = 0;
-      layerSepia.style.opacity = 0.8 - p * 0.8;
-      layerColor.style.opacity = p;
-      layerColor.querySelector('img').style.filter = `blur(${(1-p)*3}px) saturate(${0.3 + p*0.7})`;
+    // Phase 2 (0.2~0.45): 안개 걷히며 어두운 윤곽선만 등장
+    else if (p < 0.45) {
+      const t = (p - 0.2) / 0.25;
+      photoContainer.style.transform = `translate(-50%, -50%) scale(${0.65 + t * 0.1})`;
+      photoContainer.style.filter = `blur(${5 - t * 2.5}px) brightness(${0.4 + t * 0.15})`;
+      layerFog.style.opacity = `${0.7 - t * 0.5}`;
+      layerEdges.style.opacity = `${t * 0.9}`;
     }
-    // Phase 3 (0.7~1.0): 완전 선명
+    // Phase 3 (0.45~0.75): 중간톤 등장, 형체가 보이기 시작
+    else if (p < 0.75) {
+      const t = (p - 0.45) / 0.3;
+      photoContainer.style.transform = `translate(-50%, -50%) scale(${0.75 + t * 0.1})`;
+      photoContainer.style.filter = `blur(${2.5 - t * 1.5}px) brightness(${0.55 + t * 0.2})`;
+      layerFog.style.opacity = `${0.2 - t * 0.2}`;
+      layerEdges.style.opacity = `${0.9 - t * 0.9}`;
+      layerMid.style.opacity = `${t}`;
+    }
+    // Phase 4 (0.75~1.0): 최종 — 컬러 완전 드러남
     else {
-      const p = (progress - 0.7) / 0.3;
-      layerSepia.style.opacity = 0;
-      layerColor.style.opacity = 1;
-      layerColor.querySelector('img').style.filter = `blur(0px) saturate(1) brightness(${0.9 + p*0.1})`;
+      const t = (p - 0.75) / 0.25;
+      photoContainer.style.transform = `translate(-50%, -50%) scale(${0.85 + t * 0.15})`;
+      photoContainer.style.filter = `blur(${1 - t}px) brightness(${0.75 + t * 0.25})`;
+      layerFog.style.opacity = '0';
+      layerEdges.style.opacity = '0';
+      layerMid.style.opacity = `${1 - t}`;
+      layerFull.style.opacity = `${t}`;
     }
 
-    if (progress < 1) {
+    if (p < 1) {
       requestAnimationFrame(animate);
     } else {
-      finishDeveloping(polaroid);
+      finishDeveloping();
     }
   }
 
   requestAnimationFrame(animate);
 }
 
-function finishDeveloping(polaroid) {
-  polaroid.classList.remove('developing');
-  progressBar.classList.remove('active');
-  progressFill.style.width = '0%';
-  status.textContent = '인화 완료';
+function finishDeveloping() {
+  progressRing.classList.remove('active');
   btnDownload.disabled = false;
-
-  // 갤러리에 추가
   addToClothesline(currentImageSrc);
 }
 
+// === 빨랫줄 ===
 function addToClothesline(src) {
-  // 빈 메시지 제거
-  const empty = clothesline.querySelector('.clothesline-empty');
-  if (empty) empty.remove();
-
-  gallery.push(src);
-
   const item = document.createElement('div');
   item.className = 'clothesline-item';
   item.innerHTML = `<img src="${src}">`;
-  item.addEventListener('click', () => {
-    // 클릭 시 다운로드
-    downloadImage(src);
-  });
+  item.addEventListener('click', () => downloadImage(src));
   clothesline.appendChild(item);
-
-  // 스크롤 끝으로
   clothesline.scrollLeft = clothesline.scrollWidth;
 }
 
-// 다운로드
+// === 다운로드 ===
 btnDownload.addEventListener('click', () => {
   if (currentImageSrc) downloadImage(currentImageSrc);
 });
 
 function downloadImage(src) {
-  // 폴라로이드 프레임 포함 캔버스 생성
   const img = new Image();
   img.onload = () => {
-    const padding = 24;
-    const bottom = 60;
-    const cw = img.naturalWidth + padding * 2;
-    const ch = img.naturalHeight + padding + bottom;
-
+    const pad = 24, bot = 60;
+    const cw = img.naturalWidth + pad * 2;
+    const ch = img.naturalHeight + pad + bot;
     const canvas = document.createElement('canvas');
-    canvas.width = cw;
-    canvas.height = ch;
+    canvas.width = cw; canvas.height = ch;
     const ctx = canvas.getContext('2d');
-
-    // 프레임 배경
     ctx.fillStyle = '#f5f5f0';
     ctx.fillRect(0, 0, cw, ch);
-
-    // 이미지
-    ctx.drawImage(img, padding, padding, img.naturalWidth, img.naturalHeight);
-
-    // 다운로드
+    ctx.drawImage(img, pad, pad, img.naturalWidth, img.naturalHeight);
     const link = document.createElement('a');
     link.download = `darkroom_${Date.now()}.png`;
     link.href = canvas.toDataURL('image/png');
@@ -498,40 +540,41 @@ function downloadImage(src) {
   img.src = src;
 }
 
-// 리셋
+// === 리셋 ===
 btnReset.addEventListener('click', () => {
-  const polaroid = tank.querySelector('.polaroid');
-  if (polaroid) polaroid.remove();
-  uploadZone.style.display = 'flex';
+  photoContainer.style.opacity = '0';
+  photoContainer.style.transform = 'translate(-50%, -50%) scale(0.5)';
+  photoContainer.style.filter = 'blur(8px) brightness(0.3)';
+  layerFog.style.opacity = '1';
+  layerEdges.style.opacity = '0';
+  layerMid.style.opacity = '0';
+  layerFull.style.opacity = '0';
+  layerEdges.innerHTML = '';
+  layerMid.innerHTML = '';
+  layerFull.innerHTML = '';
+  uploadZone.classList.remove('hidden');
   btnDownload.disabled = true;
-  status.textContent = '대기 중';
   currentImageSrc = null;
   fileInput.value = '';
 });
 
-// jQuery Ripples 적용
+// === jQuery Ripples ===
 $(document).ready(function(){
   try {
     $('#tank').ripples({
-      resolution: 256,
-      dropRadius: 12,
-      perturbance: 0.04,
+      resolution: 512,
+      dropRadius: 15,
+      perturbance: 0.03,
       interactive: true
     });
-    // 주기적으로 자동 물방울
     setInterval(function(){
-      const $tank = $('#tank');
-      const w = $tank.outerWidth();
-      const h = $tank.outerHeight();
-      const x = Math.random() * w;
-      const y = Math.random() * h;
-      const dropRadius = 8 + Math.random() * 8;
-      const strength = 0.01 + Math.random() * 0.02;
-      $tank.ripples('drop', x, y, dropRadius, strength);
-    }, 1500);
-  } catch(e) {
-    // WebGL 미지원 시 무시
-  }
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      const x = w * 0.2 + Math.random() * w * 0.6;
+      const y = h * 0.2 + Math.random() * h * 0.6;
+      $('#tank').ripples('drop', x, y, 10 + Math.random() * 12, 0.01 + Math.random() * 0.015);
+    }, 2000);
+  } catch(e) {}
 });
 </script>
 </body>
