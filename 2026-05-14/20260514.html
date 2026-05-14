@@ -29,10 +29,10 @@ body {
   position: absolute;
   inset: 0;
   background: radial-gradient(
-    ellipse 80% 60% at 50% 40%,
-    rgba(8,30,50,0.0) 0%,
-    rgba(4,15,30,0.6) 50%,
-    rgba(0,4,12,0.92) 100%
+    ellipse 70% 50% at 50% 45%,
+    rgba(4,20,40,0.0) 0%,
+    rgba(2,10,25,0.7) 40%,
+    rgba(0,3,10,0.95) 100%
   );
   pointer-events: none;
   z-index: 2;
@@ -434,6 +434,7 @@ function startDeveloping(src) {
     // 시작
     requestAnimationFrame(() => {
       photoContainer.style.opacity = '1';
+      startDevelopRipples();
       runDevelopAnimation();
     });
   };
@@ -502,6 +503,7 @@ function runDevelopAnimation() {
 function finishDeveloping() {
   progressRing.classList.remove('active');
   btnDownload.disabled = false;
+  stopDevelopRipples();
   addToClothesline(currentImageSrc);
 }
 
@@ -558,24 +560,86 @@ btnReset.addEventListener('click', () => {
   fileInput.value = '';
 });
 
-// === jQuery Ripples ===
+// === jQuery Ripples — 깊고 역동적인 물 효과 ===
+let ripplesReady = false;
+let developingActive = false;
+
 $(document).ready(function(){
   try {
     $('#tank').ripples({
       resolution: 512,
-      dropRadius: 15,
-      perturbance: 0.03,
+      dropRadius: 20,
+      perturbance: 0.06,
       interactive: true
     });
+    ripplesReady = true;
+
+    // 기본 ambient: 느린 큰 물결 (대기 상태)
     setInterval(function(){
+      if (developingActive) return; // 인화 중엔 별도 로직
       const w = window.innerWidth;
       const h = window.innerHeight;
       const x = w * 0.2 + Math.random() * w * 0.6;
       const y = h * 0.2 + Math.random() * h * 0.6;
-      $('#tank').ripples('drop', x, y, 10 + Math.random() * 12, 0.01 + Math.random() * 0.015);
-    }, 2000);
+      $('#tank').ripples('drop', x, y, 14 + Math.random() * 10, 0.008 + Math.random() * 0.01);
+    }, 2500);
   } catch(e) {}
 });
+
+// 인화 시작 시 역동적 물결 시퀀스
+function startDevelopRipples() {
+  if (!ripplesReady) return;
+  developingActive = true;
+  const $tank = $('#tank');
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+  const cx = w / 2, cy = h / 2;
+
+  // Phase 1: 사진이 물에 빠지는 순간 — 큰 충격파
+  $tank.ripples('drop', cx, cy, 40, 0.08);
+  setTimeout(() => $tank.ripples('drop', cx - 30, cy + 20, 30, 0.05), 150);
+  setTimeout(() => $tank.ripples('drop', cx + 40, cy - 10, 25, 0.04), 300);
+
+  // Phase 2: 인화 중 지속적인 깊은 물결 (0.5초~8초)
+  let rippleInterval = setInterval(() => {
+    if (!developingActive) { clearInterval(rippleInterval); return; }
+    // 중심부 근처에서 크고 강한 물방울
+    const rx = cx + (Math.random() - 0.5) * w * 0.5;
+    const ry = cy + (Math.random() - 0.5) * h * 0.4;
+    const radius = 15 + Math.random() * 20;
+    const strength = 0.02 + Math.random() * 0.03;
+    $tank.ripples('drop', rx, ry, radius, strength);
+  }, 400);
+
+  // Phase 3: 중간에 큰 파동 (물속에서 뭔가 움직이는 느낌)
+  setTimeout(() => {
+    if (!developingActive) return;
+    $tank.ripples('drop', cx, cy, 50, 0.06);
+  }, 3000);
+
+  setTimeout(() => {
+    if (!developingActive) return;
+    $tank.ripples('drop', cx + 60, cy - 40, 35, 0.05);
+    $tank.ripples('drop', cx - 50, cy + 30, 30, 0.04);
+  }, 5500);
+
+  // Phase 4: 인화 완료 직전 — 잔잔해지며 마무리
+  setTimeout(() => {
+    clearInterval(rippleInterval);
+    // 마지막 잔물결
+    for (let i = 0; i < 4; i++) {
+      setTimeout(() => {
+        const rx = cx + (Math.random() - 0.5) * w * 0.3;
+        const ry = cy + (Math.random() - 0.5) * h * 0.3;
+        $tank.ripples('drop', rx, ry, 8 + Math.random() * 6, 0.005 + Math.random() * 0.005);
+      }, i * 300);
+    }
+  }, 8500);
+}
+
+function stopDevelopRipples() {
+  developingActive = false;
+}
 </script>
 </body>
 </html>
