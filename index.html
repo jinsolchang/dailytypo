@@ -51,6 +51,7 @@ body{background:#0a0a0a;font-family:'Noto Sans KR',sans-serif;color:#fff;min-hei
   <div class="ticker-label">속보</div>
   <div class="ticker-track">
     <div class="ticker-text">
+      배민시계 — 3D 모델 위에 실시간 인터랙티브 디스플레이를 입히다 &nbsp;│&nbsp;
       Snack Pour — 과자 봉지를 기울여 30초 안에 최대한 많이 쏟아붓는 3D 물리 실험 &nbsp;│&nbsp;
       RAPID PACK — 60초 안에 박스를 접고 테이핑하고 출하하는 물류센터 시뮬레이션 &nbsp;│&nbsp;
       관수 튜브 — 튜브를 따라 그려 꽃을 피우는 인터랙티브 실험 &nbsp;│&nbsp;
@@ -74,28 +75,30 @@ body{background:#0a0a0a;font-family:'Noto Sans KR',sans-serif;color:#fff;min-hei
 
 <div class="main">
 
-  <!-- 히어로: 최신 기사 (5/15) Snack Pour -->
-  <a class="hero" href="2026-05-15/20260515.html">
+  <!-- 히어로: 최신 기사 (5/18) 배민시계 -->
+  <a class="hero" href="2026-05-18/20260518.html">
     <div class="hero-visual">
-      <canvas id="hero-snackpour" style="position:absolute;inset:0;width:100%;height:100%"></canvas>
+      <div style="position:absolute;inset:0;background:radial-gradient(ellipse 80% 60% at 50% 55%, #1a3a38 0%, #0a1a19 50%, #050d0c 100%);display:flex;align-items:center;justify-content:center">
+        <span style="font-size:4rem">🕐</span>
+      </div>
     </div>
     <div class="hero-body">
-      <div class="hero-tag">실험·인터랙티브</div>
-      <div class="hero-title">Snack Pour<br><span style="font-size:.6em;font-weight:700">과자 봉지를 기울여 30초 안에 최대한 많이 쏟아붓는 3D 물리 실험</span></div>
-      <div class="hero-meta">2026.05.15 · 인터랙티브 · THREE.JS + CANNON-ES</div>
+      <div class="hero-tag">실험·3D</div>
+      <div class="hero-title">배민시계<br><span style="font-size:.6em;font-weight:700">3D 모델 위에 실시간 인터랙티브 디스플레이를 입히다</span></div>
+      <div class="hero-meta">2026.05.18 · 인터랙티브 · THREE.JS + CANVAS TEXTURE</div>
     </div>
   </a>
 
   <!-- 이전 기사 -->
   <div class="section-label">이전 기사</div>
   <div class="grid">
-    <a class="card" href="2026-05-14/20260514.html">
+    <a class="card" href="2026-05-15/20260515.html">
       <div class="card-body">
         <div class="card-tag">실험·인터랙티브</div>
-        <div class="card-title">RAPID PACK — 60초 안에 박스를 접고 테이핑하고 출하하는 물류센터 시뮬레이션</div>
-        <div class="card-date">2026.05.14</div>
+        <div class="card-title">Snack Pour — 과자 봉지를 기울여 30초 안에 최대한 많이 쏟아붓는 3D 물리 실험</div>
+        <div class="card-date">2026.05.15</div>
       </div>
-      <div class="card-thumb"><canvas id="thumb-rapidpack" width="100" height="72"></canvas></div>
+      <div class="card-thumb"><canvas id="thumb-snackpour" width="100" height="72"></canvas></div>
     </a>
     <a class="card" href="2026-05-11/20260511.html">
       <div class="card-body">
