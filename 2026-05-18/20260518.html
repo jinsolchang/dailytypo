@@ -151,7 +151,7 @@ displayTexture.colorSpace = THREE.SRGBColorSpace;
 
 // 화면 데이터
 let currentScreen = 0;
-const totalScreens = 4;
+const totalScreens = 5;
 let lastSwitch = 0;
 const switchInterval = 4000;
 
@@ -219,6 +219,29 @@ function getMenu() {
 
 const menuPick = getMenu();
 
+// --- 다마고치: dochi.png 이미지 로드 ---
+const dochiImg = new Image();
+dochiImg.src = 'assets/dochi.png';
+
+const tama = {
+  score: 0,
+};
+
+let tamaAction = null;
+let tamaActionTime = 0;
+
+function feedTama() {
+  tama.score += 10;
+  tamaAction = '냠냠!';
+  tamaActionTime = performance.now();
+}
+
+function petTama() {
+  tama.score += 5;
+  tamaAction = '기분 좋아~';
+  tamaActionTime = performance.now();
+}
+
 function drawDisplay(time) {
   const cx = displaySize / 2;
   const cy = displaySize / 2;
@@ -235,8 +258,9 @@ function drawDisplay(time) {
   ctx.fillStyle = '#111';
   ctx.fillRect(0, 0, displaySize, displaySize);
 
-  // 화면 전환
-  if (time - lastSwitch > switchInterval) {
+  // 화면 전환 (다마고치 화면은 더 오래 유지)
+  const interval = currentScreen === 4 ? 8000 : switchInterval;
+  if (time - lastSwitch > interval) {
     currentScreen = (currentScreen + 1) % totalScreens;
     lastSwitch = time;
   }
@@ -305,12 +329,55 @@ function drawDisplay(time) {
     // 한마디
     ctx.fillStyle = '#fff';
     ctx.font = '38px BAEMINWORK, sans-serif';
-    ctx.fillText('"배달이 빠른 건', cx, cy - 40);
-    ctx.fillText('당연한 게 아닙니다"', cx, cy + 10);
+    ctx.fillText('"세상 모든 것이', cx, cy - 40);
+    ctx.fillText('식지 않도록"', cx, cy + 10);
 
     ctx.fillStyle = 'rgba(255,255,255,0.4)';
     ctx.font = '400 24px Pretendard, sans-serif';
-    ctx.fillText('— 배민시계', cx, cy + 80);
+    ctx.fillText('', cx, cy + 80);
+
+  } else if (currentScreen === 4) {
+    // 다마고치 — dochi.png 이미지 표시
+    if (dochiImg.complete && dochiImg.naturalWidth > 0) {
+      // 이미지를 원형 안에 꽉 차게 그리기
+      const imgAspect = dochiImg.naturalWidth / dochiImg.naturalHeight;
+      let drawW, drawH, drawX, drawY;
+      if (imgAspect > 1) {
+        // 가로가 긴 이미지
+        drawH = displaySize;
+        drawW = drawH * imgAspect;
+        drawX = (displaySize - drawW) / 2;
+        drawY = 0;
+      } else {
+        drawW = displaySize;
+        drawH = drawW / imgAspect;
+        drawX = 0;
+        drawY = (displaySize - drawH) / 2;
+      }
+      ctx.drawImage(dochiImg, drawX, drawY, drawW, drawH);
+    }
+
+    // 스코어 오버레이
+    if (tama.score > 0) {
+      ctx.fillStyle = 'rgba(0,0,0,0.5)';
+      ctx.beginPath();
+      ctx.roundRect(cx - 60, cy - r * 0.75, 120, 28, 6);
+      ctx.fill();
+      ctx.fillStyle = '#fff';
+      ctx.font = '700 18px BAEMINWORK, sans-serif';
+      ctx.fillText(`SCORE: ${tama.score}`, cx, cy - r * 0.75 + 16);
+    }
+
+    // 액션 피드백
+    if (tamaAction && time - tamaActionTime < 1500) {
+      const alpha = 1 - (time - tamaActionTime) / 1500;
+      const floatY = (time - tamaActionTime) * 0.03;
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = '#fff';
+      ctx.font = '700 24px BAEMINWORK, sans-serif';
+      ctx.fillText(tamaAction, cx, cy - 30 - floatY);
+      ctx.globalAlpha = 1;
+    }
   }
 
   // 인디케이터 dots
@@ -442,9 +509,15 @@ canvas.addEventListener('click', (event) => {
   const intersects = raycaster.intersectObject(displayMeshRef);
   
   if (intersects.length > 0) {
-    // 다음 화면으로
-    currentScreen = (currentScreen + 1) % totalScreens;
-    lastSwitch = performance.now();
+    if (currentScreen === 4) {
+      // 다마고치 화면: 번갈아 먹이주기/쓰다듬기
+      if (Math.random() > 0.5) feedTama();
+      else petTama();
+    } else {
+      // 다른 화면: 다음으로 넘기기
+      currentScreen = (currentScreen + 1) % totalScreens;
+      lastSwitch = performance.now();
+    }
   }
 });
 
