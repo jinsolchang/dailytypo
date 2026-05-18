@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🌈 Rainbow Slinky</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #111119; overflow: hidden; }
+canvas { display: block; }
+#ui {
+  position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%);
+  color: rgba(255,255,255,0.4); font: 13px system-ui; pointer-events: none;
+}
+</style>
+</head>
+<body>
+<div id="ui">클릭으로 넘기기 · 스크롤 줌 · 우클릭 회전</div>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.162.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.162.0/examples/jsm/"
+}}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { FontLoader } from 'three/addons/loaders/FontLoader.js';
+import { TextGeometry } from 'three/addons/geometries/TextGeometry.js';
+
+// ===== SCENE =====
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.2;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x111119);
+
+const camera = new THREE.PerspectiveCamera(50, innerWidth/innerHeight, 0.1, 100);
+camera.position.set(5, 4, 8);
+
+const orbit = new OrbitControls(camera, renderer.domElement);
+orbit.enableDamping = true;
+orbit.target.set(0, 1.5, 0);
+
+scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+const dl = new THREE.DirectionalLight(0xffffff, 1.5);
+dl.position.set(4, 8, 6);
+scene.add(dl);
+scene.add(new THREE.DirectionalLight(0x6688ff, 0.4).translateX(-4).translateY(3));
+
+// ===== SLINKY: Procedural arc animation =====
+// The slinky is always a helix. We animate the "spine" (central axis)
+// from a vertical stack to an arc that tips over.
+
+const NUM_RINGS = 7; // one per character
+const LABELS = ['빨','주','노','초','파','남','보'];
+const COLORS = ['#ff2020','#ff8800','#ffdd00','#00cc44','#0088ff','#2244aa','#8800cc'];
+const COIL_R = 1.2;
+const TUBE_R = 0.07;
+const STACK_GAP = 0.35;
+const COILS_PER_RING = 4;
+const PTS_PER_COIL = 24;
+const TOTAL_PTS = NUM_RINGS * COILS_PER_RING * PTS_PER_COIL;
+
+// Spine: defines the central axis of the slinky (a line the helix wraps around)
+// We animate this between states:
+// State 0: vertical stack at position A
+// State 1: arc from A to B
+// State 2: vertical stack at position B
+
+let animTime = 0;       // 0..2 (0=stackA, 1=arc, 2=stackB)
+let animSpeed = 0;      // how fast we're going
+let animDirection = 1;  // +1 or -1
+let isAnimating = false;
+const ANIM_DURATION = 1.8; // seconds for full flip
+
+const posA = -2;
+const posB = 2;
+
+function startFlip() {
+  if (isAnimating) return;
+  isAnimating = true;
+  animSpeed = 1 / ANIM_DURATION;
+}
+
+// Compute spine point at parameter t (0..1 along slinky) given animation state
+function getSpinePoint(t, animState) {
+  // animState: 0 = stacked at A, 1 = mid-arc, 2 = stacked at B
+  const totalHeight = NUM_RINGS * STACK_GAP;
+  
+  if (animState <= 0) {
+    // Stack at A
+    return { x: posA, y: t * totalHeight, z: 0 };
+  } else if (animState >= 2) {
+    // Stack at B
+    return { x: posB, y: t * totalHeight, z: 0 };
+  } else if (animState <= 1) {
+    // Transitioning: bottom stays at A, top arcs over
+    // Each ring "peels off" from top to bottom
+    const peelProgress = animState; // 0..1
+    
+    // Ring index for this t
+    const ringT = t; // 0 = bottom, 1 = top
+    
+    // How much has this ring moved? Top moves first
+    const ringPeel = Math.max(0, Math.min(1, (peelProgress - (1 - ringT) * 0.7) / 0.5));
+    const ease = ringPeel * ringPeel * (3 - 2 * ringPeel); // smoothstep
+    
+    if (ease <= 0) {
+      // Still at A
+      return { x: posA, y: ringT * totalHeight, z: 0 };
+    } else if (ease >= 1) {
+      // Arrived at B
+      return { x: posB, y: ringT * totalHeight, z: 0 };
+    } else {
+      // In the arc
+      const arcAngle = ease * Math.PI; // 0..PI
+      const midX = (posA + posB) / 2;
+      const radius = (posB - posA) / 2;
+      const x = midX - Math.cos(arcAngle) * radius;
+      const y = ringT * totalHeight + Math.sin(arcAngle) * totalHeight * 0.8;
+      return { x, y, z: 0 };
+    }
+  } else {
+    // animState 1..2: bottom arcs from A to B, top already at B
+    const peelProgress = animState - 1; // 0..1
+    const ringT = t;
+    
+    // Bottom moves first now (reverse cascade)
+    const ringPeel = Math.max(0, Math.min(1, (peelProgress - ringT * 0.7) / 0.5));
+    const ease = ringPeel * ringPeel * (3 - 2 * ringPeel);
+    
+    if (ease <= 0) {
+      return { x: posA, y: ringT * totalHeight, z: 0 };
+    } else if (ease >= 1) {
+      return { x: posB, y: ringT * totalHeight, z: 0 };
+    } else {
+      const arcAngle = ease * Math.PI;
+      const midX = (posA + posB) / 2;
+      const radius = (posB - posA) / 2;
+      const x = midX - Math.cos(arcAngle) * radius;
+      const y = ringT * totalHeight + Math.sin(arcAngle) * totalHeight * 0.8;
+      return { x, y, z: 0 };
+    }
+  }
+}
+
+// Build slinky geometry
+let slinkyMesh = null;
+
+function buildSlinky(animState) {
+  const pts = [];
+  
+  for (let i = 0; i <= TOTAL_PTS; i++) {
+    const t = i / TOTAL_PTS;
+    const spine = getSpinePoint(t, animState);
+    
+    // Compute local tangent for helix frame
+    const dt = 0.001;
+    const spineNext = getSpinePoint(Math.min(1, t + dt), animState);
+    let tx = spineNext.x - spine.x;
+    let ty = spineNext.y - spine.y;
+    let tz = spineNext.z - spine.z;
+    const tLen = Math.sqrt(tx*tx + ty*ty + tz*tz) || 1e-6;
+    tx /= tLen; ty /= tLen; tz /= tLen;
+    
+    // Build perpendicular frame
+    let nx, ny, nz;
+    if (Math.abs(ty) < 0.99) {
+      // cross(tangent, up)
+      nx = tz; ny = 0; nz = -tx;
+    } else {
+      nx = 0; ny = tz; nz = -ty;
+    }
+    const nLen = Math.sqrt(nx*nx + ny*ny + nz*nz) || 1e-6;
+    nx /= nLen; ny /= nLen; nz /= nLen;
+    
+    const bx = ty*nz - tz*ny;
+    const by = tz*nx - tx*nz;
+    const bz = tx*ny - ty*nx;
+    
+    // Helix angle
+    const totalCoils = NUM_RINGS * COILS_PER_RING;
+    const angle = t * totalCoils * Math.PI * 2;
+    const ca = Math.cos(angle), sa = Math.sin(angle);
+    
+    pts.push(new THREE.Vector3(
+      spine.x + COIL_R * (ca * nx + sa * bx),
+      spine.y + COIL_R * (ca * ny + sa * by),
+      spine.z + COIL_R * (ca * nz + sa * bz)
+    ));
+  }
+  
+  const curve = new THREE.CatmullRomCurve3(pts, false);
+  
+  if (slinkyMesh) {
+    slinkyMesh.geometry.dispose();
+    slinkyMesh.geometry = new THREE.TubeGeometry(curve, TOTAL_PTS, TUBE_R, 8, false);
+    applyRainbow(slinkyMesh.geometry);
+  } else {
+    const geo = new THREE.TubeGeometry(curve, TOTAL_PTS, TUBE_R, 8, false);
+    applyRainbow(geo);
+    const mat = new THREE.MeshStandardMaterial({
+      vertexColors: true,
+      metalness: 0.75,
+      roughness: 0.2,
+      side: THREE.DoubleSide,
+    });
+    slinkyMesh = new THREE.Mesh(geo, mat);
+    scene.add(slinkyMesh);
+  }
+}
+
+function applyRainbow(geo) {
+  const count = geo.attributes.position.count;
+  const colors = new Float32Array(count * 3);
+  const radSegs = 8;
+  const tubSegs = TOTAL_PTS;
+  for (let i = 0; i <= tubSegs; i++) {
+    const t = i / tubSegs;
+    // Map to ring color
+    const ringIdx = Math.min(NUM_RINGS - 1, Math.floor(t * NUM_RINGS));
+    const hex = COLORS[ringIdx];
+    const c = new THREE.Color(hex);
+    for (let j = 0; j <= radSegs; j++) {
+      const vi = i * (radSegs + 1) + j;
+      if (vi * 3 + 2 < colors.length) {
+        colors[vi*3] = c.r; colors[vi*3+1] = c.g; colors[vi*3+2] = c.b;
+      }
+    }
+  }
+  geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+}
+
+// ===== TEXT LABELS (billboard sprites) =====
+const textSprites = [];
+
+function createTextSprite(text, color) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 128; canvas.height = 128;
+  const ctx = canvas.getContext('2d');
+  ctx.font = 'bold 72px "Black Han Sans", sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = color;
+  ctx.fillText(text, 64, 64);
+  
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.needsUpdate = true;
+  const mat = new THREE.SpriteMaterial({ map: tex, transparent: true });
+  const sprite = new THREE.Sprite(mat);
+  sprite.scale.set(0.8, 0.8, 1);
+  scene.add(sprite);
+  return sprite;
+}
+
+// Create one sprite per ring
+for (let i = 0; i < NUM_RINGS; i++) {
+  const sprite = createTextSprite(LABELS[i], COLORS[i]);
+  textSprites.push(sprite);
+}
+
+function updateTextPositions(animState) {
+  for (let i = 0; i < NUM_RINGS; i++) {
+    const t = (i + 0.5) / NUM_RINGS; // center of each ring section
+    const spine = getSpinePoint(t, animState);
+    textSprites[i].position.set(spine.x, spine.y + COIL_R + 0.4, spine.z);
+  }
+}
+
+// ===== INTERACTION =====
+renderer.domElement.addEventListener('click', startFlip);
+window.addEventListener('keydown', e => { if (e.code === 'Space') { e.preventDefault(); startFlip(); }});
+
+// ===== LOOP =====
+let last = performance.now();
+
+function loop() {
+  requestAnimationFrame(loop);
+  const now = performance.now();
+  const dt = (now - last) / 1000;
+  last = now;
+  
+  // Update animation
+  if (isAnimating) {
+    animTime += animSpeed * animDirection * dt;
+    if (animDirection > 0 && animTime >= 1) {
+      animTime = 1;
+      isAnimating = false;
+      animDirection = -1; // next click goes back
+    } else if (animDirection < 0 && animTime <= 0) {
+      animTime = 0;
+      isAnimating = false;
+      animDirection = 1;
+    }
+  }
+  
+  buildSlinky(animTime);
+  updateTextPositions(animTime);
+  orbit.update();
+  renderer.render(scene, camera);
+}
+
+// Load font then start
+buildSlinky(0);
+updateTextPositions(0);
+loop();
+
+window.addEventListener('resize', () => {
+  camera.aspect = innerWidth/innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+</script>
+</body>
+</html>
