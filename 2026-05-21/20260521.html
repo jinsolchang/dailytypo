@@ -1,0 +1,807 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
+<title>360° 뷰어 — 이미지를 끌어다 놓으세요</title>
+
+<!-- Pannellum -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.css" />
+<script defer src="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.js"></script>
+
+<style>
+  :root {
+    --bg: #0a0a0a;
+    --bg-2: #141414;
+    --bg-3: #1a1a1a;
+    --fg: #f2f2f2;
+    --fg-2: #b8b8b8;
+    --muted: #6b6b6b;
+    --line: #262626;
+    --line-2: #333;
+    --accent: oklch(72% 0.12 220);
+    --warn: oklch(76% 0.14 60);
+    --radius: 8px;
+    --font-sans: ui-sans-serif, system-ui, -apple-system, "Apple SD Gothic Neo", "Pretendard", "Helvetica Neue", Helvetica, Arial, sans-serif;
+    --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--font-sans);
+    height: 100%;
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  body { touch-action: none; }
+
+  /* ---------- App shell ---------- */
+  #app {
+    position: fixed; inset: 0;
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+  }
+
+  header.bar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 18px 24px;
+    z-index: 30;
+    position: relative;
+  }
+  .brand {
+    display: flex; align-items: center; gap: 12px;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--fg-2);
+    user-select: none;
+  }
+  .brand .mark {
+    width: 22px; height: 22px;
+    border-radius: 999px;
+    border: 1px solid var(--fg-2);
+    position: relative;
+  }
+  .brand .mark::before,
+  .brand .mark::after {
+    content: ""; position: absolute; inset: 0; border-radius: inherit;
+    border: 1px solid var(--fg-2);
+  }
+  .brand .mark::before { transform: scaleX(0.35); }
+  .brand .mark::after { transform: scaleY(0.35); }
+
+  .top-actions {
+    display: flex; gap: 8px;
+    opacity: 0; pointer-events: none;
+    transition: opacity .25s ease;
+  }
+  body.viewer .top-actions { opacity: 1; pointer-events: auto; }
+
+  .btn {
+    appearance: none;
+    background: rgba(255,255,255,0.04);
+    color: var(--fg);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 8px 14px;
+    font: 500 13px var(--font-sans);
+    letter-spacing: -0.005em;
+    display: inline-flex; align-items: center; gap: 8px;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background .15s ease, border-color .15s ease, color .15s ease;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .btn:hover { background: rgba(255,255,255,0.08); border-color: var(--line-2); }
+  .btn:active { background: rgba(255,255,255,0.12); }
+  .btn.icon { padding: 8px; width: 36px; height: 36px; justify-content: center; }
+  .btn.primary {
+    background: var(--fg); color: #0a0a0a; border-color: var(--fg);
+  }
+  .btn.primary:hover { background: #fff; border-color: #fff; }
+  .btn.ghost {
+    background: transparent;
+  }
+  .btn.toggle-on { color: var(--accent); border-color: color-mix(in oklch, var(--accent) 50%, var(--line)); }
+
+  .icon svg { width: 18px; height: 18px; display: block; }
+
+  /* ---------- Stage ---------- */
+  main.stage { position: relative; overflow: hidden; }
+  #pano {
+    position: absolute; inset: 0;
+    background: #000;
+    opacity: 0;
+    transition: opacity .35s ease;
+  }
+  body.viewer #pano { opacity: 1; }
+
+  /* override pannellum chrome */
+  .pnlm-load-box, .pnlm-about-msg, .pnlm-zoom-controls,
+  .pnlm-fullscreen-toggle-button, .pnlm-orientation-button,
+  .pnlm-controls-container, .pnlm-compass, .pnlm-panorama-info {
+    display: none !important;
+  }
+  .pnlm-container { background: #000 !important; cursor: grab; }
+  .pnlm-grab { cursor: grab !important; }
+  .pnlm-grabbing { cursor: grabbing !important; }
+
+  /* ---------- Dropzone (state 1) ---------- */
+  .dropzone-wrap {
+    position: absolute; inset: 0;
+    display: grid; place-items: center;
+    padding: 24px;
+    transition: opacity .3s ease;
+  }
+  body.viewer .dropzone-wrap { opacity: 0; pointer-events: none; }
+
+  .dropzone {
+    width: min(720px, 92vw);
+    aspect-ratio: 16 / 9;
+    max-height: 70vh;
+    border: 1.5px dashed #3a3a3a;
+    border-radius: 14px;
+    background: rgba(255,255,255,0.012);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    text-align: center;
+    padding: 32px;
+    cursor: pointer;
+    transition: border-color .2s ease, background .2s ease, transform .2s ease;
+    position: relative;
+  }
+  .dropzone:hover { border-color: #555; background: rgba(255,255,255,0.025); }
+  .dropzone.drag-active {
+    border-color: var(--accent);
+    background: color-mix(in oklch, var(--accent) 8%, transparent);
+    transform: scale(1.01);
+  }
+  .dropzone .upload-icon {
+    width: 72px; height: 72px;
+    border: 1.5px solid #4a4a4a;
+    border-radius: 12px;
+    display: grid; place-items: center;
+    margin-bottom: 24px;
+    color: #9a9a9a;
+    transition: color .2s ease, border-color .2s ease;
+  }
+  .dropzone.drag-active .upload-icon { color: var(--accent); border-color: var(--accent); }
+  .dropzone .upload-icon svg { width: 32px; height: 32px; }
+  .dropzone h1 {
+    font-size: clamp(20px, 2.4vw, 28px);
+    font-weight: 500;
+    letter-spacing: -0.015em;
+    margin: 0 0 10px;
+    color: var(--fg);
+  }
+  .dropzone p.sub {
+    margin: 0;
+    font-size: clamp(13px, 1.4vw, 15px);
+    color: var(--fg-2);
+  }
+  .dropzone .or {
+    margin-top: 22px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--muted);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+  }
+  .dropzone .pick-btn {
+    margin-top: 14px;
+  }
+
+  .foothint {
+    position: absolute; left: 0; right: 0; bottom: 28px;
+    text-align: center;
+    color: var(--muted);
+    font-size: 13px;
+    letter-spacing: -0.005em;
+    pointer-events: none;
+    transition: opacity .25s ease;
+  }
+  body.viewer .foothint { opacity: 0; }
+  .foothint .sep { opacity: 0.5; margin: 0 10px; }
+  .foothint a, .foothint button.linklike {
+    color: var(--fg-2);
+    text-decoration: none;
+    background: none; border: 0; font: inherit; cursor: pointer;
+    padding: 0;
+    pointer-events: auto;
+    border-bottom: 1px dashed var(--line-2);
+  }
+  .foothint a:hover, .foothint button.linklike:hover { color: var(--fg); }
+
+  /* ---------- Drag overlay (global) ---------- */
+  .drop-overlay {
+    position: fixed; inset: 0;
+    background: color-mix(in oklch, var(--accent) 14%, rgba(0,0,0,0.55));
+    backdrop-filter: blur(2px);
+    display: grid; place-items: center;
+    z-index: 60;
+    opacity: 0; pointer-events: none;
+    transition: opacity .15s ease;
+    text-align: center;
+  }
+  .drop-overlay.show { opacity: 1; }
+  .drop-overlay .ring {
+    width: 96px; height: 96px;
+    border: 2px dashed #fff;
+    border-radius: 16px;
+    display: grid; place-items: center;
+    color: #fff;
+    margin: 0 auto 18px;
+  }
+  .drop-overlay h2 {
+    color: #fff;
+    font-size: 22px; font-weight: 500;
+    margin: 0 0 6px;
+    letter-spacing: -0.015em;
+  }
+  .drop-overlay p { color: rgba(255,255,255,0.7); margin: 0; font-size: 14px; }
+
+  /* ---------- Viewer hint ---------- */
+  .viewer-hint {
+    position: absolute;
+    left: 24px;
+    bottom: 24px;
+    background: rgba(0,0,0,0.55);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 999px;
+    padding: 8px 14px;
+    color: #eaeaea;
+    font-size: 13px;
+    letter-spacing: -0.005em;
+    opacity: 0;
+    transform: translateY(6px);
+    transition: opacity .3s ease, transform .3s ease;
+    z-index: 20;
+    display: inline-flex; align-items: center; gap: 8px;
+    pointer-events: none;
+  }
+  .viewer-hint .dot {
+    width: 6px; height: 6px; border-radius: 999px; background: var(--accent);
+  }
+  body.viewer .viewer-hint.show { opacity: 1; transform: translateY(0); }
+
+  /* ---------- Modal ---------- */
+  .modal-back {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.6);
+    backdrop-filter: blur(6px);
+    display: grid; place-items: center;
+    z-index: 80;
+    opacity: 0; pointer-events: none;
+    transition: opacity .2s ease;
+  }
+  .modal-back.show { opacity: 1; pointer-events: auto; }
+  .modal {
+    width: min(440px, 92vw);
+    background: #161616;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 24px;
+    transform: translateY(8px) scale(0.98);
+    transition: transform .2s ease;
+    box-shadow: 0 30px 80px rgba(0,0,0,0.6);
+  }
+  .modal-back.show .modal { transform: none; }
+  .modal h3 {
+    margin: 0 0 8px;
+    font-size: 17px;
+    font-weight: 500;
+    letter-spacing: -0.015em;
+    color: var(--fg);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .modal h3 .badge {
+    width: 24px; height: 24px; border-radius: 999px;
+    background: color-mix(in oklch, var(--warn) 20%, transparent);
+    color: var(--warn);
+    display: grid; place-items: center;
+    font-size: 13px; font-weight: 600;
+  }
+  .modal p { margin: 0; color: var(--fg-2); font-size: 14px; line-height: 1.55; }
+  .modal .row {
+    margin-top: 22px;
+    display: flex; gap: 8px; justify-content: flex-end;
+  }
+
+  /* ---------- Toast ---------- */
+  .toast-wrap {
+    position: fixed;
+    left: 50%; bottom: 28px;
+    transform: translateX(-50%);
+    display: flex; flex-direction: column-reverse; gap: 8px;
+    z-index: 90;
+    pointer-events: none;
+  }
+  .toast {
+    background: rgba(20,20,20,0.92);
+    border: 1px solid var(--line-2);
+    border-radius: 999px;
+    padding: 10px 18px;
+    font-size: 13px;
+    color: var(--fg);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+    opacity: 0;
+    transform: translateY(8px);
+    transition: opacity .2s ease, transform .2s ease;
+  }
+  .toast.show { opacity: 1; transform: none; }
+  .toast.err { border-color: color-mix(in oklch, var(--warn) 50%, var(--line-2)); }
+  .toast .lead { color: var(--muted); margin-right: 8px; font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; }
+
+  /* ---------- Mobile tuning ---------- */
+  @media (max-width: 560px) {
+    header.bar { padding: 14px 16px; }
+    .dropzone { aspect-ratio: auto; height: 60vh; padding: 24px; }
+    .viewer-hint { left: 16px; bottom: 16px; font-size: 12px; padding: 7px 12px; }
+    .top-actions .label { display: none; }
+    .top-actions .btn { padding: 8px; width: 36px; height: 36px; justify-content: center; gap: 0; }
+    .foothint { font-size: 12px; padding: 0 16px; bottom: 18px; }
+  }
+
+  /* Focus rings */
+  .btn:focus-visible,
+  .dropzone:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  .dropzone:focus-visible { outline-offset: -3px; }
+
+  /* GIF hotspots */
+  .gif-hotspot, .creature-hotspot {
+    background: none !important;
+    border: none !important;
+    box-shadow: none !important;
+    pointer-events: auto;
+  }
+  .gif-hotspot .pnlm-tooltip,
+  .creature-hotspot .pnlm-tooltip {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+  }
+  .gif-hotspot span,
+  .creature-hotspot > span {
+    display: none !important;
+  }
+
+  @keyframes creatureBob {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-8px); }
+  }
+  @keyframes creatureSpin {
+    0% { transform: rotate(0deg) scale(1); }
+    25% { transform: rotate(5deg) scale(1.05); }
+    50% { transform: rotate(0deg) scale(1); }
+    75% { transform: rotate(-5deg) scale(1.05); }
+    100% { transform: rotate(0deg) scale(1); }
+  }
+</style>
+</head>
+<body>
+
+<div id="app">
+
+  <header class="bar">
+    <div class="brand">
+      <span class="mark" aria-hidden="true"></span>
+      <span>360 VIEWER</span>
+    </div>
+    <div class="top-actions" id="topActions">
+      <button class="btn primary" id="btnNew" title="다른 방 선택 (N)">
+        <span class="icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
+          </svg>
+        </span>
+        <span class="label">다른 방 선택</span>
+      </button>
+    </div>
+  </header>
+
+  <main class="stage">
+    <div id="pano" aria-label="360도 파노라마 뷰어"></div>
+
+    <div class="dropzone-wrap" id="dropzoneWrap">
+      <div style="display:flex;flex-direction:column;align-items:center;gap:24px;width:min(720px,92vw);">
+        <h1 style="font-size:clamp(20px,2.4vw,28px);font-weight:500;color:var(--fg);letter-spacing:-0.015em;">방을 선택하세요</h1>
+        <div id="roomGrid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;width:100%;"></div>
+      </div>
+      <input type="file" id="filePicker" accept="image/*" hidden />
+      <div class="foothint">
+      </div>
+    </div>
+
+    <div class="viewer-hint" id="viewerHint">
+      <span class="dot"></span>
+      드래그해서 둘러보세요 · 휠/핀치로 줌
+    </div>
+  </main>
+
+</div>
+
+<!-- Global drag overlay -->
+<div class="drop-overlay" id="dropOverlay" aria-hidden="true">
+  <div>
+    <div class="ring">
+      <svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 16V4"/><path d="M6 10l6-6 6 6"/><path d="M4 20h16"/>
+      </svg>
+    </div>
+    <h2>여기에 놓으세요</h2>
+    <p>이미지 파일을 드롭하면 바로 360°로 열립니다</p>
+  </div>
+</div>
+
+<!-- Ratio warning modal -->
+<div class="modal-back" id="ratioModal" role="dialog" aria-modal="true" aria-labelledby="ratioTitle">
+  <div class="modal">
+    <h3 id="ratioTitle"><span class="badge">!</span>비율이 2:1이 아닙니다</h3>
+    <p id="ratioDesc">이 이미지는 — 비율입니다. 360° 뷰어는 2:1 (equirectangular)을 권장합니다. 그대로 열면 왜곡되어 보일 수 있어요.</p>
+    <div class="row">
+      <button class="btn ghost" id="ratioCancel">취소</button>
+      <button class="btn primary" id="ratioContinue">그대로 보기</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toasts -->
+<div class="toast-wrap" id="toastWrap" aria-live="polite"></div>
+
+<script>
+(function () {
+  'use strict';
+
+  const $ = (s) => document.querySelector(s);
+
+  const dropzone = null; // no longer used
+  const dropzoneWrap = $('#dropzoneWrap');
+  const filePicker = $('#filePicker');
+  const dropOverlay = $('#dropOverlay');
+  const ratioModal = $('#ratioModal');
+  const ratioDesc = $('#ratioDesc');
+  const ratioCancel = $('#ratioCancel');
+  const ratioContinue = $('#ratioContinue');
+  const toastWrap = $('#toastWrap');
+  const viewerHint = $('#viewerHint');
+
+  const btnNew = $('#btnNew');
+  const roomGrid = $('#roomGrid');
+
+  let viewer = null;
+  let currentObjectUrl = null;
+  let autoRotateOn = false;
+  let hintTimer = null;
+  let dragDepth = 0;
+  let pendingImageUrl = null;
+
+  // ---------- toast ----------
+  function toast(msg, kind = '') {
+    const el = document.createElement('div');
+    el.className = 'toast' + (kind ? ' ' + kind : '');
+    if (kind === 'err') el.innerHTML = '<span class="lead">알림</span>' + msg;
+    else el.textContent = msg;
+    toastWrap.appendChild(el);
+    requestAnimationFrame(() => el.classList.add('show'));
+    setTimeout(() => {
+      el.classList.remove('show');
+      setTimeout(() => el.remove(), 250);
+    }, 2600);
+  }
+
+  // ---------- image loading ----------
+  function readImageDimensions(blobUrl) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve({ w: img.naturalWidth, h: img.naturalHeight });
+      img.onerror = () => reject(new Error('이미지를 읽을 수 없습니다'));
+      img.src = blobUrl;
+    });
+  }
+
+  async function handleFile(file) {
+    if (!file) return;
+    if (!file.type || !file.type.startsWith('image/')) {
+      toast('이미지 파일만 올릴 수 있어요', 'err');
+      return;
+    }
+    const url = URL.createObjectURL(file);
+    let dims;
+    try {
+      dims = await readImageDimensions(url);
+    } catch (e) {
+      URL.revokeObjectURL(url);
+      toast('이미지를 읽지 못했어요', 'err');
+      return;
+    }
+    const ratio = dims.w / dims.h;
+    // 2:1 +/- 5% tolerance
+    if (Math.abs(ratio - 2) / 2 > 0.05) {
+      pendingImageUrl = url;
+      ratioDesc.textContent =
+        '이 이미지는 ' + ratio.toFixed(2) + ':1 비율입니다 (' + dims.w + '×' + dims.h + '). 360° 뷰어는 2:1 (equirectangular)을 권장합니다. 그대로 열면 왜곡되어 보일 수 있어요.';
+      ratioModal.classList.add('show');
+      return;
+    }
+    openViewer(url);
+  }
+
+  function openViewer(url) {
+    if (currentObjectUrl && currentObjectUrl !== url) {
+      try { URL.revokeObjectURL(currentObjectUrl); } catch (e) {}
+    }
+    currentObjectUrl = url;
+
+    if (viewer) {
+      try { viewer.destroy(); } catch (e) {}
+      viewer = null;
+    }
+    document.body.classList.add('viewer');
+
+    // Pannellum config
+    viewer = window.pannellum.viewer('pano', {
+      type: 'equirectangular',
+      panorama: url,
+      autoLoad: true,
+      showControls: false,
+      showZoomCtrl: false,
+      showFullscreenCtrl: false,
+      compass: false,
+      hfov: 120,
+      minHfov: 120,
+      maxHfov: 120,
+      pitch: 0,
+      yaw: 0,
+      backgroundColor: [0, 0, 0],
+      mouseZoom: false,
+      keyboardZoom: false,
+      autoRotate: 0,
+      friction: 0.18
+    });
+
+    autoRotateOn = false;
+    updateAutoRotateBtn();
+
+    // 3-second hint
+    if (hintTimer) clearTimeout(hintTimer);
+    viewerHint.classList.add('show');
+    hintTimer = setTimeout(() => viewerHint.classList.remove('show'), 3000);
+  }
+
+  function backToDropzone() {
+    if (viewer) {
+      try { viewer.destroy(); } catch (e) {}
+      viewer = null;
+    }
+    if (currentObjectUrl) {
+      try { URL.revokeObjectURL(currentObjectUrl); } catch (e) {}
+      currentObjectUrl = null;
+    }
+    document.body.classList.remove('viewer');
+    viewerHint.classList.remove('show');
+    autoRotateOn = false;
+    updateAutoRotateBtn();
+  }
+
+  function updateAutoRotateBtn() {
+    // removed
+  }
+
+  // ---------- dropzone interactions ----------
+  // File picker still available via drag & drop
+  filePicker.addEventListener('change', (e) => {
+    const f = e.target.files && e.target.files[0];
+    if (f) handleFile(f);
+    filePicker.value = '';
+  });
+
+  // ---------- global drag/drop ----------
+  function isFileDrag(e) {
+    if (!e.dataTransfer) return false;
+    const types = e.dataTransfer.types;
+    if (!types) return false;
+    for (let i = 0; i < types.length; i++) {
+      if (types[i] === 'Files') return true;
+    }
+    return false;
+  }
+
+  window.addEventListener('dragenter', (e) => {
+    if (!isFileDrag(e)) return;
+    e.preventDefault();
+    dragDepth++;
+    dropOverlay.classList.add('show');
+  });
+  window.addEventListener('dragover', (e) => {
+    if (!isFileDrag(e)) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+  });
+  window.addEventListener('dragleave', (e) => {
+    if (!isFileDrag(e)) return;
+    dragDepth = Math.max(0, dragDepth - 1);
+    if (dragDepth === 0) dropOverlay.classList.remove('show');
+  });
+  window.addEventListener('drop', (e) => {
+    if (!isFileDrag(e)) return;
+    e.preventDefault();
+    dragDepth = 0;
+    dropOverlay.classList.remove('show');
+    const f = e.dataTransfer.files && e.dataTransfer.files[0];
+    if (f) handleFile(f);
+  });
+
+  // ---------- controls ----------
+  btnNew.addEventListener('click', backToDropzone);
+
+  // ---------- ratio modal ----------
+  ratioCancel.addEventListener('click', () => {
+    ratioModal.classList.remove('show');
+    if (pendingImageUrl) {
+      try { URL.revokeObjectURL(pendingImageUrl); } catch (e) {}
+      pendingImageUrl = null;
+    }
+  });
+  ratioContinue.addEventListener('click', () => {
+    ratioModal.classList.remove('show');
+    if (pendingImageUrl) {
+      openViewer(pendingImageUrl);
+      pendingImageUrl = null;
+    }
+  });
+
+  // ---------- keyboard ----------
+  window.addEventListener('keydown', (e) => {
+    if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
+
+    if (e.key === 'Escape') {
+      if (ratioModal.classList.contains('show')) { ratioCancel.click(); return; }
+    }
+    if (!viewer) return;
+
+    if (e.key === 'n' || e.key === 'N') { btnNew.click(); }
+    else if (e.key === 'ArrowLeft')  { viewer.setYaw(viewer.getYaw() - 8, 200); }
+    else if (e.key === 'ArrowRight') { viewer.setYaw(viewer.getYaw() + 8, 200); }
+    else if (e.key === 'ArrowUp')    { viewer.setPitch(Math.min(85, viewer.getPitch() + 6), 200); }
+    else if (e.key === 'ArrowDown')  { viewer.setPitch(Math.max(-85, viewer.getPitch() - 6), 200); }
+  });
+
+  // ---------- Room grid (initial screen) ----------
+  const SAMPLES = [
+    { name: '방 1', url: 'assets/room1.png' },
+    { name: '방 2', url: 'assets/room2.png' },
+  ];
+
+  const GIFS = ['assets/2.gif'];
+
+  // Animated text "creatures" that float around in the room
+  const CREATURES = [
+    { emoji: '🐱', label: '고양이' },
+    { emoji: '🐶', label: '강아지' },
+    { emoji: '🤖', label: '로봇청소기' },
+  ];
+
+  function buildRoomGrid() {
+    SAMPLES.forEach((s) => {
+      const card = document.createElement('button');
+      card.style.cssText = 'border:1.5px solid var(--line);border-radius:12px;overflow:hidden;cursor:pointer;background:var(--bg-2);padding:0;transition:border-color .2s,transform .2s;';
+      card.innerHTML = `
+        <img src="${s.url}" style="width:100%;height:160px;object-fit:cover;display:block;" />
+        <div style="padding:14px;color:var(--fg);font:500 15px var(--font-sans);text-align:center;">${s.name}</div>
+      `;
+      card.onmouseenter = () => { card.style.borderColor = '#666'; card.style.transform = 'scale(1.02)'; };
+      card.onmouseleave = () => { card.style.borderColor = 'var(--line)'; card.style.transform = 'none'; };
+      card.onclick = () => openViewerWithGifs(s.url);
+      roomGrid.appendChild(card);
+    });
+  }
+  buildRoomGrid();
+
+  function openViewerWithGifs(url) {
+    if (currentObjectUrl && currentObjectUrl !== url) {
+      try { URL.revokeObjectURL(currentObjectUrl); } catch (e) {}
+    }
+    currentObjectUrl = url;
+
+    if (viewer) {
+      try { viewer.destroy(); } catch (e) {}
+      viewer = null;
+    }
+    document.body.classList.add('viewer');
+
+    // Random hotspot positions for GIFs - 5 copies spread around
+    const hotspots = [];
+    for (let i = 0; i < 5; i++) {
+      GIFS.forEach((gif) => {
+        hotspots.push({
+          pitch: (Math.random() - 0.5) * 60,
+          yaw: (i * 72) + (Math.random() - 0.5) * 40,  // spread evenly around 360°
+          type: 'info',
+          cssClass: 'gif-hotspot',
+          createTooltipFunc: (div) => {
+            div.style.cssText = 'background:#222;border-radius:8px;padding:4px;';
+            const img = document.createElement('img');
+            img.src = gif;
+            img.style.cssText = 'width:120px;height:auto;border-radius:0;box-shadow:none;mix-blend-mode:multiply;display:block;';
+            div.appendChild(img);
+          },
+          createTooltipArgs: gif,
+        });
+      });
+    }
+
+    // Add animated text creatures - on the floor (pitch around -60 to -70)
+    CREATURES.forEach((c) => {
+      hotspots.push({
+        pitch: -65 + (Math.random() - 0.5) * 10,  // floor level
+        yaw: Math.random() * 360 - 180,
+        type: 'info',
+        cssClass: 'creature-hotspot',
+        createTooltipFunc: (div) => {
+          div.style.cssText = 'pointer-events:none;';
+          div.innerHTML = `
+            <div style="display:flex;flex-direction:column;align-items:center;animation:creatureBob 2s ease-in-out infinite;">
+              <span style="font-size:48px;display:block;animation:creatureSpin 4s linear infinite;">${c.emoji}</span>
+              <span style="font-size:12px;color:#fff;background:rgba(0,0,0,0.5);padding:2px 8px;border-radius:99px;margin-top:4px;white-space:nowrap;">${c.label}</span>
+            </div>
+          `;
+        },
+        createTooltipArgs: c.label,
+      });
+    });
+
+    viewer = window.pannellum.viewer('pano', {
+      type: 'equirectangular',
+      panorama: url,
+      autoLoad: true,
+      showControls: false,
+      showZoomCtrl: false,
+      showFullscreenCtrl: false,
+      compass: false,
+      hfov: 120,
+      minHfov: 120,
+      maxHfov: 120,
+      pitch: 0,
+      yaw: 0,
+      backgroundColor: [0, 0, 0],
+      mouseZoom: false,
+      keyboardZoom: false,
+      autoRotate: 0,
+      friction: 0.18,
+      hotSpots: hotspots,
+    });
+
+    autoRotateOn = false;
+    updateAutoRotateBtn();
+
+    if (hintTimer) clearTimeout(hintTimer);
+    viewerHint.classList.add('show');
+    hintTimer = setTimeout(() => viewerHint.classList.remove('show'), 3000);
+    toast('방 안을 둘러보세요! GIF를 찾아보세요 🎯');
+  }
+
+  // Wait for pannellum to be ready
+  function waitForPannellum() {
+    if (window.pannellum) return Promise.resolve();
+    return new Promise((resolve) => {
+      const id = setInterval(() => {
+        if (window.pannellum) { clearInterval(id); resolve(); }
+      }, 40);
+    });
+  }
+
+  // Disable picker until ready (still allow drop; we'll await when needed)
+  waitForPannellum().then(() => { /* noop */ });
+
+})();
+</script>
+
+</body>
+</html>
