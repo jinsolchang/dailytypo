@@ -250,76 +250,41 @@ function startIntroSequence() {
   setTimeout(() => {
     glitchLayer.style.display = 'block';
 
-    // Phase 1: single dot in center grows through ASCII sizes
-    const dotSequence = ['.', '·', '∙', '•', '◦', '○', '◎', '●', '◉', '⬤', '✺', '❋'];
+    // Simple: dot blinks 3 times, then "무(無)", then bang
     const centerDot = document.createElement('div');
-    centerDot.style.cssText = 'position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-family:Courier New,monospace;color:#fff;font-size:12px;';
+    centerDot.style.cssText = 'position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-family:Courier New,monospace;color:#fff;font-size:24px;opacity:0;transition:opacity 0.15s;';
+    centerDot.textContent = '.';
     glitchLayer.appendChild(centerDot);
 
-    let dotIdx = 0;
-    const dotWriter = new GlitchedWriter(centerDot, {
-      interval: [10, 20], steps: [1, 2], maxGhosts: 1,
-      glyphs: '.,·∙•◦○◎●◉⬤',
-    });
-
-    function growDot() {
-      if (dotIdx >= dotSequence.length) {
-        centerDot.remove();
-        startSpiralPhase();
+    let blinks = 0;
+    function blink() {
+      if (blinks >= 3) {
+        centerDot.style.fontSize = '32px';
+        centerDot.style.opacity = '1';
+        const muWriter = new GlitchedWriter(centerDot, {
+          interval: [15, 30], steps: [2, 4], maxGhosts: 3,
+          glyphs: '!@#$%^&*∞∅∑∏∂∆◊⌀≈≠±×÷',
+        });
+        muWriter.write('무(無)').then(() => {
+          setTimeout(() => {
+            glitchLayer.style.display = 'none';
+            glitchLayer.innerHTML = '';
+            triggerBigBang();
+          }, 400);
+        });
         return;
       }
-      const size = 12 + dotIdx * 3;
-      centerDot.style.fontSize = size + 'px';
-      dotWriter.write(dotSequence[dotIdx]).then(() => {
-        dotIdx++;
-        setTimeout(growDot, 80);
-      });
+      centerDot.style.opacity = '1';
+      setTimeout(() => {
+        centerDot.style.opacity = '0';
+        setTimeout(() => {
+          blinks++;
+          blink();
+        }, 200);
+      }, 250);
     }
-    growDot();
-
-    // Phase 2: spiral words
-    function startSpiralPhase() {
-      const totalWords = 25;
-      let spawned = 0;
-      function scheduleNext() {
-        if (spawned >= totalWords) {
-          setTimeout(() => {
-            glitchLayer.querySelectorAll('.glitch-text').forEach(el => {
-              el.classList.add('glitch-flicker');
-            });
-            setTimeout(() => {
-              glitchLayer.innerHTML = '';
-              glitchLayer.style.background = '#000';
-              const finalEl = document.createElement('div');
-              finalEl.style.cssText = 'position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:32px;font-family:Courier New,monospace;color:#fff;';
-              glitchLayer.appendChild(finalEl);
-              const finalWriter = new GlitchedWriter(finalEl, {
-                interval: [15, 30],
-                delay: [10, 30],
-                steps: [2, 4],
-                maxGhosts: 3,
-                ghostChance: 0.7,
-                glyphs: '!@#$%^&*∞∅∑∏∂∆◊⌀≈≠±×÷',
-              });
-              finalWriter.write('빛이 있으라').then(() => {
-                setTimeout(() => {
-                  glitchLayer.style.display = 'none';
-                  glitchLayer.innerHTML = '';
-                  triggerBigBang();
-                }, 300);
-              });
-            }, 500);
-          }, 300);
-          return;
-        }
-        spawnGlitchText(spawned, totalWords);
-        spawned++;
-        const delay = getSpawnDelay(spawned, totalWords);
-        setTimeout(scheduleNext, delay);
-      }
-      scheduleNext();
-    }
-  }, 600);
+    blink();
+  }, 400);
 }
 
 function triggerBigBang() {
