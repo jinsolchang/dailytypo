@@ -303,7 +303,7 @@ function startIntroSequence() {
                   glitchLayer.style.display = 'none';
                   glitchLayer.innerHTML = '';
                   triggerBigBang();
-                }, 300);
+                }, 600);
               });
             }, 500);
           }, 300);
