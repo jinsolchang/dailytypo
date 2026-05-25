@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cosmic Zoom — 우주의 스케일</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { overflow: hidden; background: #000; color: #fff; font-family: 'Helvetica Neue', sans-serif; height: 100%; }
+    #canvas { position: fixed; inset: 0; opacity: 0; transition: opacity 0.5s; }
+    #canvas.visible { opacity: 1; }
+    #progress { position: fixed; right: 20px; top: 50%; transform: translateY(-50%); width: 2px; height: 180px; background: rgba(255,255,255,0.08); z-index: 10; border-radius: 1px; }
+    #progress-fill { width: 100%; background: rgba(255,255,255,0.5); border-radius: 1px; height: 0%; transition: height 0.15s; }
+    #flash { position: fixed; inset: 0; background: #fff; opacity: 0; pointer-events: none; z-index: 50; }
+
+    /* Intro */
+    #intro { position: fixed; inset: 0; z-index: 200; background: #000; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+    #intro-hint { position: absolute; bottom: 60px; font-size: 12px; opacity: 0.3; letter-spacing: 1px; }
+
+    /* Glitch sequence */
+    #glitch-layer { position: fixed; inset: 0; z-index: 150; background: #000; display: none; overflow: hidden; }
+    .glitch-text {
+      position: absolute;
+      font-family: 'Courier New', monospace;
+      color: rgba(255,255,255,0.8);
+      white-space: nowrap;
+      animation: glitchFade 0.3s ease-out forwards;
+      text-shadow: 0 0 8px rgba(255,255,255,0.5);
+    }
+    @keyframes glitchFade {
+      0% { opacity: 0; transform: scale(0.8) translateY(10px); }
+      50% { opacity: 1; }
+      100% { opacity: 0.9; transform: scale(1) translateY(0); }
+    }
+    @keyframes glitchFlicker {
+      0%, 100% { opacity: 0.9; }
+      10% { opacity: 0.1; }
+      20% { opacity: 0.8; transform: translateX(-2px); }
+      30% { opacity: 0.3; }
+      50% { opacity: 1; transform: translateX(1px); }
+      70% { opacity: 0.5; }
+      90% { opacity: 0.9; transform: translateX(0); }
+    }
+    .glitch-flicker { animation: glitchFlicker 0.15s infinite; }
+
+    .fade-out { opacity: 0 !important; pointer-events: none !important; transition: opacity 1s !important; }
+  </style>
+  <script type="module" crossorigin src="/assets/index-B8xKcciH.js"></script>
+</head>
+<body>
+  <canvas id="canvas"></canvas>
+  <div id="progress"><div id="progress-fill"></div></div>
+  <div id="flash"></div>
+  <div id="glitch-layer"></div>
+  <div id="intro">
+    <span id="intro-hint" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-family:'Courier New',monospace;font-size:14px;color:rgba(255,255,255,0.7);"></span>
+  </div>
+</body>
+</html>
