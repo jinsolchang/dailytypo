@@ -211,7 +211,7 @@ const GLITCH_WORDS = [
 function getSpawnDelay(index, total) {
   const t = index / total;
   const logCurve = 1 - Math.pow(t, 3);
-  return logCurve * 450 + 20;
+  return logCurve * 120 + 10;
 }
 
 function spawnGlitchText(index, total) {
@@ -258,7 +258,7 @@ function startIntroSequence() {
 
     let dotIdx = 0;
     const dotWriter = new GlitchedWriter(centerDot, {
-      interval: [20, 40], steps: [1, 2], maxGhosts: 1,
+      interval: [10, 20], steps: [1, 2], maxGhosts: 1,
       glyphs: '.,·∙•◦○◎●◉⬤',
     });
 
@@ -272,14 +272,14 @@ function startIntroSequence() {
       centerDot.style.fontSize = size + 'px';
       dotWriter.write(dotSequence[dotIdx]).then(() => {
         dotIdx++;
-        setTimeout(growDot, 250);
+        setTimeout(growDot, 80);
       });
     }
     growDot();
 
     // Phase 2: spiral words
     function startSpiralPhase() {
-      const totalWords = 40;
+      const totalWords = 25;
       let spawned = 0;
       function scheduleNext() {
         if (spawned >= totalWords) {
