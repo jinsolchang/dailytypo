@@ -259,18 +259,8 @@ function startIntroSequence() {
     let blinks = 0;
     function blink() {
       if (blinks >= 3) {
-        centerDot.style.fontSize = '32px';
-        centerDot.style.opacity = '1';
-        const muWriter = new GlitchedWriter(centerDot, {
-          interval: [15, 30], steps: [2, 4], maxGhosts: 3,
-          glyphs: '!@#$%^&*∞∅∑∏∂∆◊⌀≈≠±×÷',
-        });
-        muWriter.write('무(無)').then(() => {
-          setTimeout(() => {
-            centerDot.remove();
-            startSpiralPhase();
-          }, 300);
-        });
+        centerDot.remove();
+        startSpiralPhase();
         return;
       }
       centerDot.style.opacity = '1';
