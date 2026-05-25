@@ -250,7 +250,7 @@ function startIntroSequence() {
   setTimeout(() => {
     glitchLayer.style.display = 'block';
 
-    // Simple: dot blinks 3 times, then "무(無)", then bang
+    // Phase 1: dot blinks 3 times then becomes 무(無)
     const centerDot = document.createElement('div');
     centerDot.style.cssText = 'position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-family:Courier New,monospace;color:#fff;font-size:24px;opacity:0;transition:opacity 0.15s;';
     centerDot.textContent = '.';
@@ -267,10 +267,9 @@ function startIntroSequence() {
         });
         muWriter.write('무(無)').then(() => {
           setTimeout(() => {
-            glitchLayer.style.display = 'none';
-            glitchLayer.innerHTML = '';
-            triggerBigBang();
-          }, 400);
+            centerDot.remove();
+            startSpiralPhase();
+          }, 300);
         });
         return;
       }
@@ -284,6 +283,49 @@ function startIntroSequence() {
       }, 250);
     }
     blink();
+
+    // Phase 2: spiral words (original)
+    function startSpiralPhase() {
+      const totalWords = 25;
+      let spawned = 0;
+      function scheduleNext() {
+        if (spawned >= totalWords) {
+          setTimeout(() => {
+            glitchLayer.querySelectorAll('.glitch-text').forEach(el => {
+              el.classList.add('glitch-flicker');
+            });
+            setTimeout(() => {
+              glitchLayer.innerHTML = '';
+              glitchLayer.style.background = '#000';
+              const finalEl = document.createElement('div');
+              finalEl.style.cssText = 'position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:32px;font-family:Courier New,monospace;color:#fff;';
+              glitchLayer.appendChild(finalEl);
+              const finalWriter = new GlitchedWriter(finalEl, {
+                interval: [15, 30],
+                delay: [10, 30],
+                steps: [2, 4],
+                maxGhosts: 3,
+                ghostChance: 0.7,
+                glyphs: '!@#$%^&*∞∅∑∏∂∆◊⌀≈≠±×÷',
+              });
+              finalWriter.write('빛이 있으라').then(() => {
+                setTimeout(() => {
+                  glitchLayer.style.display = 'none';
+                  glitchLayer.innerHTML = '';
+                  triggerBigBang();
+                }, 300);
+              });
+            }, 500);
+          }, 300);
+          return;
+        }
+        spawnGlitchText(spawned, totalWords);
+        spawned++;
+        const delay = getSpawnDelay(spawned, totalWords);
+        setTimeout(scheduleNext, delay);
+      }
+      scheduleNext();
+    }
   }, 400);
 }
 
