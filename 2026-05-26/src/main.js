@@ -354,8 +354,8 @@ function animate() {
 
     // Subtle drift toward center when idle (very slow zoom in)
     if (!dragging) {
-      camera.position.z += (78 - camera.position.z) * 0.0003;
-      pivot.rotation.y += 0.0008;
+      camera.position.z += (78 - camera.position.z) * 0.0006;
+      pivot.rotation.y += 0.0016;
     }
   }
   pivot.rotation.x += (rx - pivot.rotation.x) * 0.08;
