@@ -361,6 +361,12 @@ function animate() {
     const s = getScale(progress);
     pivot.scale.setScalar(s);
     updateUI(progress);
+
+    // Subtle drift toward center when idle (very slow zoom in)
+    if (!dragging) {
+      camera.position.z += (78 - camera.position.z) * 0.0003;
+      pivot.rotation.y += 0.0008;
+    }
   }
   pivot.rotation.x += (rx - pivot.rotation.x) * 0.08;
   pivot.rotation.y += (ry - pivot.rotation.y) * 0.08;
