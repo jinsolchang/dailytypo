@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Snowfight — 1-bit</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { overflow: hidden; background: #000; }
+    #game-canvas { display: block; width: 100vw; height: 100vh; image-rendering: pixelated; }
+    #hud {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      pointer-events: none; z-index: 10;
+      font-family: 'Courier New', monospace;
+    }
+    #hp {
+      position: absolute; top: 12px; left: 12px;
+      color: #fff; font-size: 16px; font-weight: bold;
+      background: rgba(0,0,0,0.85); padding: 6px 12px; border-radius: 4px;
+    }
+    #score {
+      position: absolute; top: 12px; right: 12px;
+      color: #fff; font-size: 16px; font-weight: bold;
+      background: rgba(0,0,0,0.85); padding: 6px 12px; border-radius: 4px;
+    }
+    #msg {
+      position: absolute; top: 30%; left: 50%; transform: translate(-50%,-50%);
+      color: #fff; font-size: 22px; font-weight: bold;
+      background: rgba(0,0,0,0.85); padding: 8px 16px; border-radius: 4px;
+      opacity: 0; transition: opacity 0.3s;
+    }
+    #msg.show { opacity: 1; }
+    #controls {
+      position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%);
+      color: rgba(255,255,255,0.7); font-size: 12px;
+      background: rgba(0,0,0,0.7); padding: 4px 10px; border-radius: 4px;
+    }
+    #charge-bar {
+      position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+      width: 160px; height: 10px;
+      background: rgba(0,0,0,0.8); border-radius: 5px;
+      border: 1px solid rgba(255,255,255,0.4);
+      display: none;
+    }
+    #charge-bar.active { display: block; }
+    #charge-fill {
+      height: 100%; width: 0%; border-radius: 4px;
+      background: #fff; transition: background 0.1s;
+    }
+    #charge-fill.overcharge { background: #ff4444; }
+    #charge-sweet {
+      position: absolute; left: 88%; top: -2px; bottom: -2px; width: 3px;
+      background: rgba(255,255,255,0.6); border-radius: 2px;
+    }
+    #title-screen {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      z-index: 100; pointer-events: all; cursor: pointer;
+    }
+    #title-canvas { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -55%); }
+    #title-screen p {
+      font-family: 'Courier New', monospace;
+      font-size: 14px; color: rgba(255,255,255,0.5); margin-top: 160px;
+      letter-spacing: 8px; text-transform: uppercase;
+    }
+    #title-screen.hidden { display: none; }
+  </style>
+</head>
+<body>
+  <div id="title-screen">
+    <canvas id="title-canvas" width="700" height="200"></canvas>
+    <p>CLICK TO START</p>
+  </div>
+  <div id="hud">
+    <div id="hp">HP: ■■■■■</div>
+    <div id="score">SCORE: 0</div>
+    <div id="msg"></div>
+    <div id="charge-bar">
+      <div id="charge-fill"></div>
+      <div id="charge-sweet"></div>
+    </div>
+    <div id="controls">WASD 이동 | HOLD CLICK 차징 → 놓으면 던지기 | R 재장전</div>
+  </div>
+  <canvas id="game-canvas"></canvas>
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.162.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.162.0/examples/jsm/"
+    }
+  }
+  </script>
+  <script>
+  // Draw hand-drawn style title text on canvas
+  (function() {
+    const tc = document.getElementById('title-canvas');
+    const ctx = tc.getContext('2d');
+    ctx.clearRect(0, 0, 700, 200);
+
+    // Draw each letter as hand-drawn strokes
+    function jitter() { return (Math.random() - 0.5) * 3; }
+    function drawStroke(x1, y1, x2, y2, thickness) {
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = thickness || 3;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      const cp1x = (x1+x2)/2 + jitter()*2;
+      const cp1y = (y1+y2)/2 + jitter()*2;
+      ctx.moveTo(x1+jitter(), y1+jitter());
+      ctx.quadraticCurveTo(cp1x, cp1y, x2+jitter(), y2+jitter());
+      ctx.stroke();
+    }
+    function drawLine(x1,y1,x2,y2,t){ for(let i=0;i<2;i++) drawStroke(x1,y1,x2,y2,t||3); }
+
+    const ox = 40, oy = 40, s = 1.1;
+    // S
+    let bx=ox;
+    drawLine(bx+35*s,oy,bx+10*s,oy,4);
+    drawLine(bx+10*s,oy,bx+5*s,oy+30*s,4);
+    drawLine(bx+5*s,oy+30*s,bx+35*s,oy+55*s,4);
+    drawLine(bx+35*s,oy+55*s,bx+35*s,oy+85*s,4);
+    drawLine(bx+35*s,oy+85*s,bx+5*s,oy+90*s,4);
+    // n
+    bx+=55*s;
+    drawLine(bx,oy+30*s,bx,oy+90*s,3);
+    drawLine(bx,oy+35*s,bx+15*s,oy+28*s,3);
+    drawLine(bx+15*s,oy+28*s,bx+30*s,oy+40*s,3);
+    drawLine(bx+30*s,oy+40*s,bx+30*s,oy+90*s,3);
+    // o
+    bx+=45*s;
+    drawLine(bx+15*s,oy+28*s,bx+2*s,oy+50*s,3);
+    drawLine(bx+2*s,oy+50*s,bx+10*s,oy+88*s,3);
+    drawLine(bx+10*s,oy+88*s,bx+28*s,oy+88*s,3);
+    drawLine(bx+28*s,oy+88*s,bx+32*s,oy+50*s,3);
+    drawLine(bx+32*s,oy+50*s,bx+15*s,oy+28*s,3);
+    // w
+    bx+=45*s;
+    drawLine(bx,oy+30*s,bx+8*s,oy+90*s,3);
+    drawLine(bx+8*s,oy+90*s,bx+17*s,oy+55*s,3);
+    drawLine(bx+17*s,oy+55*s,bx+26*s,oy+90*s,3);
+    drawLine(bx+26*s,oy+90*s,bx+35*s,oy+30*s,3);
+    // f
+    bx+=50*s;
+    drawLine(bx+20*s,oy+5*s,bx+10*s,oy,4);
+    drawLine(bx+10*s,oy,bx+10*s,oy+90*s,4);
+    drawLine(bx+2*s,oy+30*s,bx+25*s,oy+30*s,3);
+    // i
+    bx+=35*s;
+    drawLine(bx+8*s,oy+30*s,bx+8*s,oy+90*s,3);
+    ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(bx+8*s+jitter(),oy+18*s,4,0,Math.PI*2);ctx.fill();
+    // g
+    bx+=28*s;
+    drawLine(bx+28*s,oy+30*s,bx+28*s,oy+110*s,3);
+    drawLine(bx+28*s,oy+110*s,bx+5*s,oy+110*s,3);
+    drawLine(bx+28*s,oy+30*s,bx+5*s,oy+30*s,3);
+    drawLine(bx+5*s,oy+30*s,bx+2*s,oy+60*s,3);
+    drawLine(bx+2*s,oy+60*s,bx+5*s,oy+85*s,3);
+    drawLine(bx+5*s,oy+85*s,bx+28*s,oy+85*s,3);
+    // h
+    bx+=45*s;
+    drawLine(bx,oy,bx,oy+90*s,3);
+    drawLine(bx,oy+40*s,bx+15*s,oy+30*s,3);
+    drawLine(bx+15*s,oy+30*s,bx+28*s,oy+45*s,3);
+    drawLine(bx+28*s,oy+45*s,bx+28*s,oy+90*s,3);
+    // t
+    bx+=42*s;
+    drawLine(bx+10*s,oy+5*s,bx+10*s,oy+85*s,3);
+    drawLine(bx+10*s,oy+85*s,bx+22*s,oy+90*s,3);
+    drawLine(bx+2*s,oy+30*s,bx+22*s,oy+30*s,3);
+
+    // Add some snow dots around
+    ctx.fillStyle = 'rgba(255,255,255,0.4)';
+    for (let i = 0; i < 30; i++) {
+      ctx.beginPath();
+      ctx.arc(Math.random()*700, Math.random()*200, 1+Math.random()*2, 0, Math.PI*2);
+      ctx.fill();
+    }
+  })();
+  </script>
+  <script type="module" src="game.js"></script>
+</body>
+</html>
