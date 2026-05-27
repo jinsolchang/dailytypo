@@ -51,7 +51,7 @@
             align-items: center;
             justify-content: center;
             text-align: center;
-            padding: 15px 25px;
+            padding: 30px 40px;
             transition: transform 0.1s;
             will-change: transform;
         }
@@ -306,8 +306,8 @@
             const el = document.createElement('div');
             el.className = `sign shape-${shape} ${anim}`;
 
-            const width = Math.max(text.length * fontSize * 0.6 + 60, 120);
-            const height = fontSize + 60;
+            const width = Math.max(text.length * fontSize * 0.7 + 100, 160);
+            const height = fontSize + 100;
 
             el.style.cssText = `
                 left: ${x}px;
@@ -576,7 +576,7 @@
             font-size: 0;
             transition: transform 0.3s ease;
           `;
-          bono.innerHTML = `<img src="bono.png" style="width:120px;height:auto;" />`;
+          bono.innerHTML = `<img src="bono.png" style="width:360px;height:auto;" />`;
 
           // Random position from edge
           const side = Math.floor(Math.random() * 4);
@@ -611,7 +611,7 @@
 
         // Random bonobono appearances
         function scheduleBonobono() {
-          const delay = 8000 + Math.random() * 15000; // 8~23초마다
+          const delay = 3000 + Math.random() * 2000; // 3~5초마다
           setTimeout(() => {
             spawnBonobono();
             scheduleBonobono();
