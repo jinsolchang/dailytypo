@@ -202,7 +202,7 @@
     <script>
     (function() {
         // ============ CONFIG ============
-        const SIGN_DENSITY = 0.00025; // signs per square pixel
+        const SIGN_DENSITY = 0.00004; // signs per square pixel
         const CHUNK_SIZE = 600;
         const VIEW_PADDING = 300;
 
@@ -566,7 +566,58 @@
             document.head.appendChild(style);
         }
 
-        // ============ HIDE INSTRUCTIONS ============
+        // ============ BONOBONO EASTER EGG ============
+        function spawnBonobono() {
+          const bono = document.createElement('div');
+          bono.style.cssText = `
+            position: fixed;
+            pointer-events: none;
+            z-index: 9998;
+            font-size: 0;
+            transition: transform 0.3s ease;
+          `;
+          bono.innerHTML = `<img src="bono.png" style="width:120px;height:auto;" />`;
+
+          // Random position from edge
+          const side = Math.floor(Math.random() * 4);
+          const vw = window.innerWidth, vh = window.innerHeight;
+          let startX, startY, endX, endY;
+
+          if (side === 0) { startX = -130; startY = Math.random() * vh; endX = 80; endY = startY; }
+          else if (side === 1) { startX = vw + 10; startY = Math.random() * vh; endX = vw - 130; endY = startY; }
+          else if (side === 2) { startX = Math.random() * vw; startY = -130; endX = startX; endY = 80; }
+          else { startX = Math.random() * vw; startY = vh + 10; endX = startX; endY = vh - 130; }
+
+          bono.style.left = startX + 'px';
+          bono.style.top = startY + 'px';
+          document.body.appendChild(bono);
+
+          // Peek in
+          setTimeout(() => {
+            bono.style.left = endX + 'px';
+            bono.style.top = endY + 'px';
+            bono.style.transition = 'left 0.6s ease-out, top 0.6s ease-out';
+          }, 50);
+
+          // Peek out after a moment
+          setTimeout(() => {
+            bono.style.left = startX + 'px';
+            bono.style.top = startY + 'px';
+          }, 2500);
+
+          // Remove
+          setTimeout(() => bono.remove(), 3500);
+        }
+
+        // Random bonobono appearances
+        function scheduleBonobono() {
+          const delay = 8000 + Math.random() * 15000; // 8~23초마다
+          setTimeout(() => {
+            spawnBonobono();
+            scheduleBonobono();
+          }, delay);
+        }
+        scheduleBonobono();
         function hideInstructions() {
             const inst = document.getElementById('instructions');
             setTimeout(() => {
