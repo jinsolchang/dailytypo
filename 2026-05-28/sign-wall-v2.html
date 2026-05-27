@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>★보노보노 PPT 간판 월드★</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Do+Hyeon&family=Gaegu:wght@700&family=Jua&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            overflow: hidden;
+            background: linear-gradient(135deg, 
+                #ff0000, #ff8800, #ffff00, #00ff00, #0088ff, #8800ff, #ff00ff, #ff0000);
+            background-size: 400% 400%;
+            animation: rainbowBg 8s ease infinite;
+            width: 100vw;
+            height: 100vh;
+            cursor: grab;
+            user-select: none;
+            font-family: 'Black Han Sans', sans-serif;
+        }
+
+        body:active {
+            cursor: grabbing;
+        }
+
+        @keyframes rainbowBg {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        #canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        .sign {
+            position: absolute;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 15px 25px;
+            transition: transform 0.1s;
+            will-change: transform;
+        }
+
+        .sign-text {
+            white-space: nowrap;
+            font-weight: 900;
+            line-height: 1.2;
+        }
+
+        /* Shape: Starburst */
+        .shape-starburst {
+            clip-path: polygon(50% 0%, 61% 15%, 78% 5%, 75% 24%, 95% 25%, 83% 40%, 100% 50%, 83% 60%, 95% 75%, 75% 76%, 78% 95%, 61% 85%, 50% 100%, 39% 85%, 22% 95%, 25% 76%, 5% 75%, 17% 60%, 0% 50%, 17% 40%, 5% 25%, 25% 24%, 22% 5%, 39% 15%);
+        }
+
+        /* Shape: Bubble */
+        .shape-bubble {
+            border-radius: 50%;
+        }
+
+        /* Shape: Heart */
+        .shape-heart {
+            clip-path: path('M 50 85 C 25 65, 0 40, 15 20 C 30 0, 50 10, 50 30 C 50 10, 70 0, 85 20 C 100 40, 75 65, 50 85 Z');
+            clip-path: polygon(50% 100%, 0% 35%, 0% 25%, 15% 5%, 35% 0%, 50% 15%, 65% 0%, 85% 5%, 100% 25%, 100% 35%);
+        }
+
+        /* Shape: Star */
+        .shape-star {
+            clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
+        }
+
+        /* Shape: Rectangle with thick border */
+        .shape-rect {
+            border: 6px solid;
+            outline: 4px solid;
+            outline-offset: 3px;
+            border-radius: 8px;
+        }
+
+        /* Shape: Cloud */
+        .shape-cloud {
+            border-radius: 50px;
+            box-shadow: 
+                -25px -10px 0 -5px currentColor,
+                25px -10px 0 -5px currentColor,
+                -15px -20px 0 -5px currentColor,
+                15px -20px 0 -5px currentColor;
+        }
+
+        /* Shape: Pill */
+        .shape-pill {
+            border-radius: 999px;
+            border: 5px solid;
+        }
+
+        /* Animations */
+        @keyframes wiggle {
+            0%, 100% { transform: rotate(-3deg); }
+            25% { transform: rotate(3deg); }
+            50% { transform: rotate(-2deg); }
+            75% { transform: rotate(2deg); }
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.08); }
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-4px) rotate(-1deg); }
+            75% { transform: translateX(4px) rotate(1deg); }
+        }
+
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-8px); }
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .anim-wiggle { animation: wiggle 0.4s infinite; }
+        .anim-pulse { animation: pulse 1.2s infinite; }
+        .anim-shake { animation: shake 0.3s infinite; }
+        .anim-bounce { animation: bounce 0.8s infinite; }
+
+        /* Counter */
+        #counter {
+            position: fixed;
+            top: 15px;
+            right: 15px;
+            background: linear-gradient(45deg, #ff00ff, #00ffff);
+            color: #fff;
+            font-family: 'Jua', sans-serif;
+            font-size: 18px;
+            padding: 10px 20px;
+            border-radius: 999px;
+            border: 3px solid #fff;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.4), inset 0 0 10px rgba(255,255,255,0.3);
+            z-index: 9999;
+            -webkit-text-stroke: 1px #000;
+            text-shadow: 2px 2px 0 #000;
+        }
+
+        /* Instructions */
+        #instructions {
+            position: fixed;
+            bottom: 15px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.7);
+            color: #ffff00;
+            font-family: 'Gaegu', cursive;
+            font-size: 20px;
+            padding: 8px 24px;
+            border-radius: 999px;
+            border: 2px solid #ffff00;
+            z-index: 9999;
+            text-shadow: 1px 1px 0 #ff0000;
+            animation: pulse 2s infinite;
+            pointer-events: none;
+        }
+
+        /* Title */
+        #title {
+            position: fixed;
+            top: 15px;
+            left: 15px;
+            font-family: 'Black Han Sans', sans-serif;
+            font-size: 28px;
+            color: #ffff00;
+            -webkit-text-stroke: 2px #ff0000;
+            text-shadow: 3px 3px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
+            z-index: 9999;
+            animation: wiggle 0.5s infinite;
+        }
+    </style>
+</head>
+<body>
+    <div id="canvas"></div>
+    <div id="title">★보노보노 간판월드★</div>
+    <div id="counter">간판: 0개</div>
+    <div id="instructions">♥ 드래그해서 탐험하세요~ *^^* ♥</div>
+
+    <script>
+    (function() {
+        // ============ CONFIG ============
+        const SIGN_DENSITY = 0.00025; // signs per square pixel
+        const CHUNK_SIZE = 600;
+        const VIEW_PADDING = 300;
+
+        // ============ DATA ============
+        const signTexts = [
+            // 학원
+            '★대박입시학원★', '♥천재영어교실♥', '꿈꾸는수학~', '◆서울TOP학원◆',
+            '엘리트논술ㅋㅋ', '♨수능대박학원♨', '1등급보장학원', '합격의신학원',
+            '영재사관학원', 'SKY입시전문', '수학왕학원*^^*', '올A영어~♥',
+            '대치동1타강사', '♨족집게학원♨', '100점맞자학원',
+            // 음식점
+            '맛자랑떡볶이♨', '24시국밥★', '왕족발보쌈~', '◆엄마손칼국수◆',
+            '불닭볶음면맛집', '♥순대국1번지♥', '황제갈비살', '진짜맛있는집',
+            '할매순대국', '원조왕돈까스', '꿀맛치킨~ㅋㅋ', '대박라면집★',
+            '24시부대찌개', '왕만두전골♨', '소문난김밥', '맛있는녀석들',
+            '장인정신횟집', '★불맛쭈꾸미★', '오빠떡볶이♥', '매운맛1번지',
+            // 병원/의원
+            '서울수려한치과', '24시응급치과♨', '◆예쁜미소치과◆', '튼튼정형외과',
+            '맑은눈안과★', '밝은웃음치과', '건강한내일의원', '♥아름다운피부과♥',
+            '든든한의원', '새봄한의원~',
+            // 정치 슬로건
+            '오직 시민만 바라봅니다', '깨끗한 정치!', 'GTX 조기 개통!!',
+            '교육비 ZERO', '우리동네 지킴이★', '함께하는 미래◆', '약속은 반드시!',
+            '시민이 주인입니다♥', '변화의 시작~', '일 잘하는 후보!',
+            '경제 살리기 1순위', '청년 일자리 10만개', '아이 키우기 좋은 도시',
+            '주차장 확대!!', '♨재개발 조기추진♨', '무상급식 확대★',
+            '안전한 거리 만들기', '소상공인 지원◆', '교통비 반값!',
+            // 기타 상점
+            '♥뷰티풀 미용실♥', '★헤어짱 미용실★', '대박부동산~', '◆로또1번지◆',
+            '빨래왕 세탁소', '고시텔 월15만~', '노래방 24시♨', '♥PC방 최신사양♥',
+            '만화카페 올나잇', '당구장오픈★', '찜질방24시~', '★운세카페★',
+            '타로점 용한곳♥', '꽃배달 전문◆', '이사 잘하는집', '열쇠 24시~',
+            '인쇄소 당일출력', '복사 100원♨', '공인중개사무소★', '법률사무소◆',
+        ];
+
+        const fonts = ['Black Han Sans', 'Jua', 'Do Hyeon', 'Gaegu'];
+        const shapes = ['starburst', 'bubble', 'star', 'rect', 'cloud', 'pill', 'heart'];
+        const animations = ['anim-wiggle', 'anim-pulse', 'anim-shake', 'anim-bounce', ''];
+
+        const bgColors = [
+            '#ff0066', '#ff6600', '#ffcc00', '#00ff66', '#0066ff', '#9900ff',
+            '#ff3399', '#ff9933', '#ffff33', '#33ff99', '#3399ff', '#cc33ff',
+            '#ff0000', '#00ff00', '#0000ff', '#ff00ff', '#00ffff', '#ffff00',
+            '#ffffff', '#ffe0f0', '#e0f0ff', '#f0ffe0', '#fff0e0', '#f0e0ff',
+        ];
+
+        const textColors = [
+            '#ff0000', '#ff00ff', '#0000ff', '#ff6600', '#9900ff', '#00cc00',
+            '#ffffff', '#ffff00', '#00ffff', '#ff3399', '#000000', '#ff0066',
+        ];
+
+        const strokeColors = [
+            '#000000', '#ffffff', '#ff0000', '#0000ff', '#ff00ff', '#ffff00',
+            '#00ff00', '#ff6600', '#9900ff',
+        ];
+
+        // ============ STATE ============
+        let offsetX = 0;
+        let offsetY = 0;
+        let isDragging = false;
+        let startX = 0;
+        let startY = 0;
+        let signs = new Map(); // key: "chunkX,chunkY", value: array of sign elements
+        let signCount = 0;
+
+        const canvas = document.getElementById('canvas');
+        const counterEl = document.getElementById('counter');
+
+        // ============ UTILS ============
+        function seededRandom(seed) {
+            let s = seed;
+            return function() {
+                s = (s * 1664525 + 1013904223) & 0xFFFFFFFF;
+                return (s >>> 0) / 4294967296;
+            };
+        }
+
+        function hashChunk(cx, cy, index) {
+            return ((cx * 73856093) ^ (cy * 19349663) ^ (index * 83492791)) & 0x7FFFFFFF;
+        }
+
+        function randomFrom(arr, rng) {
+            return arr[Math.floor(rng() * arr.length)];
+        }
+
+        // ============ SIGN CREATION ============
+        function createSign(x, y, seed) {
+            const rng = seededRandom(seed);
+            const text = randomFrom(signTexts, rng);
+            const font = randomFrom(fonts, rng);
+            const shape = randomFrom(shapes, rng);
+            const anim = randomFrom(animations, rng);
+            const bgColor = randomFrom(bgColors, rng);
+            const textColor = randomFrom(textColors, rng);
+            const strokeColor = randomFrom(strokeColors, rng);
+            const fontSize = Math.floor(rng() * 40 + 22);
+            const rotation = (rng() - 0.5) * 30;
+            const strokeWidth = Math.floor(rng() * 3 + 1);
+            const shadowSize = Math.floor(rng() * 4 + 2);
+
+            const el = document.createElement('div');
+            el.className = `sign shape-${shape} ${anim}`;
+
+            const width = Math.max(text.length * fontSize * 0.6 + 60, 120);
+            const height = fontSize + 60;
+
+            el.style.cssText = `
+                left: ${x}px;
+                top: ${y}px;
+                width: ${width}px;
+                height: ${height}px;
+                background: ${bgColor};
+                transform: rotate(${rotation}deg);
+            `;
+
+            if (shape === 'rect') {
+                el.style.borderColor = strokeColor;
+                el.style.outlineColor = textColor;
+            }
+
+            if (shape === 'cloud') {
+                el.style.color = bgColor;
+            }
+
+            const textEl = document.createElement('span');
+            textEl.className = 'sign-text';
+            textEl.textContent = text;
+            textEl.style.cssText = `
+                font-family: '${font}', sans-serif;
+                font-size: ${fontSize}px;
+                color: ${textColor};
+                -webkit-text-stroke: ${strokeWidth}px ${strokeColor};
+                text-shadow: ${shadowSize}px ${shadowSize}px 0 ${strokeColor}, 
+                             -1px -1px 0 ${strokeColor}, 
+                             1px -1px 0 ${strokeColor}, 
+                             -1px 1px 0 ${strokeColor},
+                             0 0 10px ${bgColor};
+            `;
+
+            el.appendChild(textEl);
+            return el;
+        }
+
+        // ============ CHUNK MANAGEMENT ============
+        function getVisibleChunks() {
+            const vw = window.innerWidth;
+            const vh = window.innerHeight;
+            const startCX = Math.floor((offsetX - VIEW_PADDING) / CHUNK_SIZE);
+            const startCY = Math.floor((offsetY - VIEW_PADDING) / CHUNK_SIZE);
+            const endCX = Math.floor((offsetX + vw + VIEW_PADDING) / CHUNK_SIZE);
+            const endCY = Math.floor((offsetY + vh + VIEW_PADDING) / CHUNK_SIZE);
+
+            const chunks = [];
+            for (let cx = startCX; cx <= endCX; cx++) {
+                for (let cy = startCY; cy <= endCY; cy++) {
+                    chunks.push({ cx, cy });
+                }
+            }
+            return chunks;
+        }
+
+        function generateChunk(cx, cy) {
+            const key = `${cx},${cy}`;
+            if (signs.has(key)) return;
+
+            const signsInChunk = [];
+            const numSigns = Math.floor(CHUNK_SIZE * CHUNK_SIZE * SIGN_DENSITY);
+
+            for (let i = 0; i < numSigns; i++) {
+                const seed = hashChunk(cx, cy, i);
+                const rng = seededRandom(seed);
+                const x = cx * CHUNK_SIZE + rng() * CHUNK_SIZE;
+                const y = cy * CHUNK_SIZE + rng() * CHUNK_SIZE;
+
+                const signEl = createSign(x, y, seed + 12345);
+                canvas.appendChild(signEl);
+                signsInChunk.push(signEl);
+                signCount++;
+            }
+
+            signs.set(key, signsInChunk);
+            updateCounter();
+        }
+
+        function removeChunk(key) {
+            const chunkSigns = signs.get(key);
+            if (!chunkSigns) return;
+
+            chunkSigns.forEach(el => {
+                canvas.removeChild(el);
+                signCount--;
+            });
+            signs.delete(key);
+            updateCounter();
+        }
+
+        function updateVisibleChunks() {
+            const visibleChunks = getVisibleChunks();
+            const visibleKeys = new Set(visibleChunks.map(c => `${c.cx},${c.cy}`));
+
+            // Remove chunks that are no longer visible
+            for (const key of signs.keys()) {
+                if (!visibleKeys.has(key)) {
+                    removeChunk(key);
+                }
+            }
+
+            // Generate new visible chunks
+            visibleChunks.forEach(({ cx, cy }) => {
+                generateChunk(cx, cy);
+            });
+        }
+
+        function updateCounter() {
+            counterEl.textContent = `간판: ${signCount}개 ♥`;
+        }
+
+        // ============ CAMERA ============
+        function updateCamera() {
+            canvas.style.transform = `translate(${-offsetX}px, ${-offsetY}px)`;
+        }
+
+        // ============ INPUT HANDLING ============
+        // Mouse
+        document.addEventListener('mousedown', (e) => {
+            isDragging = true;
+            startX = e.clientX + offsetX;
+            startY = e.clientY + offsetY;
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+            offsetX = startX - e.clientX;
+            offsetY = startY - e.clientY;
+            updateCamera();
+            updateVisibleChunks();
+        });
+
+        document.addEventListener('mouseup', () => {
+            isDragging = false;
+        });
+
+        // Touch
+        document.addEventListener('touchstart', (e) => {
+            isDragging = true;
+            const touch = e.touches[0];
+            startX = touch.clientX + offsetX;
+            startY = touch.clientY + offsetY;
+        }, { passive: true });
+
+        document.addEventListener('touchmove', (e) => {
+            if (!isDragging) return;
+            e.preventDefault();
+            const touch = e.touches[0];
+            offsetX = startX - touch.clientX;
+            offsetY = startY - touch.clientY;
+            updateCamera();
+            updateVisibleChunks();
+        }, { passive: false });
+
+        document.addEventListener('touchend', () => {
+            isDragging = false;
+        });
+
+        // ============ DECORATIVE FLOATING ELEMENTS ============
+        function createFloatingDecor() {
+            const decors = ['★', '♥', '♨', '◆', '~', '*', '♪', '☆', '♡', '✿'];
+            const container = document.createElement('div');
+            container.style.cssText = `
+                position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+                pointer-events: none; z-index: 1; overflow: hidden;
+            `;
+
+            for (let i = 0; i < 20; i++) {
+                const span = document.createElement('span');
+                span.textContent = decors[Math.floor(Math.random() * decors.length)];
+                const size = Math.random() * 30 + 15;
+                const x = Math.random() * 100;
+                const duration = Math.random() * 10 + 5;
+                const delay = Math.random() * 5;
+                span.style.cssText = `
+                    position: absolute;
+                    left: ${x}%;
+                    top: ${Math.random() * 100}%;
+                    font-size: ${size}px;
+                    color: rgba(255,255,255,0.3);
+                    animation: floatUp ${duration}s ${delay}s infinite linear;
+                    text-shadow: 0 0 10px currentColor;
+                `;
+                container.appendChild(span);
+            }
+
+            document.body.appendChild(container);
+
+            const style = document.createElement('style');
+            style.textContent = `
+                @keyframes floatUp {
+                    0% { transform: translateY(100vh) rotate(0deg); opacity: 0; }
+                    10% { opacity: 0.5; }
+                    90% { opacity: 0.5; }
+                    100% { transform: translateY(-100vh) rotate(720deg); opacity: 0; }
+                }
+            `;
+            document.head.appendChild(style);
+        }
+
+        // ============ EXTRA SIGN SHAPES & VARIETY ============
+        function addExtraStyles() {
+            const style = document.createElement('style');
+            style.textContent = `
+                .shape-starburst {
+                    background: linear-gradient(45deg, #ff0 0%, #f0f 50%, #0ff 100%) !important;
+                }
+                .shape-star {
+                    padding: 30px 35px;
+                }
+                .shape-heart {
+                    padding: 35px 30px;
+                    padding-top: 45px;
+                }
+                .shape-bubble {
+                    padding: 30px 40px;
+                    box-shadow: inset -5px -5px 15px rgba(0,0,0,0.2), 
+                                5px 5px 20px rgba(0,0,0,0.3),
+                                inset 5px 5px 15px rgba(255,255,255,0.3);
+                }
+                .shape-pill {
+                    box-shadow: 5px 5px 0 #000, 8px 8px 0 rgba(0,0,0,0.3);
+                }
+                .shape-cloud {
+                    box-shadow: 
+                        0 8px 0 -2px rgba(0,0,0,0.2),
+                        -20px -5px 0 -8px currentColor,
+                        20px -5px 0 -8px currentColor,
+                        -10px -15px 0 -8px currentColor,
+                        10px -15px 0 -8px currentColor;
+                    padding: 25px 35px;
+                }
+                .shape-rect {
+                    box-shadow: 6px 6px 0 #000;
+                }
+
+                /* Gradient text effect for some signs */
+                .gradient-text {
+                    background: linear-gradient(to bottom, #ff0, #f00);
+                    -webkit-background-clip: text;
+                    -webkit-text-fill-color: transparent;
+                    background-clip: text;
+                }
+
+                /* Neon glow */
+                .neon-glow {
+                    text-shadow: 
+                        0 0 5px #fff,
+                        0 0 10px #fff,
+                        0 0 20px #ff00ff,
+                        0 0 40px #ff00ff,
+                        0 0 80px #ff00ff !important;
+                }
+            `;
+            document.head.appendChild(style);
+        }
+
+        // ============ HIDE INSTRUCTIONS ============
+        function hideInstructions() {
+            const inst = document.getElementById('instructions');
+            setTimeout(() => {
+                inst.style.transition = 'opacity 1s';
+                inst.style.opacity = '0';
+                setTimeout(() => inst.remove(), 1000);
+            }, 5000);
+        }
+
+        // ============ INIT ============
+        function init() {
+            // Center the view
+            offsetX = -window.innerWidth / 2;
+            offsetY = -window.innerHeight / 2;
+            updateCamera();
+            updateVisibleChunks();
+            createFloatingDecor();
+            addExtraStyles();
+            hideInstructions();
+        }
+
+        // Handle resize
+        window.addEventListener('resize', () => {
+            updateVisibleChunks();
+        });
+
+        init();
+    })();
+    </script>
+</body>
+</html>
