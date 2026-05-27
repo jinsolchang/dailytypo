@@ -1,0 +1,1214 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>無限看板 · 끝없는 벽</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Jua&family=Do+Hyeon&family=Gaegu:wght@400;700&family=Nanum+Pen+Script&family=Stylish&family=Gugi&family=Single+Day&family=Sunflower:wght@300;500;700&family=Gothic+A1:wght@400;700;900&family=Hi+Melody&family=East+Sea+Dokdo&family=Cute+Font&family=Yeon+Sung&family=Dokdo&family=Poor+Story&family=Song+Myung&family=Kirang+Haerang&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body {
+    width: 100%; height: 100%;
+    overflow: hidden;
+    background: #c9c3b6;
+    font-family: 'Gothic A1', sans-serif;
+    cursor: grab;
+    touch-action: none;
+    -webkit-user-select: none;
+    user-select: none;
+    overscroll-behavior: none;
+  }
+  body.dragging { cursor: grabbing; }
+
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image:
+      radial-gradient(circle at 20% 30%, rgba(0,0,0,0.05) 0%, transparent 50%),
+      radial-gradient(circle at 80% 70%, rgba(0,0,0,0.04) 0%, transparent 50%),
+      radial-gradient(circle at 50% 50%, rgba(255,200,150,0.04) 0%, transparent 70%),
+      repeating-linear-gradient(90deg, transparent 0px, transparent 2px, rgba(0,0,0,0.018) 2px, rgba(0,0,0,0.018) 3px),
+      repeating-linear-gradient(0deg, transparent 0px, transparent 80px, rgba(0,0,0,0.025) 80px, rgba(0,0,0,0.025) 81px);
+    pointer-events: none;
+    z-index: 1;
+  }
+  body::after {
+    content: '';
+    position: fixed; inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.45 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    opacity: 0.32;
+    pointer-events: none;
+    z-index: 9999;
+    mix-blend-mode: multiply;
+  }
+
+  #canvas {
+    position: fixed; inset: 0;
+    z-index: 2;
+    will-change: transform;
+  }
+
+  .sign {
+    position: absolute;
+    padding: 0.55em 1em;
+    white-space: nowrap;
+    line-height: 1;
+    box-shadow:
+      0 2px 0 rgba(0,0,0,0.18),
+      0 6px 18px rgba(0,0,0,0.2),
+      inset 0 0 0 2px rgba(0,0,0,0.06);
+    transform-origin: center center;
+    transition: opacity 0.4s ease;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    gap: 0.4em;
+  }
+
+  .sign.in-right, .poster.in-right, .led-clock.in-right, .banner.in-right, .vertical.in-right, .stamp.in-right, .arrow-sign.in-right {
+    animation: slideInRight 0.55s cubic-bezier(.16,1,.3,1) both;
+  }
+  .sign.in-left, .poster.in-left, .led-clock.in-left, .banner.in-left, .vertical.in-left, .stamp.in-left, .arrow-sign.in-left {
+    animation: slideInLeft 0.55s cubic-bezier(.16,1,.3,1) both;
+  }
+  .sign.in-up, .poster.in-up, .led-clock.in-up, .banner.in-up, .vertical.in-up, .stamp.in-up, .arrow-sign.in-up {
+    animation: slideInUp 0.55s cubic-bezier(.16,1,.3,1) both;
+  }
+  .sign.in-down, .poster.in-down, .led-clock.in-down, .banner.in-down, .vertical.in-down, .stamp.in-down, .arrow-sign.in-down {
+    animation: slideInDown 0.55s cubic-bezier(.16,1,.3,1) both;
+  }
+  @keyframes slideInRight {
+    from { transform: var(--base-transform) translateX(80px); opacity: 0; }
+    to { transform: var(--base-transform); opacity: 1; }
+  }
+  @keyframes slideInLeft {
+    from { transform: var(--base-transform) translateX(-80px); opacity: 0; }
+    to { transform: var(--base-transform); opacity: 1; }
+  }
+  @keyframes slideInUp {
+    from { transform: var(--base-transform) translateY(-80px); opacity: 0; }
+    to { transform: var(--base-transform); opacity: 1; }
+  }
+  @keyframes slideInDown {
+    from { transform: var(--base-transform) translateY(80px); opacity: 0; }
+    to { transform: var(--base-transform); opacity: 1; }
+  }
+
+  .s-red { background: #e8202a; color: #fff8e7; }
+  .s-blue { background: #1845a8; color: #fff; }
+  .s-yellow { background: #ffd400; color: #1a1a1a; }
+  .s-pink { background: #ff4d8d; color: #fff; }
+  .s-hotpink { background: #ff1f88; color: #fff700; }
+  .s-green { background: #0a7a3b; color: #fff8e7; }
+  .s-limegreen { background: #4fc14a; color: #1a1a1a; }
+  .s-black { background: #0d0d0d; color: #ffd400; }
+  .s-white { background: #fafaf5; color: #1a1a1a; border: 3px solid #1a1a1a; }
+  .s-orange { background: #ff6a13; color: #fff; }
+  .s-cream { background: #f4e8c1; color: #8b2a1a; }
+  .s-neon { background: #c9ff00; color: #0d0d0d; }
+  .s-darkred { background: #8b0000; color: #ffd400; }
+  .s-navy { background: #0a1f44; color: #f4e8c1; }
+  .s-purple { background: #5e1a8a; color: #ffd400; }
+  .s-teal { background: #0a8090; color: #fff; }
+  .s-brown { background: #5a3a1a; color: #f4e8c1; }
+  .s-mint { background: #a8e6c4; color: #1a4a2a; }
+  .s-sky { background: #6fc8f0; color: #0a1f44; }
+  .s-banner-r { background: linear-gradient(180deg, #ff2a3c 0%, #c8001a 100%); color: #fff; }
+  .s-banner-b { background: linear-gradient(180deg, #2a6fff 0%, #003ec8 100%); color: #fff; }
+  .s-banner-y { background: linear-gradient(180deg, #ffe14a 0%, #d49a00 100%); color: #1a1a1a; }
+  .s-split-rb { background: linear-gradient(90deg, #e8202a 50%, #1845a8 50%); color: #fff; }
+  .s-split-yk { background: linear-gradient(180deg, #ffd400 50%, #0d0d0d 50%); color: #fff; }
+  .s-stripes-rw { background: repeating-linear-gradient(90deg, #e8202a 0 14px, #fff 14px 28px); color: #0d0d0d; padding-left: 1.4em; padding-right: 1.4em; }
+  .s-stripes-bw { background: repeating-linear-gradient(45deg, #1845a8 0 10px, #fff 10px 20px); color: #ffd400; padding-left: 1.4em; padding-right: 1.4em; text-shadow: 1px 1px 0 #000; }
+
+  .glow-pink { box-shadow: 0 0 24px #ff4d8d, 0 0 8px #fff, inset 0 0 0 2px #fff; text-shadow: 0 0 4px #fff, 0 0 8px #ff4d8d; }
+  .glow-cyan { box-shadow: 0 0 24px #00e6ff, 0 0 8px #fff, inset 0 0 0 2px #fff; text-shadow: 0 0 4px #fff, 0 0 8px #00e6ff; }
+  .glow-yellow { box-shadow: 0 0 24px #ffd400, 0 0 8px #fff8e7, inset 0 0 0 2px #fff8e7; text-shadow: 0 0 4px #fff, 0 0 8px #ffd400; }
+
+  .weathered { position: relative; }
+  .weathered::after {
+    content: '';
+    position: absolute; inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='w'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.04' numOctaves='2'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.35 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23w)'/%3E%3C/svg%3E");
+    opacity: 0.6;
+    pointer-events: none;
+    mix-blend-mode: screen;
+  }
+
+  .border-thick { box-shadow: 0 2px 0 rgba(0,0,0,0.2), 0 6px 18px rgba(0,0,0,0.25), inset 0 0 0 5px #fff, inset 0 0 0 8px rgba(0,0,0,0.15); }
+  .border-dashed { box-shadow: 0 6px 18px rgba(0,0,0,0.2), inset 0 0 0 3px currentColor; outline: 2px dashed currentColor; outline-offset: 4px; }
+  .corners-round { border-radius: 14px; }
+  .corners-pill { border-radius: 999px; }
+
+  .f-black-han { font-family: 'Black Han Sans', sans-serif; letter-spacing: -0.02em; }
+  .f-jua { font-family: 'Jua', sans-serif; }
+  .f-do-hyeon { font-family: 'Do Hyeon', sans-serif; }
+  .f-gaegu { font-family: 'Gaegu', cursive; font-weight: 700; }
+  .f-nanum-pen { font-family: 'Nanum Pen Script', cursive; }
+  .f-stylish { font-family: 'Stylish', sans-serif; }
+  .f-gugi { font-family: 'Gugi', cursive; }
+  .f-single { font-family: 'Single Day', cursive; }
+  .f-sunflower { font-family: 'Sunflower', sans-serif; font-weight: 700; }
+  .f-gothic { font-family: 'Gothic A1', sans-serif; font-weight: 900; letter-spacing: -0.04em; }
+  .f-hi-melody { font-family: 'Hi Melody', cursive; }
+  .f-east-sea { font-family: 'East Sea Dokdo', cursive; }
+  .f-cute { font-family: 'Cute Font', cursive; }
+  .f-yeon-sung { font-family: 'Yeon Sung', cursive; }
+  .f-dokdo { font-family: 'Dokdo', cursive; }
+  .f-poor-story { font-family: 'Poor Story', cursive; }
+  .f-song-myung { font-family: 'Song Myung', serif; }
+  .f-kirang { font-family: 'Kirang Haerang', cursive; }
+
+  .phone {
+    font-family: 'Do Hyeon', sans-serif;
+    font-size: 0.4em;
+    opacity: 0.85;
+    padding-left: 0.5em;
+    border-left: 2px solid currentColor;
+    margin-left: 0.3em;
+  }
+  .floor-tag {
+    font-family: 'Black Han Sans', sans-serif;
+    font-size: 0.6em;
+    background: rgba(0,0,0,0.22);
+    padding: 0.12em 0.35em;
+    border-radius: 3px;
+    margin-left: 0.3em;
+  }
+  .price-tag {
+    font-family: 'Black Han Sans', sans-serif;
+    font-size: 0.7em;
+    color: #ffd400;
+    background: #c8001a;
+    padding: 0.1em 0.4em;
+    margin-left: 0.3em;
+    border-radius: 3px;
+  }
+  .star-rating {
+    font-size: 0.55em;
+    color: #ffd400;
+    margin-left: 0.2em;
+    letter-spacing: -0.05em;
+  }
+  .badge-24h {
+    font-family: 'Black Han Sans', sans-serif;
+    font-size: 0.55em;
+    background: #ffd400;
+    color: #c8001a;
+    padding: 0.1em 0.35em;
+    border-radius: 50%;
+    margin-right: 0.3em;
+    border: 2px solid #c8001a;
+  }
+  .icon-symbol {
+    font-size: 1.1em;
+    margin-right: 0.2em;
+  }
+  .subtitle {
+    display: block;
+    font-size: 0.4em;
+    line-height: 1;
+    opacity: 0.85;
+    margin-bottom: 0.3em;
+    font-family: 'Gothic A1', sans-serif;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+  }
+  .with-sub {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0;
+  }
+  .with-sub .main-line {
+    line-height: 1;
+  }
+
+  .vertical {
+    position: absolute;
+    writing-mode: vertical-rl;
+    text-orientation: upright;
+    padding: 1em 0.5em;
+    line-height: 1;
+    letter-spacing: 0.1em;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.2), inset 0 0 0 2px rgba(0,0,0,0.08);
+    transition: opacity 0.4s ease;
+  }
+
+  .arrow-sign {
+    position: absolute;
+    padding: 0.5em 1em 0.5em 0.9em;
+    line-height: 1;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.2);
+    transition: opacity 0.4s ease;
+    clip-path: polygon(0% 0%, 92% 0%, 100% 50%, 92% 100%, 0% 100%);
+    padding-right: 1.8em;
+    white-space: nowrap;
+  }
+  .arrow-sign.left {
+    clip-path: polygon(0% 50%, 8% 0%, 100% 0%, 100% 100%, 8% 100%);
+    padding-left: 1.8em;
+    padding-right: 1em;
+  }
+
+  .stamp {
+    position: absolute;
+    width: 110px; height: 110px;
+    border-radius: 50%;
+    background: #c8001a;
+    color: #fff8e7;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    line-height: 1.1;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.3), inset 0 0 0 4px #fff8e7, inset 0 0 0 7px #c8001a;
+    transition: opacity 0.4s ease;
+    padding: 12px;
+  }
+  .stamp.gold { background: #d4a017; color: #fff; box-shadow: 0 4px 14px rgba(0,0,0,0.3), inset 0 0 0 4px #fff, inset 0 0 0 7px #d4a017; }
+  .stamp.black { background: #0d0d0d; color: #ffd400; box-shadow: 0 4px 14px rgba(0,0,0,0.4), inset 0 0 0 4px #ffd400, inset 0 0 0 7px #0d0d0d; }
+
+  .poster {
+    position: absolute;
+    background: #fff;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.25);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    transform-origin: center center;
+    transition: opacity 0.4s ease;
+  }
+  .poster.layout-tall { width: 220px; }
+  .poster.layout-wide { width: 340px; flex-direction: row; }
+  .poster.layout-square { width: 260px; }
+  .poster.layout-banner { width: 380px; flex-direction: row; padding: 0; }
+
+  .poster-header {
+    padding: 10px 16px 7px;
+    color: #fff;
+    font-family: 'Black Han Sans', sans-serif;
+    font-size: 12px;
+    letter-spacing: 0.02em;
+  }
+  .poster-header.party-red { background: #e8202a; }
+  .poster-header.party-blue { background: #0050b5; }
+  .poster-header.party-green { background: #0a7a3b; }
+  .poster-header.party-orange { background: #ff6a13; }
+  .poster-header.party-purple { background: #5e1a8a; }
+  .poster-header.party-yellow { background: #d4a017; color: #1a1a1a; }
+
+  .poster-number {
+    font-family: 'Black Han Sans', sans-serif;
+    font-size: 88px;
+    line-height: 0.85;
+    padding: 4px 16px 0;
+    color: #1a1a1a;
+    background: #f4e8c1;
+  }
+  .poster-number.invert { background: #1a1a1a; color: #ffd400; }
+  .poster-number.party-red-num { color: #e8202a; }
+  .poster-number.party-blue-num { color: #0050b5; }
+
+  .poster-name {
+    font-family: 'Black Han Sans', sans-serif;
+    font-size: 36px;
+    line-height: 1;
+    padding: 6px 16px 4px;
+    background: #f4e8c1;
+    color: #1a1a1a;
+    letter-spacing: -0.03em;
+  }
+  .poster-title {
+    font-family: 'Gothic A1', sans-serif;
+    font-weight: 700;
+    font-size: 10px;
+    padding: 4px 16px 10px;
+    background: #f4e8c1;
+    color: #444;
+  }
+  .poster-slogan {
+    padding: 12px 14px;
+    font-family: 'Black Han Sans', sans-serif;
+    font-size: 22px;
+    line-height: 1.05;
+    text-align: center;
+    background: #fff;
+    color: #1a1a1a;
+    border-top: 4px solid #1a1a1a;
+    letter-spacing: -0.03em;
+  }
+  .poster-slogan.invert { background: #1a1a1a; color: #fff; }
+  .poster-slogan.party-red-bg { background: #e8202a; color: #fff; border-top-color: #fff; }
+  .poster-slogan.party-blue-bg { background: #0050b5; color: #fff; border-top-color: #fff; }
+
+  .poster-left { flex: 1; display: flex; flex-direction: column; }
+  .poster-right { flex: 1; display: flex; flex-direction: column; }
+
+  .face {
+    height: 100px;
+    position: relative;
+    overflow: hidden;
+  }
+  .face.skin-1 { background: linear-gradient(135deg, #e0c8a8 0%, #c0a078 100%); }
+  .face.skin-2 { background: linear-gradient(135deg, #d8b890 0%, #a88560 100%); }
+  .face.skin-3 { background: linear-gradient(135deg, #efd8b8 0%, #d4b088 100%); }
+
+  .face .head {
+    position: absolute;
+    width: 60px; height: 64px;
+    border-radius: 50% 50% 48% 48%;
+    background: #5a4a3a;
+    top: 6px; left: 50%;
+    transform: translateX(-50%);
+  }
+  .face.head-gray .head { background: #6a6a6a; }
+  .face.head-white .head { background: #c0c0c0; }
+  .face.head-bald .head { background: transparent; height: 28px; width: 50px; top: 18px; border-radius: 50% 50% 30% 30%; }
+  .face.head-mid-part .head { background: linear-gradient(90deg, #5a4a3a 49%, #1a1a1a 49%, #1a1a1a 51%, #5a4a3a 51%); }
+
+  .face .suit {
+    position: absolute;
+    width: 85px; height: 55px;
+    border-radius: 50% 50% 0 0;
+    bottom: 0; left: 50%;
+    transform: translateX(-50%);
+  }
+  .face .suit::before {
+    content: '';
+    position: absolute;
+    width: 0; height: 0;
+    border-left: 10px solid transparent;
+    border-right: 10px solid transparent;
+    border-bottom: 22px solid #fff;
+    bottom: 0; left: 50%;
+    transform: translateX(-50%);
+  }
+  .face .suit::after {
+    content: '';
+    position: absolute;
+    width: 6px; height: 18px;
+    background: #c8001a;
+    bottom: 0; left: 50%;
+    transform: translateX(-50%);
+  }
+  .face.suit-red .suit { background: #c8001a; }
+  .face.suit-blue .suit { background: #003ec8; }
+  .face.suit-gray .suit { background: #555; }
+  .face.suit-black .suit { background: #1a1a1a; }
+  .face.suit-navy .suit { background: #0a1f44; }
+
+  .face .glasses {
+    position: absolute;
+    width: 50px; height: 14px;
+    top: 36px; left: 50%;
+    transform: translateX(-50%);
+    pointer-events: none;
+  }
+  .face .glasses::before, .face .glasses::after {
+    content: '';
+    position: absolute;
+    width: 22px; height: 14px;
+    border: 2.5px solid #1a1a1a;
+    border-radius: 50%;
+    top: 0;
+    background: rgba(255,255,255,0.15);
+  }
+  .face .glasses::before { left: 0; }
+  .face .glasses::after { right: 0; }
+
+  .face .smile {
+    position: absolute;
+    width: 22px; height: 10px;
+    top: 58px; left: 50%;
+    transform: translateX(-50%);
+    border-bottom: 2.5px solid #4a2a1a;
+    border-radius: 0 0 50% 50%;
+  }
+
+  .led-clock {
+    position: absolute;
+    background: #0d0d0d;
+    color: #ff2a00;
+    font-family: 'Black Han Sans', monospace;
+    font-size: 48px;
+    padding: 8px 20px;
+    letter-spacing: 0.1em;
+    border: 3px solid #333;
+    box-shadow: 0 0 20px rgba(255,42,0,0.3), inset 0 0 10px rgba(0,0,0,0.8);
+    text-shadow: 0 0 8px #ff2a00;
+    transition: opacity 0.4s ease;
+  }
+  .led-clock.green { color: #00ff66; text-shadow: 0 0 8px #00ff66; box-shadow: 0 0 20px rgba(0,255,102,0.3), inset 0 0 10px rgba(0,0,0,0.8); }
+  .led-clock.amber { color: #ffaa00; text-shadow: 0 0 8px #ffaa00; box-shadow: 0 0 20px rgba(255,170,0,0.3), inset 0 0 10px rgba(0,0,0,0.8); }
+  .led-clock .clock-label {
+    display: block;
+    font-size: 0.3em;
+    color: rgba(255,255,255,0.6);
+    text-shadow: none;
+    letter-spacing: 0.2em;
+    margin-bottom: 4px;
+    font-family: 'Do Hyeon', sans-serif;
+  }
+
+  .banner {
+    position: absolute;
+    padding: 12px 32px;
+    font-family: 'Black Han Sans', sans-serif;
+    font-size: 30px;
+    color: #fff;
+    white-space: nowrap;
+    line-height: 1;
+    letter-spacing: -0.02em;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.25), inset 0 -3px 0 rgba(0,0,0,0.2);
+    border-top: 2px dashed rgba(255,255,255,0.4);
+    border-bottom: 2px dashed rgba(255,255,255,0.4);
+    transition: opacity 0.4s ease;
+    display: flex;
+    align-items: center;
+    gap: 0.4em;
+  }
+  .banner .ribbon-end {
+    display: inline-block;
+    font-size: 0.6em;
+    opacity: 0.8;
+  }
+
+  .hud {
+    position: fixed;
+    z-index: 1000;
+    font-family: 'Gothic A1', sans-serif;
+    color: #1a1a1a;
+    pointer-events: none;
+    mix-blend-mode: multiply;
+  }
+  .hud-title {
+    top: 16px; left: 20px;
+    font-family: 'Black Han Sans', sans-serif;
+    font-size: 24px;
+    line-height: 1;
+    color: #0d0d0d;
+    text-shadow: 1px 1px 0 rgba(255,255,255,0.5);
+  }
+  .hud-title small {
+    display: block;
+    font-family: 'Gothic A1', sans-serif;
+    font-weight: 400;
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    opacity: 0.7;
+    margin-top: 4px;
+  }
+  .hud-help {
+    bottom: 16px; left: 20px;
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    opacity: 0.7;
+    line-height: 1.6;
+  }
+  .hud-count {
+    bottom: 16px; right: 20px;
+    font-family: 'Black Han Sans', sans-serif;
+    font-size: 14px;
+    text-align: right;
+    line-height: 1.2;
+    opacity: 0.6;
+  }
+  .hud-count span {
+    font-size: 28px;
+    display: block;
+  }
+
+  @media (max-width: 600px) {
+    .hud-title { font-size: 18px; }
+    .hud-help { font-size: 10px; }
+  }
+</style>
+</head>
+<body>
+
+<div id="canvas"></div>
+
+<div class="hud hud-title">無限看板<small>infinite signs · 끝없는 벽</small></div>
+<div class="hud hud-help">DRAG · 드래그하여 둘러보세요<br>↑ ↓ ← → 키보드도 가능</div>
+<div class="hud hud-count"><span id="count">0</span>SIGNS</div>
+
+<script>
+const SHOP_SIGNS = [
+  // 학원
+  '대박입시학원','천재영어교실','클릭전원미술학원','제너스학원','꿈꾸는수학',
+  '오르페음악학원','JEI재능교육','크로잉영어학원','몽키즈클라이밍','주짓수아카데미',
+  '발레필라테스','입시미대예고예중','코딩으로미래를','스피치웅변학원','한양수학전문',
+  '에듀플러스논술','명문진학지도','국어의신학원','서울과학원','바둑교실미래로',
+  '키즈영어캠프','피아노학원도레미','미술학원무지개','글로벌어학원','해법수학교실',
+  '서예학원묵향','태권도장정의관','검도장무도관','드럼교실비트','수학의정석',
+  // 병원
+  '서울수려한치과','여의사산부인과','5대암검진센터','양주맘유외과의원','옥정서울정형외과',
+  '독일보청기','유방갑상선전문','척추관절통증','24시응급치과','미소가득성형외과',
+  '튼튼한방병원','연세이비인후과','바른정신건강의학','강남피부과','눈건강안과',
+  '서울내과의원','튼튼소아과','편한가정의학','명문비뇨기과','맑은정신과의원',
+  '예쁜피부클리닉','신경외과21','항외과대장항문','청심한의원','이안산부인과',
+  // 음식점
+  '맛자랑떡볶이','Katsu Hesed','24시국밥','청춘노래방','한우명가','동네분식',
+  '왕족발보쌈','치킨공화국','돈까스장인','진짜순대국','본가김치찌개',
+  '제일냉면','바다횟집','한솥도시락','쉐프스시','엄마손칼국수',
+  '명동닭갈비','신촌떡볶이','맥주창고호프','와인바케이브','브런치가든',
+  '커피베이','드립앤로스팅','버블티천국','디저트하우스','베이커리오븐',
+  // 교회/종교
+  '햇살가득한옥토교회','새생명교회','주님의빛교회','소망의교회','믿음의공동체',
+  '예수사랑교회','은혜로교회','평화의교회','복음의문교회',
+  // 부동산
+  '제일공인중개사','믿음부동산','명문공인','한솔부동산','럭키부동산',
+  '24시매매전문','전월세전문','재개발문의','상가임대상담',
+  // 생활
+  '편의점24','세탁소클린','미용실희목헤어','네일아트프린세스','에스테틱뷰티',
+  '꽃집플라워샵','약국365','안경원비전','시계방타임','귀금속명품',
+  '대출신청전문','정부지원보청기','국민건강보험공식','청력검사100%무료',
+  '쌀집농협','정육점한우랜드','청과물시장','반찬가게엄마손','도시락배달',
+  '카페아메리카노','북카페책방','PC방게이머존','코인노래방','만화방',
+  // 기타
+  '드론학원','주식투자교육','부동산경매전문','창업컨설팅','취업아카데미',
+  '결혼정보회사','여행사하나투어','운전면허학원','자동차정비공장','셀프세차장',
+  '반려동물병원','애견미용','키즈카페놀이터','실내체육관','클라이밍짐',
+];
+
+const POLITICAL_SLOGANS = [
+  // 클리셰
+  '오직 시민만 바라봅니다','깨끗한 정치 바른 일꾼','준비된 일꾼이 다릅니다',
+  '약속을 지키는 사람','소통하는 의정활동','경험과 추진력의 차이',
+  '발로 뛰는 진짜 정치','주민이 주인입니다','변화는 한 표에서',
+  '미래를 여는 선택','검증된 행정 전문가','오직, 양주만 생각합니다',
+  '듬직한 추진력','정직한 한 사람','함께 가는 우리 동네',
+  '새로운 시대 새로운 인물','신뢰의 정치 책임의 정치','진심을 다하겠습니다',
+  // 공약
+  '교육특구 반드시 지정','GTX 조기 개통','1호선 급행 정차','메가시티 완성',
+  '100만 통합특별시','5대 핵심공약 책임이행','24시간 민원 응대',
+  '청년주택 5천호 공급','어르신 무료 셔틀버스','학교 급식 무상화 확대',
+  '문화센터 24시간 개방','도시철도 추가 노선','복지센터 신설',
+  '소상공인 지원 강화','주민자치 예산 확대',
+  // 대조
+  '낡은 정치를 끝내겠습니다','기득권 깨고 시민의 시대로','바꿔야 살아납니다',
+  '구태정치 청산','이번엔 다릅니다','말이 아닌 행동으로',
+  '진짜 일꾼을 뽑읍시다','거짓 약속은 그만',
+  // 감성
+  '엄마의 마음으로','아버지의 책임감으로','청년의 패기로',
+  '경기북부 대전환','우리 동네 우리 손으로','내 고향을 위하여',
+  '함께라서 가능합니다','여러분이 있어 행복합니다',
+  // 홍보
+  '기호 1번 찍어주세요','기호 2번 부탁드립니다','기호 3번 약속합니다',
+  '꼭 투표하세요','6월 3일 사전투표','소중한 한 표',
+  '바꿉시다 우리 동네','믿을 수 있는 후보','여러분의 선택이 미래입니다',
+];
+
+const CANDIDATES = [
+  { num: '1', name: '김의지', title: '前 시의원 / 現 위원장', party: 'blue' },
+  { num: '2', name: '박정직', title: '現 도의원 / 행정학 박사', party: 'red' },
+  { num: '2', name: '이근면', title: '前 구청장 / 변호사', party: 'red' },
+  { num: '3', name: '최성실', title: '시민단체 대표', party: 'green' },
+  { num: '4', name: '정의로', title: '교육위원회 부위원장', party: 'orange' },
+  { num: '1', name: '윤진보', title: '前 국회의원 / 경제학 박사', party: 'blue' },
+  { num: '5', name: '한약속', title: '시민 후보 / 자영업', party: 'green' },
+  { num: '2', name: '조변화', title: '前 시의회 의장', party: 'red' },
+  { num: '1', name: '강민생', title: '경제학 박사 / 前 교수', party: 'blue' },
+  { num: '6', name: '서희망', title: '청년정책연구소장', party: 'yellow' },
+  { num: '3', name: '문공정', title: '前 검사 / 법학박사', party: 'green' },
+  { num: '7', name: '오평화', title: '시민운동가 / NGO대표', party: 'purple' },
+  { num: '2', name: '신중도', title: '前 양주시 부시장', party: 'red' },
+  { num: '1', name: '임행정', title: '행정안전부 출신', party: 'blue' },
+  { num: '4', name: '권개혁', title: '前 시의회 부의장', party: 'orange' },
+];
+
+const HEADER_LABELS = [
+  '제9회 전국동시지방선거','시의원 선거 후보자','기초의원 가선거구',
+  '도의원 선거','구청장 선거','시장 선거 후보자',
+  '제22대 보궐선거','광역의원 비례대표',
+];
+
+const PARTY_NAMES = {
+  red: '국민의당', blue: '민주의당', green: '진보의당',
+  orange: '개혁의당', purple: '시민의당', yellow: '청년의당',
+};
+
+const FLOOR_OPTIONS = ['2F','3F','4F','5F','6F','7F','8F','9F','10F','B1','B2'];
+const PHONE_OPTIONS = [
+  '031-928-6679','010-2833-2451','861-3131','865-1136','T.928-5098',
+  '010-5779-4801','031-865-2262','T.857-8500','010-7499-0984',
+  '1544-9268','031-866-0984','010-9809-0598','02-1234-5678',
+];
+const PRICE_OPTIONS = ['9,900원','12,000원','50% SALE','특가 4,900원','1+1','반값할인','3개 10,000'];
+const RATING_OPTIONS = ['★★★★★','★★★★☆','평점 4.8','맛집인증','BEST'];
+const SYMBOLS = ['★','♥','✓','!','♨','◆','◈','✦','※','◎'];
+const SUBTITLES = ['전문','24시','명문','프리미엄','특별기획','신규오픈','리뉴얼','NEW','BEST','인증','공식'];
+
+function nowClock() {
+  const d = new Date();
+  return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}:${String(d.getSeconds()).padStart(2,'0')}`;
+}
+
+const COLORS = ['s-red','s-blue','s-yellow','s-pink','s-hotpink','s-green','s-limegreen','s-black','s-white','s-orange','s-cream','s-neon','s-darkred','s-navy','s-purple','s-teal','s-brown','s-mint','s-sky','s-banner-r','s-banner-b','s-banner-y','s-split-rb','s-split-yk','s-stripes-rw','s-stripes-bw'];
+const FONTS_DISPLAY = ['f-black-han','f-jua','f-do-hyeon','f-stylish','f-gugi','f-sunflower','f-gothic','f-yeon-sung','f-song-myung','f-kirang'];
+const FONTS_HANDWRITE = ['f-nanum-pen','f-gaegu','f-single','f-hi-melody','f-east-sea','f-cute','f-dokdo','f-poor-story'];
+const FONTS_ALL = [...FONTS_DISPLAY, ...FONTS_HANDWRITE];
+const GLOW_CLASSES = ['glow-pink','glow-cyan','glow-yellow'];
+const BORDER_VARIANTS = ['','','','border-thick','border-dashed','corners-round','corners-pill'];
+
+function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+function rand(min, max) { return min + Math.random() * (max - min); }
+function randInt(min, max) { return Math.floor(rand(min, max + 1)); }
+function chance(p) { return Math.random() < p; }
+
+function randomSlogan() { return pick(POLITICAL_SLOGANS); }
+function randomShop() { return pick(SHOP_SIGNS); }
+
+const canvas = document.getElementById('canvas');
+const countEl = document.getElementById('count');
+
+let camX = 0, camY = 0;
+let velX = 0, velY = 0;
+
+const CELL_SIZE = 600;
+const cells = new Map();
+const allElements = new Set();
+
+function cellKey(cx, cy) { return `${cx},${cy}`; }
+
+function visibleCells() {
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+  const margin = 1;
+  const minCX = Math.floor((camX - w/2) / CELL_SIZE) - margin;
+  const maxCX = Math.floor((camX + w/2) / CELL_SIZE) + margin;
+  const minCY = Math.floor((camY - h/2) / CELL_SIZE) - margin;
+  const maxCY = Math.floor((camY + h/2) / CELL_SIZE) + margin;
+  const out = [];
+  for (let cy = minCY; cy <= maxCY; cy++) {
+    for (let cx = minCX; cx <= maxCX; cx++) out.push([cx, cy]);
+  }
+  return out;
+}
+
+function entryClassForDelta() {
+  if (Math.abs(velX) < 0.5 && Math.abs(velY) < 0.5) {
+    return pick(['in-right','in-left','in-up','in-down']);
+  }
+  if (Math.abs(velX) > Math.abs(velY)) {
+    return velX > 0 ? 'in-left' : 'in-right';
+  } else {
+    return velY > 0 ? 'in-up' : 'in-down';
+  }
+}
+
+function pickSignType() {
+  const r = Math.random();
+  if (r < 0.42) return 'standard';
+  if (r < 0.52) return 'arrow';
+  if (r < 0.60) return 'vertical';
+  if (r < 0.67) return 'stamp';
+  if (r < 0.79) return 'sub-main';
+  if (r < 0.87) return 'with-symbol';
+  if (r < 0.94) return 'with-rating';
+  return 'with-price';
+}
+
+function makeSign(wx, wy) {
+  const type = pickSignType();
+  const isPolitical = chance(0.35);
+  const mainText = isPolitical ? randomSlogan() : randomShop();
+
+  if (type === 'vertical') return makeVertical(wx, wy, mainText);
+  if (type === 'arrow') return makeArrow(wx, wy, mainText);
+  if (type === 'stamp') return makeStamp(wx, wy, mainText);
+
+  const el = document.createElement('div');
+  el.className = 'sign';
+  const color = pick(COLORS);
+  const font = pick(FONTS_ALL);
+  el.classList.add(color, font);
+
+  const borderVar = pick(BORDER_VARIANTS);
+  if (borderVar) el.classList.add(borderVar);
+  if (chance(0.08)) el.classList.add(pick(GLOW_CLASSES));
+  if (chance(0.12)) el.classList.add('weathered');
+
+  const fontSize = randInt(20, 72);
+  el.style.fontSize = fontSize + 'px';
+
+  if (type === 'sub-main') {
+    el.classList.add('with-sub');
+    const sub = document.createElement('span');
+    sub.className = 'subtitle';
+    sub.textContent = pick(SUBTITLES);
+    const main = document.createElement('span');
+    main.className = 'main-line';
+    main.textContent = mainText;
+    el.appendChild(sub);
+    el.appendChild(main);
+  } else if (type === 'with-symbol') {
+    const sym = document.createElement('span');
+    sym.className = 'icon-symbol';
+    sym.textContent = pick(SYMBOLS);
+    el.appendChild(sym);
+    const main = document.createElement('span');
+    main.textContent = mainText;
+    el.appendChild(main);
+  } else if (type === 'with-rating') {
+    const main = document.createElement('span');
+    main.textContent = mainText;
+    el.appendChild(main);
+    const r = document.createElement('span');
+    r.className = 'star-rating';
+    r.textContent = pick(RATING_OPTIONS);
+    el.appendChild(r);
+  } else if (type === 'with-price') {
+    const main = document.createElement('span');
+    main.textContent = mainText;
+    el.appendChild(main);
+    const p = document.createElement('span');
+    p.className = 'price-tag';
+    p.textContent = pick(PRICE_OPTIONS);
+    el.appendChild(p);
+  } else {
+    if (chance(0.18)) {
+      const badge = document.createElement('span');
+      badge.className = 'badge-24h';
+      badge.textContent = '24';
+      el.appendChild(badge);
+    }
+    const main = document.createElement('span');
+    main.textContent = mainText;
+    el.appendChild(main);
+  }
+
+  if (!isPolitical && chance(0.35)) {
+    const f = document.createElement('span');
+    f.className = 'floor-tag';
+    f.textContent = pick(FLOOR_OPTIONS);
+    el.appendChild(f);
+  }
+  if (!isPolitical && chance(0.28)) {
+    const p = document.createElement('span');
+    p.className = 'phone';
+    p.textContent = pick(PHONE_OPTIONS);
+    el.appendChild(p);
+  }
+
+  const scaleX = pick([0.6, 0.75, 0.9, 1, 1, 1, 1.1, 1.3, 1.6]);
+  const scaleY = pick([0.8, 1, 1, 1, 1.2, 1.4]);
+  const rotate = chance(0.2) ? rand(-4, 4) : 0;
+
+  el.style.setProperty('--base-transform', `translate(-50%, -50%) scale(${scaleX}, ${scaleY}) rotate(${rotate}deg)`);
+  el.style.left = wx + 'px';
+  el.style.top = wy + 'px';
+  el.style.transform = `translate(-50%, -50%) scale(${scaleX}, ${scaleY}) rotate(${rotate}deg)`;
+  el.style.zIndex = randInt(2, 30);
+  el.classList.add(entryClassForDelta());
+  el._wx = wx; el._wy = wy;
+  canvas.appendChild(el);
+  return el;
+}
+
+function makeVertical(wx, wy, text) {
+  const el = document.createElement('div');
+  el.className = 'vertical ' + pick(COLORS) + ' ' + pick(FONTS_DISPLAY);
+  el.style.fontSize = randInt(24, 44) + 'px';
+  el.textContent = text.length > 8 ? text.slice(0, 7) : text;
+  if (chance(0.15)) el.classList.add('weathered');
+
+  const rotate = chance(0.1) ? rand(-2, 2) : 0;
+  el.style.setProperty('--base-transform', `translate(-50%, -50%) rotate(${rotate}deg)`);
+  el.style.left = wx + 'px';
+  el.style.top = wy + 'px';
+  el.style.transform = `translate(-50%, -50%) rotate(${rotate}deg)`;
+  el.style.zIndex = randInt(3, 25);
+  el.classList.add(entryClassForDelta());
+  el._wx = wx; el._wy = wy;
+  canvas.appendChild(el);
+  return el;
+}
+
+function makeArrow(wx, wy, text) {
+  const el = document.createElement('div');
+  const dir = chance(0.5) ? '' : 'left';
+  el.className = 'arrow-sign ' + dir + ' ' + pick(COLORS) + ' ' + pick(FONTS_DISPLAY);
+  el.style.fontSize = randInt(22, 40) + 'px';
+  el.textContent = text;
+
+  const rotate = chance(0.15) ? rand(-3, 3) : 0;
+  const scale = rand(0.8, 1.2);
+  el.style.setProperty('--base-transform', `translate(-50%, -50%) scale(${scale}) rotate(${rotate}deg)`);
+  el.style.left = wx + 'px';
+  el.style.top = wy + 'px';
+  el.style.transform = `translate(-50%, -50%) scale(${scale}) rotate(${rotate}deg)`;
+  el.style.zIndex = randInt(4, 22);
+  el.classList.add(entryClassForDelta());
+  el._wx = wx; el._wy = wy;
+  canvas.appendChild(el);
+  return el;
+}
+
+function makeStamp(wx, wy, text) {
+  const el = document.createElement('div');
+  const variant = pick(['', 'gold', 'black']);
+  el.className = 'stamp ' + variant + ' ' + pick(['f-black-han','f-jua','f-gugi','f-song-myung']);
+  el.style.fontSize = randInt(13, 18) + 'px';
+  const short = text.length > 10 ? text.slice(0, 9) : text;
+  el.textContent = short;
+
+  const rotate = rand(-12, 12);
+  const scale = rand(0.7, 1.15);
+  el.style.setProperty('--base-transform', `translate(-50%, -50%) rotate(${rotate}deg) scale(${scale})`);
+  el.style.left = wx + 'px';
+  el.style.top = wy + 'px';
+  el.style.transform = `translate(-50%, -50%) rotate(${rotate}deg) scale(${scale})`;
+  el.style.zIndex = randInt(12, 28);
+  el.classList.add(entryClassForDelta());
+  el._wx = wx; el._wy = wy;
+  canvas.appendChild(el);
+  return el;
+}
+
+function makePoster(wx, wy) {
+  const cand = pick(CANDIDATES);
+  const layout = pick(['tall', 'tall', 'tall', 'wide', 'square', 'banner']);
+  const el = document.createElement('div');
+  el.className = `poster layout-${layout}`;
+
+  const partyLabel = PARTY_NAMES[cand.party] || '시민의당';
+  const headerText = `${pick(HEADER_LABELS)} · ${partyLabel}`;
+  const slogan = randomSlogan();
+
+  const skin = pick(['skin-1','skin-2','skin-3']);
+  const head = pick(['','head-gray','head-white','head-bald','head-mid-part']);
+  const suitClass = `suit-${cand.party === 'red' ? 'red' : cand.party === 'blue' ? 'blue' : pick(['gray','black','navy'])}`;
+  const glasses = chance(0.7) ? '<div class="glasses"></div>' : '';
+  const smile = chance(0.85) ? '<div class="smile"></div>' : '';
+
+  const faceHTML = `<div class="face ${skin} ${head} ${suitClass}">
+    <div class="head"></div>
+    <div class="suit"></div>
+    ${glasses}
+    ${smile}
+  </div>`;
+
+  const invertSlogan = chance(0.35);
+  const sloganClass = chance(0.25) ? `party-${cand.party}-bg` : (invertSlogan ? 'invert' : '');
+  const numInvert = chance(0.3) ? 'invert' : (chance(0.4) ? `party-${cand.party}-num` : '');
+
+  if (layout === 'tall') {
+    el.innerHTML = `
+      <div class="poster-header party-${cand.party}">${headerText}</div>
+      <div class="poster-number ${numInvert}">${cand.num}</div>
+      <div class="poster-name">${cand.name}</div>
+      <div class="poster-title">${cand.title}</div>
+      ${faceHTML}
+      <div class="poster-slogan ${sloganClass}">${slogan}</div>
+    `;
+  } else if (layout === 'wide') {
+    el.innerHTML = `
+      <div class="poster-left">
+        <div class="poster-header party-${cand.party}">${headerText}</div>
+        <div class="poster-number ${numInvert}">${cand.num}</div>
+        <div class="poster-name">${cand.name}</div>
+        <div class="poster-title">${cand.title}</div>
+      </div>
+      <div class="poster-right">
+        ${faceHTML.replace('height: 100px', 'height: 100%').replace('class="face', 'style="height:140px" class="face')}
+        <div class="poster-slogan ${sloganClass}" style="font-size:16px;padding:10px 8px;">${slogan}</div>
+      </div>
+    `;
+  } else if (layout === 'square') {
+    el.innerHTML = `
+      <div class="poster-header party-${cand.party}">${headerText}</div>
+      <div style="display:flex;background:#f4e8c1;">
+        <div style="flex:1;">
+          <div class="poster-number ${numInvert}" style="font-size:72px;padding:8px 12px 0;">${cand.num}</div>
+          <div class="poster-name" style="font-size:30px;">${cand.name}</div>
+          <div class="poster-title">${cand.title}</div>
+        </div>
+        <div style="width:110px;">${faceHTML}</div>
+      </div>
+      <div class="poster-slogan ${sloganClass}">${slogan}</div>
+    `;
+  } else {
+    el.innerHTML = `
+      <div style="width:120px;">${faceHTML.replace('height: 100px', 'height: 100%').replace('class="face', 'style="height:130px" class="face')}</div>
+      <div style="flex:1;display:flex;flex-direction:column;">
+        <div class="poster-header party-${cand.party}">${headerText}</div>
+        <div style="display:flex;align-items:center;background:#f4e8c1;flex:1;">
+          <div class="poster-number ${numInvert}" style="font-size:64px;padding:4px 12px;">${cand.num}</div>
+          <div style="flex:1;">
+            <div class="poster-name" style="font-size:28px;padding:4px 12px 2px;">${cand.name}</div>
+            <div style="font-size:13px;font-family:'Black Han Sans',sans-serif;padding:4px 12px 8px;color:#333;">${slogan}</div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  const rotate = rand(-5, 5);
+  const scale = rand(0.7, 1.15);
+  el.style.setProperty('--base-transform', `translate(-50%, -50%) rotate(${rotate}deg) scale(${scale})`);
+  el.style.left = wx + 'px';
+  el.style.top = wy + 'px';
+  el.style.transform = `translate(-50%, -50%) rotate(${rotate}deg) scale(${scale})`;
+  el.style.zIndex = randInt(15, 35);
+  el.classList.add(entryClassForDelta());
+  el._wx = wx; el._wy = wy;
+  canvas.appendChild(el);
+  return el;
+}
+
+function makeClock(wx, wy) {
+  const el = document.createElement('div');
+  const color = pick(['', 'green', 'amber']);
+  el.className = 'led-clock ' + color;
+  el._isClock = true;
+
+  const withLabel = chance(0.4);
+  if (withLabel) {
+    el.innerHTML = `<span class="clock-label">${pick(['CURRENT TIME','현재시각','TIME','지금'])}</span>${nowClock()}`;
+  } else {
+    el.textContent = nowClock();
+  }
+
+  const fontSize = randInt(28, 56);
+  el.style.fontSize = fontSize + 'px';
+
+  const rotate = chance(0.2) ? rand(-2, 2) : 0;
+  const scale = rand(0.7, 1.2);
+  el.style.setProperty('--base-transform', `translate(-50%, -50%) rotate(${rotate}deg) scale(${scale})`);
+  el.style.left = wx + 'px';
+  el.style.top = wy + 'px';
+  el.style.transform = `translate(-50%, -50%) rotate(${rotate}deg) scale(${scale})`;
+  el.style.zIndex = 26;
+  el.classList.add(entryClassForDelta());
+  el._wx = wx; el._wy = wy;
+  canvas.appendChild(el);
+  return el;
+}
+
+function makeBanner(wx, wy) {
+  const el = document.createElement('div');
+  el.className = 'banner';
+  const isPol = chance(0.6);
+  const text = isPol ? randomSlogan() : randomShop();
+
+  const colorOptions = ['#e8202a', '#1845a8', '#0050b5', '#c8001a', '#0a7a3b', '#ff6a13', '#5e1a8a', '#0a8090', '#d4a017'];
+  const gradOptions = [
+    'linear-gradient(90deg, #e8202a 0%, #c8001a 100%)',
+    'linear-gradient(90deg, #1845a8 0%, #003ec8 100%)',
+    'linear-gradient(180deg, #ffd400 0%, #d49a00 100%)',
+    'linear-gradient(135deg, #ff4d8d 0%, #c8001a 100%)',
+    'linear-gradient(90deg, #0a7a3b 0%, #4fc14a 100%)',
+  ];
+
+  if (chance(0.4)) {
+    el.style.background = pick(gradOptions);
+  } else {
+    el.style.background = pick(colorOptions);
+  }
+
+  const font = pick(['f-black-han', 'f-black-han', 'f-gothic', 'f-do-hyeon', 'f-jua']);
+  el.classList.add(font);
+
+  const ribbon = chance(0.3) ? '◆' : (chance(0.2) ? '◈' : '');
+  if (ribbon) {
+    const left = document.createElement('span');
+    left.className = 'ribbon-end';
+    left.textContent = ribbon;
+    el.appendChild(left);
+  }
+  const main = document.createElement('span');
+  main.textContent = text;
+  el.appendChild(main);
+  if (ribbon) {
+    const right = document.createElement('span');
+    right.className = 'ribbon-end';
+    right.textContent = ribbon;
+    el.appendChild(right);
+  }
+
+  const fontSize = randInt(22, 48);
+  el.style.fontSize = fontSize + 'px';
+
+  const rotate = chance(0.5) ? rand(-3, 3) : 0;
+  const scaleY = pick([0.6, 0.8, 1, 1.1]);
+  el.style.setProperty('--base-transform', `translate(-50%, -50%) scaleY(${scaleY}) rotate(${rotate}deg)`);
+  el.style.left = wx + 'px';
+  el.style.top = wy + 'px';
+  el.style.transform = `translate(-50%, -50%) scaleY(${scaleY}) rotate(${rotate}deg)`;
+  el.style.zIndex = randInt(5, 20);
+  el.classList.add(entryClassForDelta());
+  el._wx = wx; el._wy = wy;
+  canvas.appendChild(el);
+  return el;
+}
+
+function populateCell(cx, cy) {
+  const key = cellKey(cx, cy);
+  if (cells.has(key)) return;
+
+  const items = [];
+  const x0 = cx * CELL_SIZE;
+  const y0 = cy * CELL_SIZE;
+
+  const numSigns = randInt(6, 11);
+  const numPosters = chance(0.6) ? randInt(1, 2) : 0;
+  const includeClock = chance(0.18);
+  const numBanners = chance(0.55) ? randInt(1, 2) : 0;
+
+  for (let i = 0; i < numSigns; i++) {
+    items.push(makeSign(x0 + rand(20, CELL_SIZE - 20), y0 + rand(20, CELL_SIZE - 20)));
+  }
+  for (let i = 0; i < numPosters; i++) {
+    items.push(makePoster(x0 + rand(140, CELL_SIZE - 140), y0 + rand(180, CELL_SIZE - 180)));
+  }
+  if (includeClock) {
+    items.push(makeClock(x0 + rand(120, CELL_SIZE - 120), y0 + rand(40, CELL_SIZE - 40)));
+  }
+  for (let i = 0; i < numBanners; i++) {
+    items.push(makeBanner(x0 + rand(200, CELL_SIZE - 200), y0 + rand(40, CELL_SIZE - 40)));
+  }
+
+  cells.set(key, items);
+  items.forEach(el => allElements.add(el));
+  updateCount();
+}
+
+function pruneCells() {
+  const vc = new Set(visibleCells().map(([x,y]) => cellKey(x,y)));
+  for (const [key, items] of cells.entries()) {
+    if (!vc.has(key)) {
+      items.forEach(el => {
+        el.style.opacity = '0';
+        allElements.delete(el);
+        setTimeout(() => el.remove(), 400);
+      });
+      cells.delete(key);
+    }
+  }
+}
+
+function updateCount() {
+  countEl.textContent = allElements.size;
+}
+
+function render() {
+  canvas.style.transform = `translate(${-camX + window.innerWidth/2}px, ${-camY + window.innerHeight/2}px)`;
+}
+
+function ensureCellsAndPrune() {
+  visibleCells().forEach(([cx, cy]) => populateCell(cx, cy));
+  pruneCells();
+}
+
+function tick() {
+  if (!dragging) {
+    camX += velX;
+    camY += velY;
+    velX *= 0.92;
+    velY *= 0.92;
+    if (Math.abs(velX) < 0.05) velX = 0;
+    if (Math.abs(velY) < 0.05) velY = 0;
+  }
+  render();
+  requestAnimationFrame(tick);
+}
+
+let lastCheck = 0;
+function checkCellsLoop() {
+  const now = performance.now();
+  if (now - lastCheck > 120) {
+    ensureCellsAndPrune();
+    lastCheck = now;
+  }
+  requestAnimationFrame(checkCellsLoop);
+}
+
+setInterval(() => {
+  document.querySelectorAll('.led-clock').forEach(el => {
+    const lbl = el.querySelector('.clock-label');
+    if (lbl) {
+      el.innerHTML = lbl.outerHTML + nowClock();
+    } else {
+      el.textContent = nowClock();
+    }
+  });
+}, 1000);
+
+let dragging = false;
+let lastX = 0, lastY = 0;
+let lastT = 0;
+
+function onDown(x, y) {
+  dragging = true;
+  lastX = x; lastY = y; lastT = performance.now();
+  velX = 0; velY = 0;
+  document.body.classList.add('dragging');
+}
+function onMove(x, y) {
+  if (!dragging) return;
+  const dx = x - lastX;
+  const dy = y - lastY;
+  const now = performance.now();
+  const dt = Math.max(1, now - lastT);
+  camX -= dx;
+  camY -= dy;
+  velX = -dx / dt * 16;
+  velY = -dy / dt * 16;
+  lastX = x; lastY = y; lastT = now;
+}
+function onUp() {
+  dragging = false;
+  document.body.classList.remove('dragging');
+}
+
+window.addEventListener('mousedown', e => onDown(e.clientX, e.clientY));
+window.addEventListener('mousemove', e => onMove(e.clientX, e.clientY));
+window.addEventListener('mouseup', onUp);
+window.addEventListener('mouseleave', onUp);
+
+window.addEventListener('touchstart', e => {
+  if (e.touches.length === 1) onDown(e.touches[0].clientX, e.touches[0].clientY);
+}, { passive: true });
+window.addEventListener('touchmove', e => {
+  if (e.touches.length === 1) onMove(e.touches[0].clientX, e.touches[0].clientY);
+  e.preventDefault();
+}, { passive: false });
+window.addEventListener('touchend', onUp);
+window.addEventListener('touchcancel', onUp);
+
+window.addEventListener('wheel', e => {
+  e.preventDefault();
+  velX = 0; velY = 0;
+  camX += e.deltaX;
+  camY += e.deltaY;
+}, { passive: false });
+
+const keys = new Set();
+window.addEventListener('keydown', e => {
+  keys.add(e.key);
+  if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)) e.preventDefault();
+});
+window.addEventListener('keyup', e => keys.delete(e.key));
+
+function keyboardLoop() {
+  const speed = 12;
+  if (keys.has('ArrowLeft'))  velX = -speed;
+  if (keys.has('ArrowRight')) velX = speed;
+  if (keys.has('ArrowUp'))    velY = -speed;
+  if (keys.has('ArrowDown'))  velY = speed;
+  requestAnimationFrame(keyboardLoop);
+}
+
+window.addEventListener('resize', () => ensureCellsAndPrune());
+
+ensureCellsAndPrune();
+tick();
+checkCellsLoop();
+keyboardLoop();
+</script>
+</body>
+</html>
