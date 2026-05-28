@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>"AI가 스스로 해킹한다"…국내 대학도 털렸다 | JINSOL NEWSROOM</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/quiple/galmuri/dist/galmuri.css">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    width: 100%; height: 100%; overflow: hidden;
+    background: #060809; color: #e6f7ec;
+    font-family: 'Galmuri11', 'Galmuri9', monospace;
+    cursor: crosshair;
+    user-select: none;
+  }
+  #stage { position: fixed; inset: 0; }
+  canvas { display: block; position: absolute; inset: 0; width: 100%; height: 100%; }
+  #bg { z-index: 1; opacity: 0.55; }
+  #sim { z-index: 2; }
+
+  .ui { position: fixed; left: 0; right: 0; pointer-events: none; z-index: 5; }
+  #top { top: 0; padding: 26px 40px 0; }
+  #brand {
+    font-family: 'Galmuri11', monospace;
+    font-size: 12px; letter-spacing: 0.35em;
+    color: #46f0a3; opacity: 0.75;
+  }
+  #head {
+    font-family: 'Galmuri11', monospace;
+    font-weight: 700;
+    font-size: clamp(1.8rem, 4.6vw, 3.8rem);
+    line-height: 1.1; margin-top: 14px;
+    text-shadow: 0 0 14px rgba(70, 240, 163, 0.28);
+    letter-spacing: -0.01em;
+  }
+  #head .red {
+    color: #ff4c6b;
+    text-shadow: 0 0 18px rgba(255, 76, 107, 0.55);
+  }
+  #bottom { bottom: 0; padding: 0 40px 24px; }
+  #status {
+    font-family: 'Galmuri11', monospace;
+    font-size: 14px; letter-spacing: 0.18em;
+    color: #46f0a3;
+    transition: color 0.4s;
+  }
+  #status .mark { display: inline-block; width: 26px; }
+  #status.warn { color: #ffd03b; }
+  #status.crit { color: #ff4c6b; text-shadow: 0 0 12px rgba(255, 76, 107, 0.55); }
+  #bar { margin-top: 10px; height: 3px; background: rgba(255,255,255,0.08); position: relative; overflow: hidden; }
+  #bar > i { display: block; height: 100%; width: 0%; background: #46f0a3; transition: width 0.2s linear, background 0.4s; }
+  #bar.warn > i { background: #ffd03b; }
+  #bar.crit > i { background: #ff4c6b; box-shadow: 0 0 10px #ff4c6b; }
+  #hint {
+    position: fixed; left: 50%; bottom: 64px;
+    transform: translateX(-50%);
+    font-family: 'Galmuri11', monospace;
+    font-size: 12px; letter-spacing: 0.3em;
+    color: rgba(230, 247, 236, 0.45);
+    z-index: 5; pointer-events: none;
+    transition: opacity 1.2s;
+  }
+  #hint.hide { opacity: 0; }
+
+  /* 헤드라인 깜빡임 */
+  @keyframes flick {
+    0%, 88%, 100% { opacity: 1; }
+    90% { opacity: 0.35; transform: translateX(2px); }
+    92% { opacity: 1; transform: translateX(-1px); }
+    94% { opacity: 0.6; }
+  }
+  #head { animation: flick 5s infinite; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="bg"></canvas>
+  <canvas id="sim"></canvas>
+</div>
+
+<div id="top" class="ui">
+  <div id="brand">JINSOL NEWSROOM · 2026.05.29 · CYBER DESK</div>
+  <h1 id="head">"AI가 스스로 <span class="red">해킹</span>한다"…국내 대학도 털렸다</h1>
+</div>
+
+<div id="bottom" class="ui">
+  <div id="status"><span class="mark">■</span><span id="msg">SYSTEM ONLINE — 보안 정상 가동</span></div>
+  <div id="bar"><i></i></div>
+</div>
+
+<div id="hint">CLICK : FIRE AI PACKET     ·     DRAG : GRAB DEBRIS</div>
+
+<script src="https://cdn.jsdelivr.net/npm/matter-js@0.19.0/build/matter.min.js"></script>
+<script>
+(() => {
+  const { Engine, World, Bodies, Body, Mouse, MouseConstraint, Events, Query } = Matter;
+
+  const bgCanvas = document.getElementById('bg');
+  const simCanvas = document.getElementById('sim');
+  const bgCtx = bgCanvas.getContext('2d');
+  const ctx = simCanvas.getContext('2d');
+
+  let W = 0, H = 0;
+  const DPR = Math.min(2, window.devicePixelRatio || 1);
+
+  function resize() {
+    W = innerWidth; H = innerHeight;
+    [bgCanvas, simCanvas].forEach(c => {
+      c.width = W * DPR; c.height = H * DPR;
+      c.style.width = W + 'px'; c.style.height = H + 'px';
+    });
+    bgCtx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  }
+  resize();
+
+  // === 배경 코드 비 ===
+  const RAIN_CHARS = '01アイウエオカキクケコサシスセソタチツテト가나다라마바사아자차카타파하ㄱㄴㄷㄹㅁㅂㅅㅇㅈㅊㅋㅌㅍㅎ▣▤▥▦▧▨▩'.split('');
+  let columns = [];
+  function initRain() {
+    const size = 14;
+    const cols = Math.floor(W / size);
+    columns = Array(cols).fill(0).map((_, i) => ({
+      x: i * size,
+      y: Math.random() * H,
+      speed: 0.8 + Math.random() * 2.4,
+      char: RAIN_CHARS[(Math.random() * RAIN_CHARS.length) | 0],
+      hot: Math.random() < 0.12
+    }));
+  }
+  initRain();
+
+  function drawRain() {
+    bgCtx.fillStyle = 'rgba(6, 8, 9, 0.16)';
+    bgCtx.fillRect(0, 0, W, H);
+    bgCtx.font = '14px Galmuri11, monospace';
+    columns.forEach(c => {
+      bgCtx.fillStyle = c.hot
+        ? `rgba(255, 76, 107, ${0.45 + Math.random() * 0.25})`
+        : `rgba(70, 240, 163, ${0.35 + Math.random() * 0.3})`;
+      if (Math.random() < 0.03) c.char = RAIN_CHARS[(Math.random() * RAIN_CHARS.length) | 0];
+      bgCtx.fillText(c.char, c.x, c.y);
+      c.y += c.speed;
+      if (c.y > H + 20) {
+        c.y = -20;
+        c.speed = 0.8 + Math.random() * 2.4;
+        c.hot = Math.random() < 0.12;
+      }
+    });
+  }
+
+  // === Matter.js (무중력 자기장 격자) ===
+  const engine = Engine.create();
+  engine.gravity.scale = 0;
+  engine.gravity.x = 0;
+  engine.gravity.y = 0;
+  const world = engine.world;
+
+  // === 블록 ===
+  const FW_WORDS = ['FIREWALL','보안','암호','SSL','VPN','2FA','Auth','TLS','방어','OAuth','JWT','RSA','AES','SHA','HTTPS','포트','패치','백업','탐지','WAF','커버로스','쿠키','세션'];
+  const PK_WORDS = ['AI','GPT','LLM','BOT','HACK','01','RCE','XSS','SQL','ROOT','침투','탈취','유출','01010','0xFF','PWN'];
+
+  const bodies = [];
+
+  function makeWall(x, y, w, h, word) {
+    const b = Bodies.rectangle(x, y, w, h, {
+      density: 0.002, friction: 0.0, restitution: 0.6, frictionAir: 0.08,
+      label: 'wall',
+      plugin: { word, kind: 'wall', w, h, hp: 3, homeX: x, homeY: y, captured: false }
+    });
+    return b;
+  }
+  function makePacket(x, y, word) {
+    const w = 30 + word.length * 11;
+    const h = 28;
+    const b = Bodies.rectangle(x, y, w, h, {
+      density: 0.0035, friction: 0.0, restitution: 0.55, frictionAir: 0.012,
+      label: 'packet',
+      plugin: { word, kind: 'packet', w, h, born: performance.now() }
+    });
+    return b;
+  }
+
+  function buildFirewall() {
+    const marginX = 80;
+    const topPad = H * 0.24;
+    const botPad = H * 0.16;
+    const availW = W - marginX * 2;
+    const availH = H - topPad - botPad;
+    const blockH = 38;
+    const gap = 14;
+    const cols = Math.max(6, Math.min(13, Math.floor((availW + gap) / (110 + gap))));
+    const blockW = (availW - gap * (cols - 1)) / cols;
+    const rows = Math.max(4, Math.min(9, Math.floor((availH + gap) / (blockH + gap))));
+    const gridH = rows * blockH + (rows - 1) * gap;
+    const startY = topPad + (availH - gridH) / 2 + blockH / 2;
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const x = marginX + blockW / 2 + c * (blockW + gap);
+        const y = startY + r * (blockH + gap);
+        const word = FW_WORDS[(r * cols + c) % FW_WORDS.length];
+        const body = makeWall(x, y, blockW - 4, blockH - 2, word);
+        bodies.push(body);
+        World.add(world, body);
+      }
+    }
+  }
+  buildFirewall();
+
+  // === 패킷 발사 (사방 가장자리에서 진입) ===
+  function randomEdgeSpawn() {
+    const edge = (Math.random() * 4) | 0;
+    if (edge === 0) return { x: -40, y: Math.random() * H };
+    if (edge === 1) return { x: W + 40, y: Math.random() * H };
+    if (edge === 2) return { x: Math.random() * W, y: -40 };
+    return { x: Math.random() * W, y: H + 40 };
+  }
+  function spawnPacket(targetX, targetY, fromX, fromY) {
+    const word = PK_WORDS[(Math.random() * PK_WORDS.length) | 0];
+    let sx, sy;
+    if (fromX != null && fromY != null) { sx = fromX; sy = fromY; }
+    else { const e = randomEdgeSpawn(); sx = e.x; sy = e.y; }
+    if (targetX == null) { targetX = W / 2 + (Math.random() - 0.5) * W * 0.6; }
+    if (targetY == null) { targetY = H / 2 + (Math.random() - 0.5) * H * 0.5; }
+    const p = makePacket(sx, sy, word);
+    const dx = targetX - sx;
+    const dy = targetY - sy;
+    const dist = Math.hypot(dx, dy) || 1;
+    const power = 0.05 + Math.random() * 0.025;
+    Body.applyForce(p, p.position, { x: dx / dist * power, y: dy / dist * power });
+    Body.setAngularVelocity(p, (Math.random() - 0.5) * 0.45);
+    World.add(world, p);
+    bodies.push(p);
+  }
+
+  // === 마우스 ===
+  const mouse = Mouse.create(simCanvas);
+  mouse.pixelRatio = DPR;
+  const mc = MouseConstraint.create(engine, {
+    mouse,
+    constraint: { stiffness: 0.2, damping: 0.1, render: { visible: false } }
+  });
+  World.add(world, mc);
+
+  const hint = document.getElementById('hint');
+  simCanvas.addEventListener('mousedown', (e) => {
+    const rect = simCanvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    const hit = Query.point(bodies, { x: mx, y: my });
+    hint.classList.add('hide');
+    if (hit.length === 0) {
+      const edge = randomEdgeSpawn();
+      spawnPacket(mx, my, edge.x, edge.y);
+    }
+  });
+
+  // === 자기장 복원 + 캡처 드리프트 ===
+  let springStrength = 1.0;
+  Events.on(engine, 'beforeUpdate', () => {
+    for (const b of bodies) {
+      if (b.plugin.kind !== 'wall') continue;
+      if (b.plugin.captured) {
+        // 캡처된 블록: 가장자리(가장 가까운 쪽)로 천천히 빨려나감
+        const cx = b.position.x, cy = b.position.y;
+        const dl = cx, dr = W - cx, dt = cy, db = H - cy;
+        const m = Math.min(dl, dr, dt, db);
+        let fx = 0, fy = 0;
+        const pull = 0.00028;
+        if (m === dl) fx = -pull;
+        else if (m === dr) fx = pull;
+        else if (m === dt) fy = -pull;
+        else fy = pull;
+        Body.applyForce(b, b.position, { x: fx * b.mass, y: fy * b.mass });
+        continue;
+      }
+      // 격자 복원 (스프링)
+      const dx = b.plugin.homeX - b.position.x;
+      const dy = b.plugin.homeY - b.position.y;
+      const k = 0.0009 * springStrength;
+      Body.applyForce(b, b.position, { x: dx * k * b.mass, y: dy * k * b.mass });
+      // 회전도 0으로 복원
+      const targetAng = 0;
+      const dA = ((targetAng - b.angle + Math.PI) % (Math.PI * 2)) - Math.PI;
+      Body.setAngularVelocity(b, b.angularVelocity * 0.9 + dA * 0.05 * springStrength);
+    }
+  });
+
+  // === 충돌: 빨강이 초록에 닿으면 즉시 감염 (도미노 전파) ===
+  function infect(target) {
+    target.plugin.captured = true;
+    target.plugin.capturedAt = performance.now();
+    target.plugin.hitTime = performance.now();
+    target.frictionAir = 0.018;
+  }
+  Events.on(engine, 'collisionStart', (ev) => {
+    ev.pairs.forEach(pair => {
+      const a = pair.bodyA, b = pair.bodyB;
+      const isRed   = (x) => x.label === 'packet' || (x.label === 'wall' && x.plugin.captured);
+      const isGreen = (x) => x.label === 'wall' && !x.plugin.captured;
+      let target, source;
+      if (isRed(a) && isGreen(b))      { target = b; source = a; }
+      else if (isRed(b) && isGreen(a)) { target = a; source = b; }
+      else return;
+      const v = Math.hypot(source.velocity.x, source.velocity.y);
+      if (v > 0.6) infect(target);
+    });
+  });
+
+  // === Progress ===
+  const STAGES = [
+    { t: 0.00, msg: 'GRID STABLE — 보안 격자 정렬됨',             mark: '■', cls: '' },
+    { t: 0.15, msg: 'PERTURBATION — 격자 흔들림 감지',            mark: '▲', cls: 'warn' },
+    { t: 0.30, msg: 'MISALIGNMENT — 자기장 약화',                 mark: '▲', cls: 'warn' },
+    { t: 0.50, msg: 'CAPTURE — AI가 보안 자산 탈취',              mark: '▼', cls: 'crit' },
+    { t: 0.70, msg: 'GRID COLLAPSE — 격자 붕괴 진행',             mark: '▼', cls: 'crit' },
+    { t: 0.90, msg: 'TOTAL BREACH — 전 자산 침투 완료',           mark: '✕', cls: 'crit' }
+  ];
+  const DURATION = 60 * 1000;
+  const t0 = performance.now();
+  const msgEl = document.getElementById('msg');
+  const statusEl = document.getElementById('status');
+  const barWrap = document.getElementById('bar');
+  const barFill = barWrap.querySelector('i');
+  let lastAuto = 0;
+
+  function updateProgress() {
+    const p = Math.min(1, (performance.now() - t0) / DURATION);
+    let stage = STAGES[0];
+    for (const s of STAGES) if (p >= s.t) stage = s;
+    msgEl.textContent = stage.msg;
+    statusEl.querySelector('.mark').textContent = stage.mark;
+    statusEl.className = stage.cls;
+    barWrap.className = stage.cls;
+    barFill.style.width = (p * 100) + '%';
+
+    // 자기장 강도: progress가 오를수록 약해짐
+    springStrength = Math.max(0.18, 1.0 - p * 0.85);
+
+    const interval =
+      p < 0.15 ? 99999 :
+      p < 0.30 ? 1800  :
+      p < 0.50 ? 900   :
+      p < 0.70 ? 420   :
+      p < 0.90 ? 220   :
+                 130;
+    if (performance.now() - lastAuto > interval) {
+      lastAuto = performance.now();
+      spawnPacket();
+    }
+  }
+
+  // === 렌더 ===
+  function drawHomeMarkers() {
+    ctx.save();
+    ctx.lineWidth = 1;
+    for (const b of bodies) {
+      if (b.plugin.kind !== 'wall') continue;
+      const x = b.plugin.homeX, y = b.plugin.homeY;
+      if (b.plugin.captured) {
+        // 탈취 흔적: 빨간 ✕
+        ctx.strokeStyle = 'rgba(255, 76, 107, 0.22)';
+        ctx.beginPath();
+        ctx.moveTo(x - 4, y - 4); ctx.lineTo(x + 4, y + 4);
+        ctx.moveTo(x - 4, y + 4); ctx.lineTo(x + 4, y - 4);
+        ctx.stroke();
+      } else {
+        ctx.strokeStyle = `rgba(70, 240, 163, ${0.10 * springStrength + 0.04})`;
+        ctx.beginPath();
+        ctx.moveTo(x - 3, y); ctx.lineTo(x + 3, y);
+        ctx.moveTo(x, y - 3); ctx.lineTo(x, y + 3);
+        ctx.stroke();
+      }
+    }
+    ctx.restore();
+  }
+
+  function drawBlock(b) {
+    const { word, kind, hitTime, w, h, hp, captured } = b.plugin;
+    ctx.save();
+    // 캡처된 wall은 가장자리 근접도에 따라 페이드아웃
+    if (kind === 'wall' && captured) {
+      const fadeM = 100;
+      const dl = b.position.x, dr = W - b.position.x;
+      const dt = b.position.y, db = H - b.position.y;
+      const m = Math.min(dl, dr, dt, db);
+      ctx.globalAlpha = Math.max(0, Math.min(1, m / fadeM));
+    }
+    ctx.translate(b.position.x, b.position.y);
+    ctx.rotate(b.angle);
+
+    const flash = hitTime && performance.now() - hitTime < 240;
+    let stroke, fill, textColor, glow, glowAmt;
+    if (kind === 'wall') {
+      if (captured) {
+        stroke    = '#ff4c6b';
+        fill      = 'rgba(255, 76, 107, 0.12)';
+        textColor = '#ffb4c1';
+        glow      = '#ff4c6b';
+        glowAmt   = 12;
+      } else {
+        const dent = 1 - Math.max(0, Math.min(1, hp / 3));
+        stroke    = flash ? '#ff4c6b' : `rgba(70, 240, 163, ${1 - dent * 0.5})`;
+        fill      = flash ? 'rgba(255, 76, 107, 0.20)' : `rgba(70, 240, 163, ${0.06 + dent * 0.05})`;
+        textColor = flash ? '#ffd6de' : `rgba(168, 255, 212, ${1 - dent * 0.3})`;
+        glow      = flash ? '#ff4c6b' : '#46f0a3';
+        glowAmt   = flash ? 18 : 5;
+      }
+    } else {
+      stroke    = '#ff4c6b';
+      fill      = 'rgba(255, 76, 107, 0.22)';
+      textColor = '#ffe6ec';
+      glow      = '#ff4c6b';
+      glowAmt   = 14;
+    }
+
+    ctx.shadowColor = glow;
+    ctx.shadowBlur = glowAmt;
+    ctx.fillStyle = fill;
+    ctx.fillRect(-w/2, -h/2, w, h);
+    ctx.strokeStyle = stroke;
+    ctx.lineWidth = 1.4;
+    ctx.strokeRect(-w/2, -h/2, w, h);
+    ctx.shadowBlur = 0;
+
+    const fontSize = Math.min(h * 0.55, 17);
+    ctx.font = `${fontSize}px Galmuri11, monospace`;
+    ctx.fillStyle = textColor;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    if (captured && kind === 'wall') {
+      // 글리치 글자: 가로선 차단
+      ctx.fillText(word, 0, 1);
+      ctx.strokeStyle = 'rgba(255, 76, 107, 0.7)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(-w/2 + 4, 0); ctx.lineTo(w/2 - 4, 0);
+      ctx.stroke();
+    } else {
+      ctx.fillText(word, 0, 1);
+    }
+
+    ctx.restore();
+  }
+
+  function cull() {
+    for (let i = bodies.length - 1; i >= 0; i--) {
+      const b = bodies[i];
+      const off = b.position.y > H + 80 || b.position.y < -80 || b.position.x < -80 || b.position.x > W + 80;
+      if (b.label === 'packet' && (off || performance.now() - b.plugin.born > 12000)) {
+        World.remove(world, b); bodies.splice(i, 1); continue;
+      }
+      if (b.label === 'wall' && b.plugin.captured && off) {
+        World.remove(world, b); bodies.splice(i, 1);
+      }
+    }
+    if (bodies.length > 280) {
+      for (let i = 0; i < bodies.length && bodies.length > 240; i++) {
+        if (bodies[i].label === 'packet') {
+          World.remove(world, bodies[i]);
+          bodies.splice(i, 1);
+          i--;
+        }
+      }
+    }
+  }
+
+  function loop() {
+    drawRain();
+    Engine.update(engine, 1000 / 60);
+    ctx.clearRect(0, 0, W, H);
+    drawHomeMarkers();
+    for (const b of bodies) drawBlock(b);
+    updateProgress();
+    cull();
+    requestAnimationFrame(loop);
+  }
+
+  // === 리사이즈 ===
+  let resizeTimer;
+  addEventListener('resize', () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+      resize();
+      initRain();
+      // 격자 재구성
+      for (let i = bodies.length - 1; i >= 0; i--) {
+        World.remove(world, bodies[i]);
+        bodies.splice(i, 1);
+      }
+      buildFirewall();
+    }, 200);
+  });
+
+  // 폰트 로딩 후 시작 (Galmuri는 외부라 fonts.ready를 안전망으로)
+  const start = () => requestAnimationFrame(loop);
+  if (document.fonts && document.fonts.ready) {
+    let started = false;
+    document.fonts.ready.then(() => { if (!started) { started = true; start(); } });
+    setTimeout(() => { if (!started) { started = true; start(); } }, 1200);
+  } else {
+    start();
+  }
+})();
+</script>
+</body>
+</html>
