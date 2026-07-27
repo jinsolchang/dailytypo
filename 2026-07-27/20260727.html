@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>김밥 해부학 — 완벽한 한 줄을 향한 토핑 선별</title>
+<title>김밥 해부학 — 토핑 적출 실험</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap');
 *{margin:0;padding:0;box-sizing:border-box}
@@ -44,311 +44,418 @@ canvas{display:block;cursor:crosshair}
   font-size:0.7rem;color:rgba(255,255,255,0.3);
   text-align:center;
 }
-.trash{
-  position:fixed;right:40px;bottom:40px;
-  width:80px;height:100px;
-  border:2px dashed rgba(255,100,100,0.3);
-  border-radius:8px;
-  display:flex;flex-direction:column;
-  align-items:center;justify-content:center;
-  color:rgba(255,100,100,0.5);
-  font-size:0.7rem;
-  transition:all 0.2s;
-}
-.trash.active{
-  border-color:#ff6b6b;
-  background:rgba(255,100,100,0.1);
-  color:#ff6b6b;
-  transform:scale(1.1);
-}
-.trash-icon{font-size:2rem;margin-bottom:4px}
 </style>
 </head>
 <body>
 
 <div class="ui">
   <div class="title">김밥 해부학</div>
-  <div class="subtitle">GIMBAP ANATOMY — 토핑 선별 실험</div>
+  <div class="subtitle">GIMBAP ANATOMY — 토핑 적출 실험</div>
 </div>
 
 <canvas id="canvas"></canvas>
 
 <div class="status">
-  <div>제거: <span id="removed">0</span></div>
+  <div>적출: <span id="removed">0</span></div>
   <div>남은 토핑: <span id="remaining">0</span></div>
-  <div>실수: <span id="mistakes">0</span></div>
+  <div>딸림 사고: <span id="accidents">0</span></div>
 </div>
 
-<div class="hint" id="hint">토핑을 클릭해서 드래그 → 쓰레기통에 버리세요</div>
-
-<div class="trash" id="trash">
-  <div class="trash-icon">🗑</div>
-  <div>DROP HERE</div>
-</div>
+<div class="hint" id="hint">토핑 단면을 클릭 → 밖으로 당겨서 적출하세요</div>
 
 <div class="message" id="message"></div>
 
 <script>
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
-const trash = document.getElementById('trash');
 const messageEl = document.getElementById('message');
 const hintEl = document.getElementById('hint');
 
-let W, H, scale;
+let W, H;
 let toppings = [];
 let dragging = null;
 let mouseX = 0, mouseY = 0;
-let removed = 0, mistakes = 0;
+let removed = 0, accidents = 0;
+
+// 김밥 기하학 (사선 뷰)
+const GIMBAP = {
+  cx: 0, cy: 0,
+  length: 400,
+  radius: 80,
+  angle: Math.PI * 0.15, // 사선 각도
+  tilt: 0.4, // 타원 찌그러짐
+};
 
 // 토핑 정의
 const TOPPING_DEFS = [
-  { name: '단무지', color: '#f7d358', shape: 'rect', w: 12, h: 40, tasty: true },
-  { name: '시금치', color: '#2e7d32', shape: 'squiggle', w: 25, h: 8, tasty: true },
-  { name: '달걀', color: '#ffd54f', shape: 'rect', w: 35, h: 12, tasty: true },
-  { name: '당근', color: '#ff7043', shape: 'rect', w: 8, h: 35, tasty: true },
-  { name: '햄', color: '#e57373', shape: 'rect', w: 30, h: 10, tasty: true },
-  { name: '게맛살', color: '#ffab91', shape: 'bundle', w: 20, h: 15, tasty: true },
-  { name: '오이', color: '#81c784', shape: 'rect', w: 10, h: 30, tasty: false },
-  { name: '우엉', color: '#8d6e63', shape: 'rect', w: 6, h: 35, tasty: false },
-  { name: '어묵', color: '#d7ccc8', shape: 'rect', w: 25, h: 8, tasty: true },
-  { name: '김치', color: '#c62828', shape: 'blob', w: 18, h: 15, tasty: false },
+  { name: '단무지', color: '#f7d358', darkColor: '#c9a82e', radius: 8, tasty: true },
+  { name: '시금치', color: '#4caf50', darkColor: '#2e7d32', radius: 6, tasty: true },
+  { name: '달걀', color: '#ffd54f', darkColor: '#f9a825', radius: 12, tasty: true },
+  { name: '당근', color: '#ff7043', darkColor: '#d84315', radius: 7, tasty: true },
+  { name: '햄', color: '#ef9a9a', darkColor: '#c62828', radius: 10, tasty: true },
+  { name: '게맛살', color: '#ffccbc', darkColor: '#ff8a65', radius: 9, tasty: true },
+  { name: '오이', color: '#a5d6a7', darkColor: '#66bb6a', radius: 8, tasty: false },
+  { name: '우엉', color: '#8d6e63', darkColor: '#5d4037', radius: 5, tasty: false },
+  { name: '어묵', color: '#d7ccc8', darkColor: '#a1887f', radius: 11, tasty: true },
+  { name: '맛살', color: '#ffab91', darkColor: '#ff7043', radius: 8, tasty: false },
 ];
 
-// 리사이즈
 function resize() {
   W = window.innerWidth;
   H = window.innerHeight;
-  scale = Math.min(W, H) / 800;
   canvas.width = W;
   canvas.height = H;
+  GIMBAP.cx = W / 2;
+  GIMBAP.cy = H / 2;
+  GIMBAP.length = Math.min(W, H) * 0.5;
+  GIMBAP.radius = Math.min(W, H) * 0.12;
 }
 
-// 김밥 단면 원형 내에 토핑 배치
 function initToppings() {
   toppings = [];
-  const cx = W / 2;
-  const cy = H / 2;
-  const gimbapRadius = Math.min(W, H) * 0.32;
-  const riceRadius = gimbapRadius * 0.85;
-  
-  // 8-12개 토핑 랜덤 생성
-  const count = 8 + Math.floor(Math.random() * 5);
+  const count = 7 + Math.floor(Math.random() * 4);
   
   for (let i = 0; i < count; i++) {
     const def = TOPPING_DEFS[Math.floor(Math.random() * TOPPING_DEFS.length)];
     
-    // 원형 내부 랜덤 위치
+    // 단면 내 랜덤 위치 (중심에서 떨어진 각도와 거리)
     const angle = Math.random() * Math.PI * 2;
-    const dist = Math.random() * riceRadius * 0.7;
-    const x = cx + Math.cos(angle) * dist;
-    const y = cy + Math.sin(angle) * dist;
-    const rot = Math.random() * Math.PI * 2;
+    const dist = Math.random() * (GIMBAP.radius * 0.65);
     
     toppings.push({
       ...def,
       id: i,
-      x, y,
-      rot,
-      originX: x,
-      originY: y,
-      scale: 0.8 + Math.random() * 0.4,
-      stuck: null, // 딸려나오는 토핑
+      angle,
+      dist,
+      pullAmount: 0, // 당겨진 정도 (0~1 → 완전 적출)
+      stuck: null,
       returning: false,
+      wiggle: 0,
     });
   }
   
   document.getElementById('remaining').textContent = toppings.length;
 }
 
-// 김밥 단면 그리기
-function drawGimbap() {
-  const cx = W / 2;
-  const cy = H / 2;
-  const radius = Math.min(W, H) * 0.32;
+// 김밥 본체 그리기 (3/4 사선 뷰)
+function drawGimbapBody() {
+  const { cx, cy, length, radius, angle, tilt } = GIMBAP;
   
-  // 김 (외피)
+  // 김밥 방향 벡터
+  const dx = Math.cos(angle);
+  const dy = Math.sin(angle);
+  
+  // 뒤쪽 단면 (먼 쪽)
+  const backX = cx + dx * length * 0.5;
+  const backY = cy + dy * length * 0.5;
+  
+  // 앞쪽 단면 (가까운 쪽)
+  const frontX = cx - dx * length * 0.5;
+  const frontY = cy - dy * length * 0.5;
+  
+  // --- 김 몸통 (원기둥) ---
+  ctx.save();
+  
+  // 그림자
+  ctx.shadowColor = 'rgba(0,0,0,0.5)';
+  ctx.shadowBlur = 30;
+  ctx.shadowOffsetX = 10;
+  ctx.shadowOffsetY = 15;
+  
+  // 몸통 상단면
   ctx.beginPath();
-  ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+  ctx.moveTo(frontX - dy * radius, frontY + dx * radius * tilt);
+  ctx.lineTo(backX - dy * radius, backY + dx * radius * tilt);
+  ctx.ellipse(backX, backY, radius, radius * tilt, angle, -Math.PI/2, Math.PI/2);
+  ctx.lineTo(frontX + dy * radius, frontY - dx * radius * tilt);
+  ctx.ellipse(frontX, frontY, radius, radius * tilt, angle, Math.PI/2, -Math.PI/2);
+  ctx.closePath();
+  
+  // 김 텍스처 그라데이션
+  const bodyGrad = ctx.createLinearGradient(
+    cx - dy * radius, cy + dx * radius,
+    cx + dy * radius, cy - dx * radius
+  );
+  bodyGrad.addColorStop(0, '#1a1f1a');
+  bodyGrad.addColorStop(0.3, '#2a302a');
+  bodyGrad.addColorStop(0.5, '#1f251f');
+  bodyGrad.addColorStop(0.7, '#252b25');
+  bodyGrad.addColorStop(1, '#151a15');
+  ctx.fillStyle = bodyGrad;
+  ctx.fill();
+  
+  ctx.shadowColor = 'transparent';
+  
+  // 김 얼룩 텍스처
+  ctx.globalAlpha = 0.15;
+  for (let i = 0; i < 80; i++) {
+    const t = Math.random();
+    const px = frontX + (backX - frontX) * t + (Math.random() - 0.5) * radius * 1.5 * dy;
+    const py = frontY + (backY - frontY) * t + (Math.random() - 0.5) * radius * 1.5 * dx;
+    ctx.beginPath();
+    ctx.arc(px, py, 2 + Math.random() * 4, 0, Math.PI * 2);
+    ctx.fillStyle = Math.random() > 0.5 ? '#3a4a3a' : '#0a0f0a';
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  
+  ctx.restore();
+  
+  // --- 뒤쪽 단면 (흐릿하게) ---
+  ctx.save();
+  ctx.globalAlpha = 0.4;
+  drawCrossSection(backX, backY, 0.9);
+  ctx.restore();
+  
+  // --- 앞쪽 단면 (선명하게) ---
+  drawCrossSection(frontX, frontY, 1);
+  
+  return { frontX, frontY, backX, backY, dx, dy };
+}
+
+// 단면 그리기
+function drawCrossSection(cx, cy, scale) {
+  const { radius, angle, tilt } = GIMBAP;
+  const r = radius * scale;
+  
+  // 김 테두리
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, r, r * tilt, angle, 0, Math.PI * 2);
   ctx.fillStyle = '#1a1a1a';
   ctx.fill();
   ctx.strokeStyle = '#333';
-  ctx.lineWidth = 3;
+  ctx.lineWidth = 2;
   ctx.stroke();
   
   // 밥 (내부)
   ctx.beginPath();
-  ctx.arc(cx, cy, radius * 0.92, 0, Math.PI * 2);
-  const riceGrad = ctx.createRadialGradient(cx - radius * 0.2, cy - radius * 0.2, 0, cx, cy, radius);
+  ctx.ellipse(cx, cy, r * 0.92, r * 0.92 * tilt, angle, 0, Math.PI * 2);
+  const riceGrad = ctx.createRadialGradient(cx, cy - r * 0.2, 0, cx, cy, r);
   riceGrad.addColorStop(0, '#fafafa');
-  riceGrad.addColorStop(0.7, '#f0f0f0');
+  riceGrad.addColorStop(0.6, '#f5f5f5');
   riceGrad.addColorStop(1, '#e8e8e8');
   ctx.fillStyle = riceGrad;
   ctx.fill();
   
   // 밥알 텍스처
-  ctx.fillStyle = 'rgba(200,200,200,0.3)';
-  for (let i = 0; i < 150; i++) {
+  ctx.fillStyle = 'rgba(180,180,180,0.25)';
+  for (let i = 0; i < 60; i++) {
     const a = Math.random() * Math.PI * 2;
-    const d = Math.random() * radius * 0.88;
-    const rx = cx + Math.cos(a) * d;
-    const ry = cy + Math.sin(a) * d;
+    const d = Math.random() * r * 0.85;
+    const rx = cx + Math.cos(a + angle) * d;
+    const ry = cy + Math.sin(a + angle) * d * tilt;
     ctx.beginPath();
-    ctx.ellipse(rx, ry, 2 + Math.random() * 2, 1 + Math.random(), Math.random() * Math.PI, 0, Math.PI * 2);
+    ctx.ellipse(rx, ry, 1.5 + Math.random() * 1.5, 0.8, Math.random() * Math.PI, 0, Math.PI * 2);
     ctx.fill();
   }
 }
 
-// 토핑 그리기
-function drawTopping(t, offsetX = 0, offsetY = 0, alpha = 1) {
-  ctx.save();
-  ctx.globalAlpha = alpha;
-  ctx.translate(t.x + offsetX, t.y + offsetY);
-  ctx.rotate(t.rot);
-  ctx.scale(t.scale, t.scale);
+// 토핑 단면 위치 계산
+function getToppingCrossSectionPos(t) {
+  const { cx, cy, length, radius, angle, tilt } = GIMBAP;
+  const dx = Math.cos(angle);
+  const dy = Math.sin(angle);
+  const frontX = cx - dx * length * 0.5;
+  const frontY = cy - dy * length * 0.5;
   
-  const hw = t.w / 2;
-  const hh = t.h / 2;
+  // 토핑 단면 위치 (앞쪽 단면 기준)
+  const tx = frontX + Math.cos(t.angle + angle) * t.dist;
+  const ty = frontY + Math.sin(t.angle + angle) * t.dist * tilt;
   
-  // 그림자
-  ctx.shadowColor = 'rgba(0,0,0,0.3)';
-  ctx.shadowBlur = 8;
-  ctx.shadowOffsetX = 2;
-  ctx.shadowOffsetY = 2;
+  return { x: tx, y: ty, dx, dy };
+}
+
+// 토핑 그리기 (단면 + 당겨진 몸통)
+function drawTopping(t, isHovered = false) {
+  const { radius, angle, tilt, length } = GIMBAP;
+  const pos = getToppingCrossSectionPos(t);
   
-  ctx.fillStyle = t.color;
-  ctx.strokeStyle = shadeColor(t.color, -20);
-  ctx.lineWidth = 1.5;
+  const pullDist = t.pullAmount * length * 0.8; // 당겨진 거리
   
-  if (t.shape === 'rect') {
-    // 직사각형 토핑 (단무지, 달걀, 햄 등)
-    roundRect(-hw, -hh, t.w, t.h, 3);
-    ctx.fill();
-    ctx.stroke();
-    // 하이라이트
-    ctx.fillStyle = 'rgba(255,255,255,0.3)';
-    roundRect(-hw + 2, -hh + 2, t.w * 0.4, t.h * 0.3, 2);
-    ctx.fill();
-  } else if (t.shape === 'squiggle') {
-    // 시금치 같은 구불구불
+  // 당겨진 토핑 몸통 (주르륵)
+  if (pullDist > 5) {
+    ctx.save();
+    
+    // 토핑 몸통 (원기둥 형태)
+    const endX = pos.x - pos.dx * pullDist;
+    const endY = pos.y - pos.dy * pullDist;
+    
+    // 그림자
+    ctx.shadowColor = 'rgba(0,0,0,0.4)';
+    ctx.shadowBlur = 15;
+    ctx.shadowOffsetX = 3;
+    ctx.shadowOffsetY = 5;
+    
+    // 원기둥 몸통
+    const bodyWidth = t.radius * 2;
+    const perpX = -pos.dy;
+    const perpY = pos.dx * tilt;
+    
     ctx.beginPath();
-    ctx.moveTo(-hw, 0);
-    for (let i = 0; i <= 6; i++) {
-      const px = -hw + (t.w / 6) * i;
-      const py = Math.sin(i * 1.5) * hh;
-      ctx.lineTo(px, py);
-    }
-    ctx.lineTo(hw, hh * 0.5);
-    ctx.lineTo(-hw, hh * 0.3);
+    ctx.moveTo(pos.x + perpX * bodyWidth * 0.5, pos.y + perpY * bodyWidth * 0.5);
+    ctx.lineTo(endX + perpX * bodyWidth * 0.5, endY + perpY * bodyWidth * 0.5);
+    ctx.lineTo(endX - perpX * bodyWidth * 0.5, endY - perpY * bodyWidth * 0.5);
+    ctx.lineTo(pos.x - perpX * bodyWidth * 0.5, pos.y - perpY * bodyWidth * 0.5);
     ctx.closePath();
+    
+    const bodyGrad = ctx.createLinearGradient(
+      pos.x + perpX * bodyWidth, pos.y,
+      pos.x - perpX * bodyWidth, pos.y
+    );
+    bodyGrad.addColorStop(0, t.darkColor);
+    bodyGrad.addColorStop(0.3, t.color);
+    bodyGrad.addColorStop(0.7, t.color);
+    bodyGrad.addColorStop(1, t.darkColor);
+    ctx.fillStyle = bodyGrad;
     ctx.fill();
-    ctx.stroke();
-  } else if (t.shape === 'bundle') {
-    // 게맛살 다발
-    for (let i = 0; i < 4; i++) {
-      const by = -hh + (t.h / 3) * i;
-      ctx.fillStyle = i % 2 === 0 ? t.color : '#fff';
-      roundRect(-hw, by, t.w, t.h / 4, 2);
-      ctx.fill();
-    }
-    ctx.strokeStyle = shadeColor(t.color, -20);
-    roundRect(-hw, -hh, t.w, t.h, 2);
-    ctx.stroke();
-  } else if (t.shape === 'blob') {
-    // 김치 같은 불규칙
+    
+    // 끝 부분 (타원)
     ctx.beginPath();
-    ctx.moveTo(-hw * 0.8, -hh * 0.5);
-    ctx.bezierCurveTo(-hw, hh * 0.3, hw * 0.5, hh, hw * 0.9, hh * 0.2);
-    ctx.bezierCurveTo(hw * 0.7, -hh * 0.8, 0, -hh, -hw * 0.8, -hh * 0.5);
+    ctx.ellipse(endX, endY, t.radius, t.radius * tilt * 0.8, angle, 0, Math.PI * 2);
+    ctx.fillStyle = t.color;
     ctx.fill();
+    ctx.strokeStyle = t.darkColor;
+    ctx.lineWidth = 1.5;
     ctx.stroke();
+    
+    ctx.restore();
+  }
+  
+  // 단면 (김밥 안에 남아있는 부분)
+  if (t.pullAmount < 1) {
+    ctx.save();
+    
+    const wiggleX = Math.sin(t.wiggle) * 2;
+    const wiggleY = Math.cos(t.wiggle * 0.7) * 1;
+    
+    ctx.beginPath();
+    ctx.ellipse(
+      pos.x + wiggleX,
+      pos.y + wiggleY,
+      t.radius * (isHovered ? 1.15 : 1),
+      t.radius * tilt * (isHovered ? 1.15 : 1),
+      angle, 0, Math.PI * 2
+    );
+    
+    const grad = ctx.createRadialGradient(
+      pos.x - t.radius * 0.3, pos.y - t.radius * 0.3, 0,
+      pos.x, pos.y, t.radius
+    );
+    grad.addColorStop(0, '#fff');
+    grad.addColorStop(0.3, t.color);
+    grad.addColorStop(1, t.darkColor);
+    ctx.fillStyle = grad;
+    ctx.fill();
+    
+    if (isHovered) {
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+    
+    ctx.restore();
+  }
+}
+
+// 딸려나온 토핑 그리기
+function drawStuckTopping(main, stuck) {
+  if (!stuck || main.pullAmount < 0.1) return;
+  
+  const { angle, tilt, length } = GIMBAP;
+  const mainPos = getToppingCrossSectionPos(main);
+  const stuckPos = getToppingCrossSectionPos(stuck);
+  
+  const pullDist = main.pullAmount * length * 0.6; // 메인보다 약간 덜 당겨짐
+  
+  ctx.save();
+  ctx.globalAlpha = 0.85;
+  
+  if (pullDist > 5) {
+    const endX = stuckPos.x - mainPos.dx * pullDist + Math.sin(Date.now() * 0.005) * 8;
+    const endY = stuckPos.y - mainPos.dy * pullDist + Math.cos(Date.now() * 0.004) * 4;
+    
+    const bodyWidth = stuck.radius * 2;
+    const perpX = -mainPos.dy;
+    const perpY = mainPos.dx * tilt;
+    
+    ctx.beginPath();
+    ctx.moveTo(stuckPos.x + perpX * bodyWidth * 0.5, stuckPos.y + perpY * bodyWidth * 0.5);
+    ctx.lineTo(endX + perpX * bodyWidth * 0.5, endY + perpY * bodyWidth * 0.5);
+    ctx.lineTo(endX - perpX * bodyWidth * 0.5, endY - perpY * bodyWidth * 0.5);
+    ctx.lineTo(stuckPos.x - perpX * bodyWidth * 0.5, stuckPos.y - perpY * bodyWidth * 0.5);
+    ctx.closePath();
+    ctx.fillStyle = stuck.color;
+    ctx.fill();
+    
+    ctx.beginPath();
+    ctx.ellipse(endX, endY, stuck.radius * 0.9, stuck.radius * tilt * 0.7, angle, 0, Math.PI * 2);
+    ctx.fillStyle = stuck.color;
+    ctx.fill();
   }
   
   ctx.restore();
 }
 
-function roundRect(x, y, w, h, r) {
-  ctx.beginPath();
-  ctx.moveTo(x + r, y);
-  ctx.lineTo(x + w - r, y);
-  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
-  ctx.lineTo(x + w, y + h - r);
-  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
-  ctx.lineTo(x + r, y + h);
-  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
-  ctx.lineTo(x, y + r);
-  ctx.quadraticCurveTo(x, y, x + r, y);
-  ctx.closePath();
-}
-
-function shadeColor(color, percent) {
-  const num = parseInt(color.replace('#', ''), 16);
-  const amt = Math.round(2.55 * percent);
-  const R = Math.max(0, Math.min(255, (num >> 16) + amt));
-  const G = Math.max(0, Math.min(255, ((num >> 8) & 0x00FF) + amt));
-  const B = Math.max(0, Math.min(255, (num & 0x0000FF) + amt));
-  return '#' + (0x1000000 + R * 0x10000 + G * 0x100 + B).toString(16).slice(1);
-}
-
-// 토핑 클릭 감지
-function hitTest(x, y) {
+// 토핑 히트 테스트
+function hitTestTopping(mx, my) {
+  const { angle, tilt } = GIMBAP;
+  
   for (let i = toppings.length - 1; i >= 0; i--) {
     const t = toppings[i];
-    const dx = x - t.x;
-    const dy = y - t.y;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-    const hitRadius = Math.max(t.w, t.h) * t.scale * 0.7;
-    if (dist < hitRadius) return t;
+    if (t.pullAmount >= 1) continue;
+    
+    const pos = getToppingCrossSectionPos(t);
+    const dx = mx - pos.x;
+    const dy = my - pos.y;
+    
+    // 타원 히트 테스트
+    const dist = Math.sqrt((dx * dx) + (dy * dy) / (tilt * tilt));
+    if (dist < t.radius * 1.5) return t;
   }
   return null;
 }
 
-// 쓰레기통 영역 체크
-function isOverTrash(x, y) {
-  const rect = trash.getBoundingClientRect();
-  return x > rect.left - 30 && x < rect.right + 30 && y > rect.top - 30 && y < rect.bottom + 30;
-}
-
-// 메인 렌더
+// 메인 렌더링
 function render() {
   ctx.clearRect(0, 0, W, H);
   
-  // 배경 그라데이션
+  // 배경
   const bg = ctx.createRadialGradient(W/2, H/2, 0, W/2, H/2, Math.max(W, H) * 0.7);
-  bg.addColorStop(0, '#1a1a1a');
+  bg.addColorStop(0, '#1f1f1f');
   bg.addColorStop(1, '#0a0a0a');
   ctx.fillStyle = bg;
   ctx.fillRect(0, 0, W, H);
   
-  drawGimbap();
+  // 김밥 몸통
+  const gimbapInfo = drawGimbapBody();
   
-  // 토핑들 (드래그 중인 것 제외)
-  for (const t of toppings) {
+  // 토핑 (당겨진 것 먼저)
+  const sortedToppings = [...toppings].sort((a, b) => a.pullAmount - b.pullAmount);
+  
+  for (const t of sortedToppings) {
     if (t === dragging) continue;
+    
+    // 위글 업데이트
+    if (t.wiggle > 0) t.wiggle *= 0.92;
+    
+    // 되돌아가기 애니메이션
     if (t.returning) {
-      // 되돌아가는 애니메이션
-      t.x += (t.originX - t.x) * 0.15;
-      t.y += (t.originY - t.y) * 0.15;
-      if (Math.abs(t.x - t.originX) < 1 && Math.abs(t.y - t.originY) < 1) {
-        t.x = t.originX;
-        t.y = t.originY;
+      t.pullAmount *= 0.85;
+      if (t.pullAmount < 0.01) {
+        t.pullAmount = 0;
         t.returning = false;
+        t.stuck = null;
       }
     }
-    drawTopping(t);
+    
+    drawTopping(t, hitTestTopping(mouseX, mouseY) === t);
+    if (t.stuck) drawStuckTopping(t, t.stuck);
   }
   
   // 드래그 중인 토핑
   if (dragging) {
-    // 딸려나온 토핑 먼저
-    if (dragging.stuck) {
-      const st = dragging.stuck;
-      const offsetX = 20 + Math.sin(Date.now() * 0.01) * 5;
-      const offsetY = -15 + Math.cos(Date.now() * 0.008) * 3;
-      drawTopping(st, mouseX - st.x + offsetX, mouseY - st.y + offsetY, 0.8);
-    }
-    // 메인 토핑
-    drawTopping(dragging, mouseX - dragging.x, mouseY - dragging.y);
+    drawTopping(dragging, true);
+    if (dragging.stuck) drawStuckTopping(dragging, dragging.stuck);
   }
   
   requestAnimationFrame(render);
@@ -360,19 +467,21 @@ function onPointerDown(e) {
   const x = e.clientX - rect.left;
   const y = e.clientY - rect.top;
   
-  const hit = hitTest(x, y);
-  if (hit) {
+  const hit = hitTestTopping(x, y);
+  if (hit && hit.pullAmount < 1) {
     dragging = hit;
-    mouseX = x;
-    mouseY = y;
+    dragging.startPull = dragging.pullAmount;
+    dragging.startMouse = { x, y };
     
-    // 35% 확률로 다른 토핑 딸려나옴
-    if (Math.random() < 0.35) {
-      const others = toppings.filter(t => t !== hit);
+    // 30% 확률로 딸려나옴
+    if (Math.random() < 0.3 && !dragging.stuck) {
+      const others = toppings.filter(t => t !== hit && t.pullAmount < 0.5);
       if (others.length > 0) {
         const stuck = others[Math.floor(Math.random() * others.length)];
         dragging.stuck = stuck;
-        showMessage(`앗! ${stuck.name}이(가) ${hit.name}에 붙어서 딸려나왔어요!`);
+        showMessage(`앗! ${stuck.name}이(가) 같이 딸려나왔어요!`);
+        accidents++;
+        document.getElementById('accidents').textContent = accidents;
       }
     }
     
@@ -385,21 +494,24 @@ function onPointerMove(e) {
   mouseX = e.clientX - rect.left;
   mouseY = e.clientY - rect.top;
   
-  // 쓰레기통 하이라이트
-  if (dragging && isOverTrash(e.clientX, e.clientY)) {
-    trash.classList.add('active');
-  } else {
-    trash.classList.remove('active');
+  if (dragging) {
+    const { dx, dy } = getToppingCrossSectionPos(dragging);
+    
+    // 마우스 이동을 김밥 방향으로 투영
+    const moveDx = mouseX - dragging.startMouse.x;
+    const moveDy = mouseY - dragging.startMouse.y;
+    const pullDir = -(moveDx * dx + moveDy * dy); // 당기는 방향 (음수 = 밖으로)
+    
+    dragging.pullAmount = Math.max(0, Math.min(1, dragging.startPull + pullDir / (GIMBAP.length * 0.6)));
+    dragging.wiggle = Math.sin(Date.now() * 0.02) * 3 * dragging.pullAmount;
   }
 }
 
 function onPointerUp(e) {
   if (!dragging) return;
   
-  const overTrash = isOverTrash(e.clientX, e.clientY);
-  
-  if (overTrash) {
-    // 토핑 제거
+  if (dragging.pullAmount > 0.85) {
+    // 적출 완료!
     const idx = toppings.indexOf(dragging);
     if (idx > -1) {
       toppings.splice(idx, 1);
@@ -408,42 +520,35 @@ function onPointerUp(e) {
       document.getElementById('remaining').textContent = toppings.length;
       
       if (!dragging.tasty) {
-        showMessage(`${dragging.name} 제거 완료! 좋은 선택이에요 👍`);
+        showMessage(`${dragging.name} 적출 완료! 👍`);
       } else {
-        showMessage(`${dragging.name}을(를) 버렸어요... 맛있는 건데 😢`);
-        mistakes++;
-        document.getElementById('mistakes').textContent = mistakes;
+        showMessage(`${dragging.name}... 맛있는 건데 😢`);
       }
     }
     
     // 딸려나온 토핑은 다시 넣기
     if (dragging.stuck) {
-      const st = dragging.stuck;
-      st.returning = true;
-      // 새 위치로 살짝 이동
-      st.originX = st.originX + (Math.random() - 0.5) * 30;
-      st.originY = st.originY + (Math.random() - 0.5) * 30;
-      showMessage(`${st.name}은(는) 다시 김밥 안으로... 🔄`, 2000);
+      dragging.stuck.returning = true;
+      dragging.stuck.pullAmount = dragging.pullAmount * 0.7;
+      showMessage(`${dragging.stuck.name}은(는) 다시 들어갑니다 🔄`, 2500);
     }
     
-    // 모두 제거 시
     if (toppings.length === 0) {
       setTimeout(() => {
-        showMessage('김밥 토핑을 모두 제거했습니다! 새 김밥이 나옵니다 🍙', 3000);
+        showMessage('모든 토핑 적출 완료! 새 김밥 준비 중... 🍙', 3000);
         setTimeout(initToppings, 2000);
       }, 500);
     }
   } else {
-    // 쓰레기통 밖 → 원위치
+    // 덜 당겼으면 되돌아가기
     dragging.returning = true;
     if (dragging.stuck) {
       dragging.stuck.returning = true;
-      dragging.stuck = null;
+      dragging.stuck.pullAmount = dragging.pullAmount * 0.5;
     }
   }
   
   dragging = null;
-  trash.classList.remove('active');
 }
 
 function showMessage(text, duration = 2500) {
@@ -463,7 +568,6 @@ resize();
 initToppings();
 render();
 
-// 터치 방지
 document.body.addEventListener('touchmove', e => e.preventDefault(), { passive: false });
 </script>
 
