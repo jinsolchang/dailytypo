@@ -16,28 +16,25 @@ body{
 }
 canvas{display:block;cursor:crosshair}
 .ui{position:fixed;top:24px;left:50%;transform:translateX(-50%);text-align:center;z-index:10;pointer-events:none}
-.title{font-size:clamp(1.2rem,3vw,1.8rem);font-weight:900;letter-spacing:-0.02em;margin-bottom:6px}
+.title{font-size:clamp(1.2rem,3vw,1.8rem);font-weight:900;margin-bottom:6px}
 .subtitle{font-size:0.75rem;color:rgba(255,255,255,0.4);letter-spacing:0.1em}
 .status{
   position:fixed;bottom:30px;left:50%;transform:translateX(-50%);
   display:flex;gap:24px;font-size:0.8rem;color:rgba(255,255,255,0.5);
   background:rgba(0,0,0,0.6);padding:12px 24px;border-radius:30px;
-  backdrop-filter:blur(10px);
 }
 .status span{color:#4ade80;font-weight:700}
 .message{
-  position:fixed;top:45%;left:50%;transform:translate(-50%,-50%);
+  position:fixed;top:42%;left:50%;transform:translate(-50%,-50%);
   font-size:1rem;font-weight:700;color:#fff;
   opacity:0;transition:opacity 0.4s;
   pointer-events:none;z-index:100;
-  text-align:center;
   background:rgba(0,0,0,0.8);padding:14px 28px;border-radius:8px;
 }
 .message.show{opacity:1}
 .hint{
   position:fixed;bottom:90px;left:50%;transform:translateX(-50%);
   font-size:0.7rem;color:rgba(255,255,255,0.3);
-  text-align:center;
 }
 </style>
 </head>
@@ -55,7 +52,7 @@ canvas{display:block;cursor:crosshair}
   <div>남은 토핑: <span id="remaining">0</span></div>
 </div>
 
-<div class="hint" id="hint">단면의 토핑을 클릭해서 왼쪽으로 잡아당기세요</div>
+<div class="hint" id="hint">단면의 토핑을 클릭 → 바깥으로 당겨서 적출</div>
 
 <div class="message" id="message"></div>
 
@@ -73,33 +70,37 @@ let removed = 0;
 // 김밥 파라미터
 let GB = {};
 
+// 45도 방향 (우상단 → 좌하단)
+const ANGLE = -Math.PI / 4;  // -45도
+const DIR_X = Math.cos(ANGLE);
+const DIR_Y = Math.sin(ANGLE);
+
 function resize() {
   W = window.innerWidth;
   H = window.innerHeight;
   canvas.width = W;
   canvas.height = H;
   
-  // 김밥 가로 방향, 약간 위에서 보는 뷰
-  const size = Math.min(W * 0.7, H * 0.5);
+  const size = Math.min(W, H) * 0.55;
   GB = {
-    cx: W / 2 + size * 0.15,  // 오른쪽으로 약간 치우침 (왼쪽에 빠진 토핑 공간)
+    cx: W / 2,
     cy: H / 2,
-    length: size,             // 김밥 길이
-    radius: size * 0.22,      // 단면 반지름
-    perspective: 0.35,        // 위에서 보는 정도 (0=정면, 1=완전위)
+    length: size,
+    radius: size * 0.18,
+    tilt: 0.4,  // 위에서 보는 정도 (타원 찌그러짐)
   };
 }
 
 // 토핑 정의
 const TOPPING_DEFS = [
-  { name: '단무지', color: '#f7d358', dark: '#c9a82e', r: 10 },
-  { name: '시금치', color: '#4caf50', dark: '#2e7d32', r: 7 },
-  { name: '달걀', color: '#ffd54f', dark: '#f9a825', r: 14 },
-  { name: '당근', color: '#ff7043', dark: '#e64a19', r: 8 },
-  { name: '햄', color: '#ef9a9a', dark: '#e57373', r: 12 },
-  { name: '게맛살', color: '#ffccbc', dark: '#ffab91', r: 10 },
-  { name: '오이', color: '#a5d6a7', dark: '#81c784', r: 9 },
-  { name: '우엉', color: '#8d6e63', dark: '#6d4c41', r: 6 },
+  { name: '단무지', color: '#f7d358', dark: '#c9a82e', r: 12 },
+  { name: '시금치', color: '#4caf50', dark: '#2e7d32', r: 8 },
+  { name: '달걀', color: '#ffd54f', dark: '#f9a825', r: 15 },
+  { name: '당근', color: '#ff7043', dark: '#e64a19', r: 9 },
+  { name: '햄', color: '#ef9a9a', dark: '#e57373', r: 13 },
+  { name: '게맛살', color: '#ffccbc', dark: '#ffab91', r: 11 },
+  { name: '오이', color: '#a5d6a7', dark: '#81c784', r: 10 },
+  { name: '우엉', color: '#8d6e63', dark: '#6d4c41', r: 7 },
 ];
 
 function initToppings() {
@@ -108,90 +109,135 @@ function initToppings() {
   
   for (let i = 0; i < count; i++) {
     const def = TOPPING_DEFS[Math.floor(Math.random() * TOPPING_DEFS.length)];
-    // 단면 내 위치 (중심 기준 각도, 거리)
-    const angle = (i / count) * Math.PI * 2 + Math.random() * 0.5;
-    const dist = GB.radius * (0.3 + Math.random() * 0.4);
+    const angle = (i / count) * Math.PI * 2 + Math.random() * 0.4;
+    const dist = GB.radius * (0.25 + Math.random() * 0.45);
     
     toppings.push({
       ...def,
       id: i,
-      angle,
-      dist,
-      pull: 0,       // 당겨진 길이 (0 ~ GB.length)
-      pulling: false,
+      angle,  // 단면 내 위치 각도
+      dist,   // 단면 중심으로부터 거리
+      pull: 0,
       returning: false,
-      stuck: null,   // 딸려나온 토핑
+      stuck: null,
     });
   }
   document.getElementById('remaining').textContent = toppings.length;
 }
 
-// 단면 위치 계산 (오른쪽 끝)
-function getCrossSectionCenter() {
+// 앞 단면 중심 (우상단)
+function getFrontCenter() {
   return {
-    x: GB.cx + GB.length * 0.5,
-    y: GB.cy
+    x: GB.cx + DIR_X * GB.length * 0.45,
+    y: GB.cy + DIR_Y * GB.length * 0.45
   };
 }
 
-// 토핑의 단면 위치
-function getToppingPos(t) {
-  const cs = getCrossSectionCenter();
-  const x = cs.x + Math.cos(t.angle) * t.dist;
-  const y = cs.y + Math.sin(t.angle) * t.dist * GB.perspective;
-  return { x, y };
+// 뒤 단면 중심 (좌하단)
+function getBackCenter() {
+  return {
+    x: GB.cx - DIR_X * GB.length * 0.45,
+    y: GB.cy - DIR_Y * GB.length * 0.45
+  };
 }
 
-// 토핑의 빠져나온 끝 위치
-function getToppingEndPos(t) {
+// 토핑 단면 위치 (앞 단면 기준)
+function getToppingPos(t) {
+  const front = getFrontCenter();
+  // 단면은 45도 기울어진 타원
+  // 로컬 좌표를 월드로 변환
+  const localX = Math.cos(t.angle) * t.dist;
+  const localY = Math.sin(t.angle) * t.dist * GB.tilt;
+  
+  // 45도 회전
+  const worldX = localX * Math.cos(ANGLE + Math.PI/2) - localY * Math.sin(ANGLE + Math.PI/2);
+  const worldY = localX * Math.sin(ANGLE + Math.PI/2) + localY * Math.cos(ANGLE + Math.PI/2);
+  
+  return {
+    x: front.x + worldX,
+    y: front.y + worldY
+  };
+}
+
+// 토핑 빠져나온 끝 위치
+function getToppingEnd(t) {
   const pos = getToppingPos(t);
   return {
-    x: pos.x - t.pull,  // 왼쪽으로 빠져나옴
-    y: pos.y
+    x: pos.x - DIR_X * t.pull,
+    y: pos.y - DIR_Y * t.pull
   };
+}
+
+// 타원 그리기 (45도 회전된)
+function drawEllipse(cx, cy, rx, ry, fill, stroke) {
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(ANGLE + Math.PI/2);  // 타원 축을 김밥 방향에 수직으로
+  ctx.beginPath();
+  ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2);
+  if (fill) {
+    ctx.fillStyle = fill;
+    ctx.fill();
+  }
+  if (stroke) {
+    ctx.strokeStyle = stroke;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
+  ctx.restore();
 }
 
 // 김밥 몸통 그리기
 function drawGimbapBody() {
-  const cs = getCrossSectionCenter();
-  const leftX = GB.cx - GB.length * 0.5;
-  const rightX = cs.x;
+  const front = getFrontCenter();
+  const back = getBackCenter();
   const r = GB.radius;
-  const p = GB.perspective;
+  const ry = r * GB.tilt;
   
   ctx.save();
   
   // 그림자
   ctx.shadowColor = 'rgba(0,0,0,0.5)';
-  ctx.shadowBlur = 40;
-  ctx.shadowOffsetY = 20;
+  ctx.shadowBlur = 50;
+  ctx.shadowOffsetX = 15;
+  ctx.shadowOffsetY = 25;
   
-  // 몸통 윗면 (위에서 보이는 부분)
+  // 수직 방향 (타원 장축 방향)
+  const perpX = Math.cos(ANGLE + Math.PI/2);
+  const perpY = Math.sin(ANGLE + Math.PI/2);
+  
+  // 몸통 (위쪽 면)
   ctx.beginPath();
-  ctx.moveTo(leftX, GB.cy - r * p);
-  ctx.lineTo(rightX, GB.cy - r * p);
-  ctx.ellipse(rightX, GB.cy, r, r * p, 0, -Math.PI/2, Math.PI/2, false);
-  ctx.lineTo(leftX, GB.cy + r * p);
-  ctx.ellipse(leftX, GB.cy, r, r * p, 0, Math.PI/2, -Math.PI/2, false);
+  // 앞 단면 위쪽 호
+  ctx.ellipse(front.x, front.y, r, ry, ANGLE + Math.PI/2, -Math.PI/2, Math.PI/2);
+  // 뒤 단면으로 선
+  ctx.lineTo(back.x + perpX * r, back.y + perpY * r);
+  // 뒤 단면 아래쪽 호
+  ctx.ellipse(back.x, back.y, r, ry, ANGLE + Math.PI/2, Math.PI/2, -Math.PI/2);
+  // 앞 단면으로 돌아감
   ctx.closePath();
   
   // 김 텍스처
-  const bodyGrad = ctx.createLinearGradient(leftX, GB.cy - r, rightX, GB.cy + r);
-  bodyGrad.addColorStop(0, '#1a1f1a');
-  bodyGrad.addColorStop(0.2, '#252a25');
+  const bodyGrad = ctx.createLinearGradient(
+    GB.cx - perpX * r, GB.cy - perpY * r,
+    GB.cx + perpX * r, GB.cy + perpY * r
+  );
+  bodyGrad.addColorStop(0, '#151a15');
+  bodyGrad.addColorStop(0.3, '#252a25');
   bodyGrad.addColorStop(0.5, '#1f241f');
-  bodyGrad.addColorStop(0.8, '#2a302a');
-  bodyGrad.addColorStop(1, '#151a15');
+  bodyGrad.addColorStop(0.7, '#2a302a');
+  bodyGrad.addColorStop(1, '#1a1f1a');
   ctx.fillStyle = bodyGrad;
   ctx.fill();
   
   ctx.shadowColor = 'transparent';
   
   // 김 텍스처 점들
-  ctx.globalAlpha = 0.12;
-  for (let i = 0; i < 100; i++) {
-    const px = leftX + Math.random() * GB.length;
-    const py = GB.cy + (Math.random() - 0.5) * r * p * 1.8;
+  ctx.globalAlpha = 0.1;
+  for (let i = 0; i < 80; i++) {
+    const t = Math.random();
+    const px = back.x + (front.x - back.x) * t + (Math.random() - 0.5) * r * 1.5 * perpX;
+    const py = back.y + (front.y - back.y) * t + (Math.random() - 0.5) * r * 1.5 * perpY;
     ctx.beginPath();
     ctx.arc(px, py, 1 + Math.random() * 3, 0, Math.PI * 2);
     ctx.fillStyle = Math.random() > 0.5 ? '#3a4a3a' : '#0a0f0a';
@@ -199,116 +245,119 @@ function drawGimbapBody() {
   }
   ctx.globalAlpha = 1;
   
-  // 왼쪽 단면 (어두운 끝)
-  ctx.beginPath();
-  ctx.ellipse(leftX, GB.cy, r, r * p, 0, 0, Math.PI * 2);
-  ctx.fillStyle = '#0f0f0f';
-  ctx.fill();
+  // 뒤 단면 (어두움)
+  drawEllipse(back.x, back.y, r, ry, '#0f0f0f', '#1a1a1a');
   
   ctx.restore();
 }
 
-// 오른쪽 단면 (밥 보이는 곳) 그리기
-function drawCrossSection() {
-  const cs = getCrossSectionCenter();
+// 앞 단면 그리기
+function drawFrontSection() {
+  const front = getFrontCenter();
   const r = GB.radius;
-  const p = GB.perspective;
+  const ry = r * GB.tilt;
   
   // 김 테두리
-  ctx.beginPath();
-  ctx.ellipse(cs.x, cs.y, r + 3, (r + 3) * p, 0, 0, Math.PI * 2);
-  ctx.fillStyle = '#1a1a1a';
-  ctx.fill();
+  drawEllipse(front.x, front.y, r + 4, (r + 4) * GB.tilt, '#1a1a1a', null);
   
   // 밥
+  ctx.save();
+  ctx.translate(front.x, front.y);
+  ctx.rotate(ANGLE + Math.PI/2);
   ctx.beginPath();
-  ctx.ellipse(cs.x, cs.y, r, r * p, 0, 0, Math.PI * 2);
-  const riceGrad = ctx.createRadialGradient(cs.x - r*0.2, cs.y - r*p*0.3, 0, cs.x, cs.y, r);
+  ctx.ellipse(0, 0, r, ry, 0, 0, Math.PI * 2);
+  
+  const riceGrad = ctx.createRadialGradient(-r*0.2, -ry*0.2, 0, 0, 0, r);
   riceGrad.addColorStop(0, '#ffffff');
-  riceGrad.addColorStop(0.5, '#f8f8f8');
-  riceGrad.addColorStop(1, '#e8e8e8');
+  riceGrad.addColorStop(0.6, '#f8f8f8');
+  riceGrad.addColorStop(1, '#eaeaea');
   ctx.fillStyle = riceGrad;
   ctx.fill();
   
-  // 밥알 텍스처
+  // 밥알
   ctx.fillStyle = 'rgba(200,200,200,0.3)';
-  for (let i = 0; i < 50; i++) {
+  for (let i = 0; i < 40; i++) {
     const a = Math.random() * Math.PI * 2;
-    const d = Math.random() * r * 0.9;
-    const px = cs.x + Math.cos(a) * d;
-    const py = cs.y + Math.sin(a) * d * p;
+    const d = Math.random() * r * 0.85;
+    const px = Math.cos(a) * d;
+    const py = Math.sin(a) * d * GB.tilt;
     ctx.beginPath();
-    ctx.ellipse(px, py, 1.5, 0.8, Math.random() * Math.PI, 0, Math.PI * 2);
+    ctx.ellipse(px, py, 1.5, 0.7, Math.random() * Math.PI, 0, Math.PI * 2);
     ctx.fill();
   }
+  ctx.restore();
 }
 
 // 토핑 그리기
 function drawTopping(t, hover = false) {
-  const pos = getToppingPos(t);      // 단면 위치
-  const endPos = getToppingEndPos(t); // 빠져나온 끝
+  const pos = getToppingPos(t);
+  const end = getToppingEnd(t);
   const r = t.r * (hover ? 1.15 : 1);
-  const p = GB.perspective;
+  const ry = r * GB.tilt;
   
-  // 빠져나온 몸통 (원기둥)
-  if (t.pull > 10) {
+  // 빠져나온 몸통
+  if (t.pull > 15) {
     ctx.save();
-    
-    // 그림자
     ctx.shadowColor = 'rgba(0,0,0,0.3)';
-    ctx.shadowBlur = 10;
-    ctx.shadowOffsetY = 5;
+    ctx.shadowBlur = 12;
+    ctx.shadowOffsetY = 6;
+    
+    const perpX = Math.cos(ANGLE + Math.PI/2);
+    const perpY = Math.sin(ANGLE + Math.PI/2);
     
     // 원기둥 옆면
     ctx.beginPath();
-    ctx.moveTo(pos.x, pos.y - r * p);
-    ctx.lineTo(endPos.x, endPos.y - r * p);
-    ctx.ellipse(endPos.x, endPos.y, r, r * p, 0, -Math.PI/2, Math.PI/2, true);
-    ctx.lineTo(pos.x, pos.y + r * p);
+    ctx.moveTo(pos.x + perpX * r, pos.y + perpY * ry);
+    ctx.lineTo(end.x + perpX * r, end.y + perpY * ry);
+    ctx.ellipse(end.x, end.y, r, ry, ANGLE + Math.PI/2, Math.PI/2, -Math.PI/2, true);
+    ctx.lineTo(pos.x - perpX * r, pos.y - perpY * ry);
     ctx.closePath();
     
-    const bodyGrad = ctx.createLinearGradient(pos.x, pos.y - r, pos.x, pos.y + r);
-    bodyGrad.addColorStop(0, t.dark);
-    bodyGrad.addColorStop(0.3, t.color);
-    bodyGrad.addColorStop(0.7, t.color);
-    bodyGrad.addColorStop(1, t.dark);
-    ctx.fillStyle = bodyGrad;
+    const grad = ctx.createLinearGradient(
+      pos.x - perpX * r, pos.y - perpY * r,
+      pos.x + perpX * r, pos.y + perpY * r
+    );
+    grad.addColorStop(0, t.dark);
+    grad.addColorStop(0.35, t.color);
+    grad.addColorStop(0.65, t.color);
+    grad.addColorStop(1, t.dark);
+    ctx.fillStyle = grad;
     ctx.fill();
     
-    // 끝 단면 (왼쪽)
-    ctx.beginPath();
-    ctx.ellipse(endPos.x, endPos.y, r, r * p, 0, 0, Math.PI * 2);
-    ctx.fillStyle = t.color;
-    ctx.fill();
-    ctx.strokeStyle = t.dark;
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
+    // 끝 단면
+    drawEllipse(end.x, end.y, r, ry, t.color, t.dark);
     
     // 하이라이트
+    ctx.save();
+    ctx.translate(end.x, end.y);
+    ctx.rotate(ANGLE + Math.PI/2);
     ctx.beginPath();
-    ctx.ellipse(endPos.x - r*0.3, endPos.y - r*p*0.3, r*0.3, r*p*0.2, 0, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(255,255,255,0.4)';
+    ctx.ellipse(-r*0.3, -ry*0.3, r*0.25, ry*0.2, 0, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255,255,255,0.5)';
     ctx.fill();
+    ctx.restore();
     
     ctx.restore();
   }
   
-  // 단면의 토핑 (김밥 안에 남은 부분)
-  if (t.pull < GB.length * 0.95) {
+  // 단면 토핑 (아직 안 빠진 부분)
+  if (t.pull < GB.length * 0.9) {
     ctx.save();
+    ctx.translate(pos.x, pos.y);
+    ctx.rotate(ANGLE + Math.PI/2);
     ctx.beginPath();
-    ctx.ellipse(pos.x, pos.y, r, r * p, 0, 0, Math.PI * 2);
+    ctx.ellipse(0, 0, r, ry, 0, 0, Math.PI * 2);
     
-    const grad = ctx.createRadialGradient(pos.x - r*0.3, pos.y - r*p*0.3, 0, pos.x, pos.y, r);
+    const grad = ctx.createRadialGradient(-r*0.25, -ry*0.25, 0, 0, 0, r);
     grad.addColorStop(0, '#fff');
-    grad.addColorStop(0.4, t.color);
+    grad.addColorStop(0.35, t.color);
     grad.addColorStop(1, t.dark);
     ctx.fillStyle = grad;
     ctx.fill();
     
     if (hover) {
       ctx.strokeStyle = '#fff';
-      ctx.lineWidth = 2;
+      ctx.lineWidth = 2.5;
       ctx.stroke();
     }
     ctx.restore();
@@ -317,48 +366,59 @@ function drawTopping(t, hover = false) {
 
 // 딸려나온 토핑
 function drawStuckTopping(main, stuck) {
-  if (!stuck || main.pull < 30) return;
+  if (!stuck || main.pull < 40) return;
   
-  const stuckPos = getToppingPos(stuck);
-  const pullAmount = main.pull * 0.6; // 메인보다 덜 나옴
-  const endX = stuckPos.x - pullAmount + Math.sin(Date.now() * 0.008) * 5;
-  const endY = stuckPos.y + Math.cos(Date.now() * 0.006) * 3;
+  const pos = getToppingPos(stuck);
+  const pullAmt = main.pull * 0.55;
+  const wobble = Math.sin(Date.now() * 0.008) * 8;
+  const end = {
+    x: pos.x - DIR_X * pullAmt + wobble * 0.5,
+    y: pos.y - DIR_Y * pullAmt + wobble * 0.3
+  };
   const r = stuck.r * 0.9;
-  const p = GB.perspective;
+  const ry = r * GB.tilt;
+  const perpX = Math.cos(ANGLE + Math.PI/2);
+  const perpY = Math.sin(ANGLE + Math.PI/2);
   
   ctx.save();
-  ctx.globalAlpha = 0.85;
+  ctx.globalAlpha = 0.8;
   
   // 몸통
   ctx.beginPath();
-  ctx.moveTo(stuckPos.x, stuckPos.y - r * p);
-  ctx.lineTo(endX, endY - r * p);
-  ctx.ellipse(endX, endY, r, r * p, 0, -Math.PI/2, Math.PI/2, true);
-  ctx.lineTo(stuckPos.x, stuckPos.y + r * p);
+  ctx.moveTo(pos.x + perpX * r, pos.y + perpY * ry);
+  ctx.lineTo(end.x + perpX * r, end.y + perpY * ry);
+  ctx.ellipse(end.x, end.y, r, ry, ANGLE + Math.PI/2, Math.PI/2, -Math.PI/2, true);
+  ctx.lineTo(pos.x - perpX * r, pos.y - perpY * ry);
   ctx.closePath();
   ctx.fillStyle = stuck.color;
   ctx.fill();
   
-  // 끝
-  ctx.beginPath();
-  ctx.ellipse(endX, endY, r, r * p, 0, 0, Math.PI * 2);
-  ctx.fill();
+  drawEllipse(end.x, end.y, r, ry, stuck.color, null);
   
   ctx.restore();
 }
 
 // 히트 테스트
 function hitTest(mx, my) {
+  const front = getFrontCenter();
+  
   for (let i = toppings.length - 1; i >= 0; i--) {
     const t = toppings[i];
-    if (t.pull >= GB.length * 0.9) continue;
+    if (t.pull >= GB.length * 0.85) continue;
     
     const pos = getToppingPos(t);
-    const dx = mx - pos.x;
-    const dy = (my - pos.y) / GB.perspective;
-    const dist = Math.sqrt(dx*dx + dy*dy);
     
-    if (dist < t.r * 1.5) return t;
+    // 회전 고려한 거리 계산
+    const dx = mx - pos.x;
+    const dy = my - pos.y;
+    
+    // 역회전으로 로컬 좌표
+    const localX = dx * Math.cos(-(ANGLE + Math.PI/2)) - dy * Math.sin(-(ANGLE + Math.PI/2));
+    const localY = dx * Math.sin(-(ANGLE + Math.PI/2)) + dy * Math.cos(-(ANGLE + Math.PI/2));
+    
+    // 타원 히트
+    const normDist = (localX * localX) / (t.r * t.r) + (localY * localY) / ((t.r * GB.tilt) * (t.r * GB.tilt));
+    if (normDist < 2.5) return t;
   }
   return null;
 }
@@ -374,41 +434,38 @@ function render() {
   ctx.fillStyle = bg;
   ctx.fillRect(0, 0, W, H);
   
-  // 빠져나온 토핑들 먼저 (김밥 뒤에)
+  // 빠져나온 토핑 (김밥 뒤)
   for (const t of toppings) {
-    if (t.pull > 10 && t !== dragging) {
+    if (t.pull > 15 && t !== dragging) {
       drawTopping(t);
       if (t.stuck) drawStuckTopping(t, t.stuck);
     }
   }
   
-  // 김밥 몸통
+  // 김밥
   drawGimbapBody();
+  drawFrontSection();
   
-  // 단면
-  drawCrossSection();
-  
-  // 단면 위 토핑들
+  // 단면 토핑
   const hovered = hitTest(mouseX, mouseY);
   for (const t of toppings) {
     if (t === dragging) continue;
     
-    // 되돌아가기
     if (t.returning) {
-      t.pull *= 0.88;
-      if (t.pull < 5) {
+      t.pull *= 0.85;
+      if (t.pull < 8) {
         t.pull = 0;
         t.returning = false;
         t.stuck = null;
       }
     }
     
-    if (t.pull <= 10) {
+    if (t.pull <= 15) {
       drawTopping(t, t === hovered);
     }
   }
   
-  // 드래그 중인 토핑
+  // 드래그 중
   if (dragging) {
     drawTopping(dragging, true);
     if (dragging.stuck) drawStuckTopping(dragging, dragging.stuck);
@@ -426,18 +483,16 @@ canvas.addEventListener('pointerdown', e => {
   const hit = hitTest(mouseX, mouseY);
   if (hit) {
     dragging = hit;
-    dragging.startX = mouseX;
+    dragging.startMouse = { x: mouseX, y: mouseY };
     dragging.startPull = dragging.pull;
     
-    // 30% 확률로 딸려나옴
     if (Math.random() < 0.3 && !dragging.stuck) {
-      const others = toppings.filter(t => t !== hit && t.pull < 30);
+      const others = toppings.filter(t => t !== hit && t.pull < 40);
       if (others.length) {
         dragging.stuck = others[Math.floor(Math.random() * others.length)];
-        showMessage(`${dragging.stuck.name}이(가) 같이 딸려나왔어요!`);
+        showMessage(`${dragging.stuck.name}이(가) 딸려나왔어요!`);
       }
     }
-    
     document.getElementById('hint').style.opacity = '0';
   }
 });
@@ -448,48 +503,45 @@ canvas.addEventListener('pointermove', e => {
   mouseY = e.clientY - rect.top;
   
   if (dragging) {
-    // 왼쪽으로 당긴 만큼
-    const dragDist = dragging.startX - mouseX;
-    dragging.pull = Math.max(0, Math.min(GB.length, dragging.startPull + dragDist));
+    const dx = mouseX - dragging.startMouse.x;
+    const dy = mouseY - dragging.startMouse.y;
+    // 김밥 방향 반대로 당긴 거리
+    const pullDist = -(dx * DIR_X + dy * DIR_Y);
+    dragging.pull = Math.max(0, Math.min(GB.length, dragging.startPull + pullDist));
   }
 });
 
-canvas.addEventListener('pointerup', e => {
+canvas.addEventListener('pointerup', () => {
   if (!dragging) return;
   
-  if (dragging.pull > GB.length * 0.8) {
-    // 적출 성공
+  if (dragging.pull > GB.length * 0.75) {
     const idx = toppings.indexOf(dragging);
     if (idx > -1) {
       toppings.splice(idx, 1);
       removed++;
       document.getElementById('removed').textContent = removed;
       document.getElementById('remaining').textContent = toppings.length;
-      showMessage(`${dragging.name} 적출 완료!`);
+      showMessage(`${dragging.name} 적출!`);
     }
     
-    // 딸려나온 건 다시 넣기
     if (dragging.stuck) {
       dragging.stuck.pull = dragging.pull * 0.5;
       dragging.stuck.returning = true;
-      showMessage(`${dragging.stuck.name}은(는) 다시 들어갑니다`, 2000);
     }
     
     if (toppings.length === 0) {
       setTimeout(() => {
-        showMessage('모두 적출! 새 김밥이 옵니다 🍙', 2500);
-        setTimeout(() => { initToppings(); }, 2000);
+        showMessage('새 김밥 준비 중... 🍙', 2500);
+        setTimeout(initToppings, 2000);
       }, 500);
     }
   } else {
-    // 덜 당겼으면 되돌아감
     dragging.returning = true;
     if (dragging.stuck) {
       dragging.stuck.returning = true;
       dragging.stuck.pull = dragging.pull * 0.4;
     }
   }
-  
   dragging = null;
 });
 
@@ -506,7 +558,6 @@ function showMessage(text, dur = 2000) {
   setTimeout(() => messageEl.classList.remove('show'), dur);
 }
 
-// 초기화
 window.addEventListener('resize', () => { resize(); initToppings(); });
 resize();
 initToppings();
