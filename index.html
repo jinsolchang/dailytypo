@@ -51,6 +51,7 @@ body{background:#0a0a0a;font-family:'Noto Sans KR',sans-serif;color:#fff;min-hei
   <div class="ticker-label">속보</div>
   <div class="ticker-track">
     <div class="ticker-text">
+      김밥 해체실험 — 토핑 분리 연구: 드래그로 맛 없는 토핑을 제거하세요 &nbsp;│&nbsp;
       "AI가 스스로 해킹한다"…국내 대학도 털렸다 — 보안 격자가 도미노처럼 빨갛게 물든다 &nbsp;│&nbsp;
       배민시계 — 3D 모델 위에 실시간 인터랙티브 디스플레이를 입히다 &nbsp;│&nbsp;
       빨주노초파남보 — 무지개 슬링키가 클릭 한 번에 넘어가는 3D 키네틱 토이 &nbsp;│&nbsp;
@@ -81,28 +82,43 @@ body{background:#0a0a0a;font-family:'Noto Sans KR',sans-serif;color:#fff;min-hei
 
 <div class="main">
 
-  <!-- 히어로: 최신 기사 (5/29) AI 해킹 -->
-  <a class="hero" href="2026-05-29/20260529.html">
-    <div class="hero-visual" style="background:radial-gradient(#46f0a3 1.2px, transparent 1.6px) 14px 14px / 42px 36px, #060809; position:relative">
-      <span style="position:absolute;left:18%;top:38%;width:7px;height:7px;background:#ff4c6b;box-shadow:0 0 14px #ff4c6b;border-radius:1px"></span>
-      <span style="position:absolute;left:32%;top:24%;width:7px;height:7px;background:#ff4c6b;box-shadow:0 0 14px #ff4c6b;border-radius:1px"></span>
-      <span style="position:absolute;left:48%;top:54%;width:7px;height:7px;background:#ff4c6b;box-shadow:0 0 14px #ff4c6b;border-radius:1px"></span>
-      <span style="position:absolute;left:62%;top:30%;width:7px;height:7px;background:#ff4c6b;box-shadow:0 0 14px #ff4c6b;border-radius:1px"></span>
-      <span style="position:absolute;left:78%;top:46%;width:7px;height:7px;background:#ff4c6b;box-shadow:0 0 14px #ff4c6b;border-radius:1px"></span>
-      <span style="position:absolute;left:24%;top:64%;width:7px;height:7px;background:#ff4c6b;box-shadow:0 0 14px #ff4c6b;border-radius:1px"></span>
-      <span style="position:absolute;left:6%;top:14%;font-family:'Courier New',monospace;color:#ff4c6b;font-size:0.85rem;letter-spacing:0.22em;opacity:0.9;text-shadow:0 0 12px #ff4c6b">AI &gt; HACK &gt; ROOT &gt;</span>
-      <span style="position:absolute;right:6%;bottom:12%;font-family:'Courier New',monospace;color:#46f0a3;font-size:0.7rem;letter-spacing:0.3em;opacity:0.5">GRID STABLE — PERTURBATION — CAPTURE</span>
+  <!-- 히어로: 최신 기사 (7/27) 김밥 해체실험 -->
+  <a class="hero" href="2026-07-27/20260727.html">
+    <div class="hero-visual" style="background:linear-gradient(180deg,#1a1a1a,#2a2a2a,#1a1a1a);position:relative;display:flex;align-items:center;justify-content:center">
+      <!-- 김밥 롤 SVG -->
+      <svg viewBox="0 0 200 50" width="300" height="75" style="filter:drop-shadow(0 4px 12px rgba(0,0,0,0.6))">
+        <ellipse cx="100" cy="25" rx="90" ry="22" fill="#1a1a1a" stroke="#333" stroke-width="1"/>
+        <ellipse cx="100" cy="25" rx="70" ry="18" fill="#2a2a2a"/>
+        <!-- 토핑들 -->
+        <rect x="40" y="20" width="30" height="5" rx="2" fill="#ff6b35" opacity="0.9"><animate attributeName="x" values="40;45;40" dur="2s" repeatCount="indefinite"/></rect>
+        <rect x="70" y="22" width="25" height="4" rx="2" fill="#228b22" opacity="0.9"><animate attributeName="x" values="70;68;70" dur="1.8s" repeatCount="indefinite"/></rect>
+        <rect x="100" y="18" width="28" height="6" rx="3" fill="#ffd700" opacity="0.9"><animate attributeName="x" values="100;103;100" dur="2.2s" repeatCount="indefinite"/></rect>
+        <rect x="130" y="21" width="20" height="5" rx="2" fill="#dc143c" opacity="0.9"><animate attributeName="x" values="130;127;130" dur="1.6s" repeatCount="indefinite"/></rect>
+      </svg>
+      <span style="position:absolute;left:8%;top:18%;font-size:0.6rem;color:#888;letter-spacing:0.15em">토핑 분리 연구</span>
+      <span style="position:absolute;right:8%;bottom:18%;font-size:0.55rem;color:#555;letter-spacing:0.2em">DRAG TO REMOVE</span>
     </div>
     <div class="hero-body">
       <div class="hero-tag">실험·인터랙티브</div>
-      <div class="hero-title">"AI가 스스로 해킹한다" · 국내 대학도 털렸다<br><span style="font-size:.6em;font-weight:700">보안 격자가 도미노처럼 빨갛게 물든다</span></div>
-      <div class="hero-meta">2026.05.29 · 인터랙티브 · MATTER.JS</div>
+      <div class="hero-title">김밥 해체실험 — 토핑 분리 연구<br><span style="font-size:.6em;font-weight:700">드래그로 맛 없는 토핑을 제거하세요</span></div>
+      <div class="hero-meta">2026.07.27 · 인터랙티브 · DRAG & DROP</div>
     </div>
   </a>
 
   <!-- 이전 기사 -->
   <div class="section-label">이전 기사</div>
   <div class="grid">
+    <!-- 기존 히어로 카드로 이동 -->
+    <a class="card" href="2026-05-29/20260529.html">
+      <div class="card-body">
+        <div class="card-tag">실험·인터랙티브</div>
+        <div class="card-title">"AI가 스스로 해킹한다" · 국내 대학도 털렸다</div>
+        <div class="card-date">2026.05.29</div>
+      </div>
+      <div class="card-thumb" style="background:#060809;overflow:hidden;display:flex;align-items:center;justify-content:center">
+        <span style="font-family:'Courier New',monospace;color:#ff4c6b;font-size:0.7rem;letter-spacing:0.15em">AI&gt;HACK</span>
+      </div>
+    </a>
     <a class="card" href="2026-05-28/sign-wall-v2.html">
       <div class="card-body">
         <div class="card-tag">실험·인터랙티브</div>
