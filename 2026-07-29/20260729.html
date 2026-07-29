@@ -1,0 +1,1622 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>그날 오후 — 피아노 학원 가기 싫은 날</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;700;900&family=Noto+Sans+KR:wght@400;700;900&display=swap');
+*{margin:0;padding:0;box-sizing:border-box}
+
+body {
+  background:#0a0806;
+  font-family:'Noto Serif KR', serif;
+  color:#f0ead8;
+  width:100vw;
+  height:100vh;
+  overflow:hidden;
+  user-select:none;
+}
+
+/* 필름 그레인 오버레이 */
+#grain {
+  position:fixed;
+  inset:0;
+  pointer-events:none;
+  z-index:1000;
+  opacity:0.5;
+}
+
+/* 비네팅 */
+#vignette {
+  position:fixed;
+  inset:0;
+  pointer-events:none;
+  z-index:999;
+  background:radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.7) 100%);
+}
+
+/* 스캔라인 */
+#scanlines {
+  position:fixed;
+  inset:0;
+  pointer-events:none;
+  z-index:998;
+  background:repeating-linear-gradient(
+    transparent,
+    transparent 2px,
+    rgba(0,0,0,0.12) 2px,
+    rgba(0,0,0,0.12) 4px
+  );
+}
+
+/* 씬 컨테이너 */
+.scene {
+  position:absolute;
+  inset:0;
+  display:none;
+  flex-direction:column;
+  align-items:center;
+  justify-content:flex-end;
+}
+.scene.active { display:flex; }
+
+/* 배경 이미지 영역 */
+.bg-image {
+  position:absolute;
+  inset:0;
+  overflow:hidden;
+}
+.bg-image img {
+  width:100%;
+  height:100%;
+  object-fit:cover;
+  filter:sepia(0.35) contrast(1.05) brightness(0.88) saturate(0.8);
+}
+/* 이미지 없을 때 폴백 배경 */
+.bg-image .bg-fallback {
+  width:100%;
+  height:100%;
+}
+
+/* 캐릭터 */
+.character-layer {
+  position:absolute;
+  bottom:180px;
+  left:50%;
+  transform:translateX(-50%);
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  z-index:10;
+}
+.character-img {
+  width:160px;
+  height:auto;
+  image-rendering:pixelated;
+  filter:drop-shadow(0 8px 24px rgba(0,0,0,0.6));
+  transition:transform 0.3s;
+}
+
+/* 감정 상태 */
+.character-img.shake {
+  animation:charShake 0.5s ease;
+}
+@keyframes charShake {
+  0%,100%{transform:translateX(0)}
+  20%{transform:translateX(-6px) rotate(-2deg)}
+  40%{transform:translateX(6px) rotate(2deg)}
+  60%{transform:translateX(-4px)}
+  80%{transform:translateX(4px)}
+}
+
+/* 말풍선/대화창 */
+#dialog-box {
+  position:fixed;
+  bottom:0;
+  left:0;
+  right:0;
+  z-index:200;
+  padding:0 32px 28px;
+  pointer-events:none;
+}
+.dialog-inner {
+  background:rgba(8,6,4,0.92);
+  border:2px solid rgba(240,234,216,0.25);
+  border-radius:4px;
+  padding:20px 28px 18px;
+  position:relative;
+  box-shadow:0 -4px 40px rgba(0,0,0,0.8), inset 0 1px 0 rgba(240,234,216,0.08);
+  min-height:100px;
+}
+.dialog-name {
+  font-size:0.8rem;
+  font-weight:700;
+  color:#c8a87a;
+  letter-spacing:0.12em;
+  margin-bottom:8px;
+  font-family:'Noto Sans KR', sans-serif;
+}
+.dialog-text {
+  font-size:1rem;
+  line-height:1.75;
+  color:#f0ead8;
+  min-height:2.5em;
+}
+.dialog-cursor {
+  display:inline-block;
+  width:10px;
+  height:1.1em;
+  background:#f0ead8;
+  vertical-align:text-bottom;
+  margin-left:2px;
+  animation:blink 0.8s step-end infinite;
+}
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+.dialog-next {
+  position:absolute;
+  bottom:14px;
+  right:20px;
+  font-size:0.7rem;
+  color:rgba(240,234,216,0.4);
+  letter-spacing:0.1em;
+  pointer-events:all;
+  cursor:pointer;
+  font-family:'Noto Sans KR', sans-serif;
+}
+.dialog-next:hover { color:rgba(240,234,216,0.8); }
+
+/* 클릭 힌트 (화면의 오브젝트) */
+.clickable {
+  position:absolute;
+  cursor:pointer;
+  z-index:20;
+  transition:filter 0.2s, transform 0.2s;
+}
+.clickable:hover {
+  filter:brightness(1.3) drop-shadow(0 0 12px rgba(255,220,100,0.6));
+  transform:scale(1.05);
+}
+.clickable-label {
+  position:absolute;
+  bottom:calc(100% + 6px);
+  left:50%;
+  transform:translateX(-50%);
+  background:rgba(8,6,4,0.9);
+  border:1px solid rgba(240,234,216,0.3);
+  padding:3px 10px;
+  font-size:0.65rem;
+  white-space:nowrap;
+  color:#c8a87a;
+  letter-spacing:0.08em;
+  border-radius:2px;
+  opacity:0;
+  transition:opacity 0.15s;
+  pointer-events:none;
+  font-family:'Noto Sans KR', sans-serif;
+}
+.clickable:hover .clickable-label { opacity:1; }
+
+/* 선택지 */
+#choices {
+  position:fixed;
+  bottom:160px;
+  left:50%;
+  transform:translateX(-50%);
+  z-index:300;
+  display:none;
+  flex-direction:column;
+  gap:8px;
+  min-width:240px;
+}
+.choice-btn {
+  background:rgba(8,6,4,0.95);
+  border:1px solid rgba(240,234,216,0.3);
+  color:#f0ead8;
+  padding:12px 24px;
+  font-size:0.9rem;
+  font-family:'Noto Serif KR', serif;
+  cursor:pointer;
+  text-align:left;
+  letter-spacing:0.03em;
+  transition:all 0.15s;
+  border-radius:2px;
+  position:relative;
+  overflow:hidden;
+}
+.choice-btn::before {
+  content:'▶';
+  margin-right:8px;
+  opacity:0;
+  transition:opacity 0.15s;
+  font-size:0.6rem;
+  color:#c8a87a;
+}
+.choice-btn:hover {
+  background:rgba(200,168,122,0.15);
+  border-color:rgba(200,168,122,0.6);
+  padding-left:30px;
+}
+.choice-btn:hover::before { opacity:1; }
+
+/* 타이틀 화면 */
+#scene-title {
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  background:#0a0806;
+  cursor:pointer;
+}
+.title-main {
+  font-size:clamp(2rem, 6vw, 3.5rem);
+  font-weight:900;
+  letter-spacing:0.15em;
+  color:#f0ead8;
+  text-shadow:0 0 60px rgba(200,168,122,0.3);
+  margin-bottom:12px;
+}
+.title-sub {
+  font-size:0.85rem;
+  color:rgba(200,168,122,0.7);
+  letter-spacing:0.3em;
+  margin-bottom:60px;
+  font-family:'Noto Sans KR', sans-serif;
+}
+.title-start {
+  font-size:0.75rem;
+  color:rgba(240,234,216,0.35);
+  letter-spacing:0.2em;
+  animation:blink 1.2s ease-in-out infinite;
+  font-family:'Noto Sans KR', sans-serif;
+}
+.title-year {
+  position:absolute;
+  bottom:28px;
+  font-size:0.65rem;
+  color:rgba(240,234,216,0.15);
+  letter-spacing:0.15em;
+  font-family:'Noto Sans KR', sans-serif;
+}
+
+/* GAME OVER 화면 */
+#scene-gameover {
+  background:#0a0806;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  cursor:default;
+}
+.gameover-label {
+  font-size:0.7rem;
+  letter-spacing:0.5em;
+  color:rgba(200,168,122,0.5);
+  margin-bottom:16px;
+  font-family:'Noto Sans KR', sans-serif;
+}
+.gameover-main {
+  font-size:clamp(1.8rem,5vw,3rem);
+  font-weight:900;
+  letter-spacing:0.1em;
+  color:#f0ead8;
+  margin-bottom:8px;
+}
+.gameover-ending {
+  font-size:1rem;
+  color:#c8a87a;
+  letter-spacing:0.12em;
+  margin-bottom:48px;
+  font-style:italic;
+}
+.retry-btn {
+  background:transparent;
+  border:1px solid rgba(240,234,216,0.3);
+  color:rgba(240,234,216,0.6);
+  padding:10px 32px;
+  font-size:0.8rem;
+  letter-spacing:0.2em;
+  cursor:pointer;
+  font-family:'Noto Sans KR', sans-serif;
+  transition:all 0.2s;
+  border-radius:2px;
+}
+.retry-btn:hover {
+  border-color:rgba(200,168,122,0.7);
+  color:#c8a87a;
+  background:rgba(200,168,122,0.08);
+}
+
+/* UFO */
+#ufo-element {
+  position:absolute;
+  z-index:30;
+  cursor:pointer;
+  transition:transform 0.3s;
+}
+#ufo-element:hover {
+  transform:scale(1.1) translateY(-4px);
+  filter:drop-shadow(0 0 20px rgba(120,200,255,0.7));
+}
+
+/* UFO SVG */
+.ufo-svg { width:120px; height:auto; }
+
+/* 전환 오버레이 */
+#transition-overlay {
+  position:fixed;
+  inset:0;
+  background:#0a0806;
+  z-index:900;
+  opacity:0;
+  pointer-events:none;
+  transition:opacity 0.5s;
+}
+#transition-overlay.fade-in { opacity:1; pointer-events:all; }
+
+/* 날짜 스탬프 */
+.date-stamp {
+  position:fixed;
+  top:20px;
+  left:20px;
+  font-size:0.65rem;
+  color:rgba(240,234,216,0.2);
+  letter-spacing:0.12em;
+  font-family:'Noto Sans KR', sans-serif;
+  z-index:500;
+}
+
+/* 흑백 노이즈 캔버스 */
+#noise-canvas {
+  position:fixed;
+  inset:0;
+  z-index:1000;
+  pointer-events:none;
+  mix-blend-mode:overlay;
+  opacity:0.35;
+}
+
+/* 이미지 placeholder 스타일 */
+.img-placeholder {
+  width:100%;
+  height:100%;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  font-size:0.7rem;
+  color:rgba(240,234,216,0.2);
+  letter-spacing:0.1em;
+  font-family:'Noto Sans KR', sans-serif;
+}
+.img-placeholder .ph-icon { font-size:2rem; margin-bottom:8px; opacity:0.3; }
+
+/* 캐릭터 placeholder */
+.char-placeholder {
+  width:160px;
+  height:220px;
+  background:rgba(240,234,216,0.05);
+  border:2px dashed rgba(240,234,216,0.1);
+  border-radius:4px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  font-size:0.6rem;
+  color:rgba(240,234,216,0.2);
+  letter-spacing:0.08em;
+  font-family:'Noto Sans KR', sans-serif;
+  gap:6px;
+}
+
+</style>
+</head>
+<body>
+
+<canvas id="noise-canvas"></canvas>
+<div id="vignette"></div>
+<div id="scanlines"></div>
+<div class="date-stamp">1993.09 — 서울</div>
+
+<!-- 전환 오버레이 -->
+<div id="transition-overlay"></div>
+
+<!-- 대화창 (공통) -->
+<div id="dialog-box" style="display:none;">
+  <div class="dialog-inner">
+    <div class="dialog-name" id="dialog-name"></div>
+    <div class="dialog-text" id="dialog-text"><span class="dialog-cursor"></span></div>
+    <div class="dialog-next" id="dialog-next" onclick="nextDialog()">▼ 다음</div>
+  </div>
+</div>
+
+<!-- 선택지 -->
+<div id="choices"></div>
+
+<!-- ═══════════════════════════════════════════
+  씬 1: 타이틀
+═══════════════════════════════════════════ -->
+<div id="scene-title" class="scene active" onclick="startGame()">
+  <div class="title-main">그날 오후</div>
+  <div class="title-sub">피아노 학원 가기 싫은 날</div>
+  <div class="title-start">[ 화면을 클릭하여 시작 ]</div>
+  <div class="title-year">1993 · EPISODE 1</div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+  씬 2: 놀이터
+═══════════════════════════════════════════ -->
+<div id="scene-playground" class="scene">
+  <div class="bg-image" id="bg-playground">
+    <!-- 이미지 교체 지점: <img src="./playground.png" alt="놀이터"> -->
+    <canvas id="playground-canvas" style="width:100%;height:100%;display:block;"></canvas>
+  </div>
+
+  <!-- 캐릭터 -->
+  <div class="character-layer" id="char-playground">
+    <!-- 이미지 교체 지점: <img class="character-img" src="./char_normal.png" alt="주인공"> -->
+    <canvas id="char-canvas" width="160" height="220"></canvas>
+  </div>
+
+  <!-- 클릭 오브젝트들 -->
+  <div class="clickable" id="obj-junglegym" style="left:8%; top:30%; width:18%; height:40%;" onclick="clickObject('junglegym')">
+    <div class="clickable-label">정글짐</div>
+  </div>
+
+  <div class="clickable" id="obj-slide" style="right:10%; top:35%; width:14%; height:35%;" onclick="clickObject('slide')">
+    <div class="clickable-label">미끄럼틀</div>
+  </div>
+
+  <div class="clickable" id="obj-seesaw" style="left:35%; bottom:120px; width:28%; height:80px;" onclick="clickObject('seesaw')">
+    <div class="clickable-label">시소 ▶ 클릭</div>
+  </div>
+
+  <div class="clickable" id="obj-sandbox" style="right:28%; bottom:120px; width:12%; height:60px;" onclick="clickObject('sandbox')">
+    <div class="clickable-label">모래밭</div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+  씬 3: 하늘
+═══════════════════════════════════════════ -->
+<div id="scene-sky" class="scene">
+  <div class="bg-image" id="bg-sky">
+    <!-- 이미지 교체 지점: <img src="./sky.png" alt="하늘"> -->
+    <canvas id="sky-canvas" style="width:100%;height:100%;display:block;"></canvas>
+  </div>
+
+  <!-- UFO -->
+  <div id="ufo-element" style="right:15%; top:12%;" onclick="clickUFO()">
+    <svg class="ufo-svg" viewBox="0 0 160 90" xmlns="http://www.w3.org/2000/svg">
+      <!-- UFO 본체 -->
+      <ellipse cx="80" cy="55" rx="55" ry="14" fill="#8ab4cc" opacity="0.9"/>
+      <ellipse cx="80" cy="55" rx="40" ry="10" fill="#b8d4e8"/>
+      <!-- UFO 캐빈 -->
+      <ellipse cx="80" cy="46" rx="28" ry="18" fill="#c8e4f4" opacity="0.85"/>
+      <ellipse cx="80" cy="44" rx="20" ry="14" fill="#dff0fa" opacity="0.7"/>
+      <!-- 창문 하이라이트 -->
+      <ellipse cx="72" cy="40" rx="8" ry="6" fill="white" opacity="0.4"/>
+      <!-- 빛 효과 -->
+      <ellipse cx="80" cy="70" rx="30" ry="6" fill="#7fd4f8" opacity="0.25"/>
+      <!-- 빔 -->
+      <polygon points="60,69 100,69 115,85 45,85" fill="rgba(127,212,248,0.15)"/>
+      <!-- 신호등 불빛 -->
+      <circle cx="55" cy="56" r="4" fill="#ff6b6b" opacity="0.9">
+        <animate attributeName="opacity" values="0.9;0.2;0.9" dur="1.2s" repeatCount="indefinite"/>
+      </circle>
+      <circle cx="80" cy="60" r="4" fill="#ffd93d" opacity="0.9">
+        <animate attributeName="opacity" values="0.2;0.9;0.2" dur="1.2s" repeatCount="indefinite"/>
+      </circle>
+      <circle cx="105" cy="56" r="4" fill="#6bcb77" opacity="0.9">
+        <animate attributeName="opacity" values="0.9;0.2;0.9" dur="0.8s" repeatCount="indefinite"/>
+      </circle>
+    </svg>
+  </div>
+
+  <!-- 캐릭터 (누운 모습) -->
+  <div class="character-layer" id="char-sky" style="bottom:160px; transform:translateX(-50%) translateX(-80px);">
+    <canvas id="char-lying-canvas" width="220" height="100"></canvas>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+  씬 4: 엘리베이터 앞
+═══════════════════════════════════════════ -->
+<div id="scene-elevator" class="scene">
+  <div class="bg-image" id="bg-elevator">
+    <!-- 이미지 교체 지점: <img src="./elevator.png" alt="엘리베이터"> -->
+    <canvas id="elevator-canvas" style="width:100%;height:100%;display:block;"></canvas>
+  </div>
+
+  <!-- 캐릭터 (서있는 모습) -->
+  <div class="character-layer" id="char-elevator" style="bottom:160px; left:38%; transform:none;">
+    <canvas id="char-elevator-canvas" width="140" height="210"></canvas>
+  </div>
+
+  <!-- 엘리베이터 버튼 클릭 오브젝트 -->
+  <div class="clickable" id="obj-elevator-btn" style="right:22%; top:40%; width:6%; height:10%;" onclick="clickElevatorBtn()">
+    <div class="clickable-label">버튼</div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+  씬 5: 현관문
+═══════════════════════════════════════════ -->
+<div id="scene-door" class="scene">
+  <div class="bg-image" id="bg-door">
+    <!-- 이미지 교체 지점: <img src="./door.png" alt="현관문"> -->
+    <canvas id="door-canvas" style="width:100%;height:100%;display:block;"></canvas>
+  </div>
+
+  <!-- 현관문 클릭 오브젝트 -->
+  <div class="clickable" id="obj-door" style="left:50%; top:20%; transform:translateX(-50%); width:22%; height:62%;" onclick="clickDoor()">
+    <div class="clickable-label">현관문 열기</div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+  씬 6: 게임 오버
+═══════════════════════════════════════════ -->
+<div id="scene-gameover" class="scene">
+  <div class="gameover-label">G A M E  O V E R</div>
+  <div class="gameover-main" id="go-title">ENDING 1</div>
+  <div class="gameover-ending" id="go-subtitle">어렸을 적 기억.</div>
+  <button class="retry-btn" onclick="retryGame()">[ RETRY ]</button>
+</div>
+
+
+<script>
+// ═══════════════════════════════════════════
+//  게임 상태
+// ═══════════════════════════════════════════
+const state = {
+  currentScene: 'title',
+  dialogQueue: [],
+  dialogIdx: 0,
+  dialogCallback: null,
+  endingOneVisited: false,   // 엔딩1 경험 여부
+  ufoPhase: 0,               // 0: 아직, 1: UFO 클릭 가능
+  seesawClicked: false,
+  ufoClicked: false,
+};
+
+// ═══════════════════════════════════════════
+//  필름 노이즈 효과
+// ═══════════════════════════════════════════
+const noiseCanvas = document.getElementById('noise-canvas');
+const nCtx = noiseCanvas.getContext('2d');
+
+function resizeNoise() {
+  noiseCanvas.width = window.innerWidth;
+  noiseCanvas.height = window.innerHeight;
+}
+resizeNoise();
+window.addEventListener('resize', resizeNoise);
+
+function drawNoise() {
+  const w = noiseCanvas.width;
+  const h = noiseCanvas.height;
+  const imageData = nCtx.createImageData(w, h);
+  const data = imageData.data;
+  for (let i = 0; i < data.length; i += 4) {
+    const v = Math.random() * 255;
+    data[i] = v;
+    data[i+1] = v;
+    data[i+2] = v;
+    data[i+3] = Math.random() * 30;
+  }
+  nCtx.putImageData(imageData, 0, 0);
+  requestAnimationFrame(drawNoise);
+}
+drawNoise();
+
+// ═══════════════════════════════════════════
+//  씬 배경 캔버스 렌더러
+// ═══════════════════════════════════════════
+
+function drawPlaygroundBg() {
+  const canvas = document.getElementById('playground-canvas');
+  if (!canvas) return;
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width, h = canvas.height;
+
+  // 하늘 - 오후 3시 느낌
+  const skyGrad = ctx.createLinearGradient(0, 0, 0, h * 0.55);
+  skyGrad.addColorStop(0, '#c9a87a');
+  skyGrad.addColorStop(0.5, '#e2c49a');
+  skyGrad.addColorStop(1, '#f0d8b4');
+  ctx.fillStyle = skyGrad;
+  ctx.fillRect(0, 0, w, h * 0.55);
+
+  // 바닥
+  const groundGrad = ctx.createLinearGradient(0, h * 0.55, 0, h);
+  groundGrad.addColorStop(0, '#8b7355');
+  groundGrad.addColorStop(1, '#6b5a3e');
+  ctx.fillStyle = groundGrad;
+  ctx.fillRect(0, h * 0.55, w, h * 0.45);
+
+  // 먼 건물들 (흐릿한 아파트)
+  ctx.fillStyle = 'rgba(100,85,65,0.4)';
+  const bldgs = [[0.05,0.25,0.08,0.32],[0.14,0.18,0.09,0.38],[0.24,0.22,0.07,0.34],[0.72,0.20,0.10,0.36],[0.83,0.16,0.08,0.40],[0.92,0.24,0.06,0.32]];
+  bldgs.forEach(([x,y,bw,bh]) => {
+    ctx.fillRect(w*x, h*y, w*bw, h*bh);
+    // 창문
+    ctx.fillStyle = 'rgba(200,160,90,0.3)';
+    for (let wy=0; wy<3; wy++) for (let wx=0; wx<2; wx++) {
+      ctx.fillRect(w*x + w*bw*0.2 + wx*(w*bw*0.4), h*y + h*bh*0.15 + wy*(h*bh*0.25), w*bw*0.18, h*bh*0.15);
+    }
+    ctx.fillStyle = 'rgba(100,85,65,0.4)';
+  });
+
+  // 정글짐 (좌측)
+  ctx.strokeStyle = '#5a4a30';
+  ctx.lineWidth = 5;
+  const jgx = w*0.1, jgy = h*0.3, jgw = w*0.15, jgh = h*0.35;
+  ctx.strokeRect(jgx, jgy, jgw, jgh);
+  ctx.beginPath(); ctx.moveTo(jgx, jgy); ctx.lineTo(jgx+jgw, jgy+jgh); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(jgx+jgw, jgy); ctx.lineTo(jgx, jgy+jgh); ctx.stroke();
+  for (let i=1;i<3;i++) {
+    ctx.beginPath(); ctx.moveTo(jgx, jgy+jgh*(i/3)); ctx.lineTo(jgx+jgw, jgy+jgh*(i/3)); ctx.stroke();
+  }
+  // 정글짐 기둥
+  ctx.lineWidth = 8;
+  ctx.strokeStyle = '#4a3a20';
+  [[jgx,h*0.55],[jgx+jgw*0.5,h*0.55],[jgx+jgw,h*0.55]].forEach(([px,py]) => {
+    ctx.beginPath(); ctx.moveTo(px, jgy+jgh); ctx.lineTo(px, py); ctx.stroke();
+  });
+
+  // 미끄럼틀 (우측)
+  const slx = w*0.76, sly = h*0.3, slw = w*0.12, slh = h*0.28;
+  ctx.lineWidth = 6;
+  ctx.strokeStyle = '#5a4a30';
+  // 플랫폼
+  ctx.fillStyle = '#7a6040';
+  ctx.fillRect(slx + slw*0.3, sly, slw*0.7, slh*0.3);
+  // 슬라이드
+  ctx.beginPath();
+  ctx.moveTo(slx + slw, sly + slh*0.3);
+  ctx.lineTo(slx, sly + slh);
+  ctx.lineWidth = 10;
+  ctx.strokeStyle = '#8a6040';
+  ctx.stroke();
+  // 사다리
+  ctx.lineWidth = 4;
+  ctx.strokeStyle = '#5a4a30';
+  ctx.beginPath(); ctx.moveTo(slx+slw*0.55, sly+slh*0.3); ctx.lineTo(slx+slw*0.55, sly+slh); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(slx+slw*0.85, sly+slh*0.3); ctx.lineTo(slx+slw*0.85, sly+slh); ctx.stroke();
+
+  // 시소 (중앙)
+  const ssx = w*0.35, ssy = h*0.6, ssw = w*0.28;
+  ctx.lineWidth = 5;
+  ctx.strokeStyle = '#5a4a30';
+  // 받침대
+  ctx.beginPath(); ctx.moveTo(w*0.5, ssy-20); ctx.lineTo(w*0.5-18, ssy+8); ctx.lineTo(w*0.5+18, ssy+8); ctx.closePath();
+  ctx.fillStyle = '#6a5035'; ctx.fill(); ctx.stroke();
+  // 시소 판 (약간 기울게)
+  ctx.save(); ctx.translate(w*0.5, ssy-20); ctx.rotate(-0.08);
+  ctx.lineWidth = 8; ctx.strokeStyle = '#7a603a';
+  ctx.beginPath(); ctx.moveTo(-ssw/2, 0); ctx.lineTo(ssw/2, 0); ctx.stroke();
+  // 양 끝 손잡이
+  ctx.fillStyle = '#5a4020';
+  ctx.beginPath(); ctx.arc(-ssw/2, -12, 10, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(ssw/2, 12, 10, 0, Math.PI*2); ctx.fill();
+  ctx.restore();
+
+  // 모래 (우측)
+  ctx.fillStyle = '#c8a870';
+  ctx.beginPath();
+  ctx.ellipse(w*0.78, h*0.64, w*0.09, h*0.04, 0, 0, Math.PI*2);
+  ctx.fill();
+  ctx.fillStyle = '#b89860';
+  ctx.beginPath();
+  ctx.ellipse(w*0.78, h*0.63, w*0.07, h*0.025, 0, 0, Math.PI*2);
+  ctx.fill();
+
+  // 세피아/필름 오버레이
+  ctx.fillStyle = 'rgba(180,130,70,0.12)';
+  ctx.fillRect(0, 0, w, h);
+
+  // 스크래치 선
+  ctx.strokeStyle = 'rgba(240,220,180,0.08)';
+  ctx.lineWidth = 1;
+  for (let i=0; i<4; i++) {
+    const sx = Math.random()*w;
+    ctx.beginPath(); ctx.moveTo(sx, 0); ctx.lineTo(sx + (Math.random()-0.5)*30, h); ctx.stroke();
+  }
+}
+
+function drawSkyBg() {
+  const canvas = document.getElementById('sky-canvas');
+  if (!canvas) return;
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width, h = canvas.height;
+
+  // 하늘
+  const skyGrad = ctx.createLinearGradient(0, 0, 0, h);
+  skyGrad.addColorStop(0, '#a8c4d8');
+  skyGrad.addColorStop(0.6, '#c8dce8');
+  skyGrad.addColorStop(1, '#e0ecf4');
+  ctx.fillStyle = skyGrad;
+  ctx.fillRect(0, 0, w, h);
+
+  // 구름
+  function drawCloud(cx, cy, sz, alpha) {
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = '#f0f4f8';
+    [[0,0,sz],[sz*0.7,-sz*0.4,sz*0.75],[-sz*0.7,-sz*0.3,sz*0.65],[sz*1.3,sz*0.1,sz*0.55],[-sz*1.2,sz*0.15,sz*0.5]].forEach(([dx,dy,r])=>{
+      ctx.beginPath(); ctx.arc(cx+dx, cy+dy, r, 0, Math.PI*2); ctx.fill();
+    });
+    ctx.restore();
+  }
+  drawCloud(w*0.15, h*0.18, 40, 0.7);
+  drawCloud(w*0.45, h*0.12, 55, 0.6);
+  drawCloud(w*0.72, h*0.22, 35, 0.65);
+  drawCloud(w*0.3, h*0.35, 30, 0.4);
+
+  // 아파트 (우측 아래)
+  const apt = [
+    [w*0.68, h*0.35, w*0.08, h*0.65, 8, 12],
+    [w*0.77, h*0.28, w*0.07, h*0.72, 7, 14],
+    [w*0.85, h*0.38, w*0.09, h*0.62, 7, 10],
+    [w*0.95, h*0.32, w*0.06, h*0.68, 6, 12],
+  ];
+  apt.forEach(([ax, ay, aw, ah, cols, rows]) => {
+    ctx.fillStyle = '#8a9aaa';
+    ctx.fillRect(ax, ay, aw, ah);
+    ctx.fillStyle = 'rgba(200,220,240,0.35)';
+    const ww = aw / (cols+1) * 0.6, wh = (ah - ay*0.05) / (rows+1) * 0.5;
+    for (let r=0; r<rows; r++) for (let c=0; c<cols; c++) {
+      const wx = ax + (c+0.5)*(aw/cols) - ww/2;
+      const wy = ay + (r+0.5)*((ah)/(rows)) - wh/2 + 20;
+      if (wy < ay+ah-10) {
+        ctx.fillStyle = Math.random() > 0.3 ? 'rgba(255,230,150,0.4)' : 'rgba(180,200,220,0.2)';
+        ctx.fillRect(wx, wy, ww*0.8, wh*0.8);
+      }
+    }
+    // 외벽 라인
+    ctx.strokeStyle = 'rgba(120,140,160,0.4)';
+    ctx.lineWidth = 1;
+    for (let r=1; r<rows; r++) {
+      ctx.beginPath();
+      ctx.moveTo(ax, ay + r*(ah/rows));
+      ctx.lineTo(ax+aw, ay + r*(ah/rows));
+      ctx.stroke();
+    }
+    // 옥탑
+    ctx.fillStyle = '#7a8a9a';
+    ctx.fillRect(ax + aw*0.35, ay - 18, aw*0.3, 22);
+  });
+
+  // 세피아 오버레이
+  ctx.fillStyle = 'rgba(160,120,70,0.1)';
+  ctx.fillRect(0, 0, w, h);
+}
+
+function drawElevatorBg() {
+  const canvas = document.getElementById('elevator-canvas');
+  if (!canvas) return;
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width, h = canvas.height;
+
+  // 복도 배경
+  const wallGrad = ctx.createLinearGradient(0, 0, 0, h);
+  wallGrad.addColorStop(0, '#c8b89a');
+  wallGrad.addColorStop(0.5, '#b8a888');
+  wallGrad.addColorStop(1, '#8a7a62');
+  ctx.fillStyle = wallGrad;
+  ctx.fillRect(0, 0, w, h);
+
+  // 원근감 복도 라인
+  const vx = w/2, vy = h*0.42;
+  ctx.strokeStyle = 'rgba(80,60,40,0.25)';
+  ctx.lineWidth = 1;
+  // 바닥
+  ctx.fillStyle = '#6a5a42';
+  ctx.beginPath();
+  ctx.moveTo(0, h*0.7);
+  ctx.lineTo(w*0.3, h*0.55);
+  ctx.lineTo(w*0.7, h*0.55);
+  ctx.lineTo(w, h*0.7);
+  ctx.lineTo(w, h);
+  ctx.lineTo(0, h);
+  ctx.closePath();
+  ctx.fill();
+
+  // 바닥 타일
+  ctx.strokeStyle = 'rgba(60,50,35,0.3)';
+  ctx.lineWidth = 1;
+  for (let i=0; i<8; i++) {
+    const t = i/7;
+    ctx.beginPath();
+    ctx.moveTo(0, h*0.7 + t*(h*0.3));
+    ctx.lineTo(w, h*0.7 + t*(h*0.3));
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(w*t, h*0.7);
+    ctx.lineTo(w*t, h);
+    ctx.stroke();
+  }
+
+  // 천장
+  ctx.fillStyle = '#d8c8aa';
+  ctx.beginPath();
+  ctx.moveTo(0,0);
+  ctx.lineTo(w,0);
+  ctx.lineTo(w*0.7, h*0.55);
+  ctx.lineTo(w*0.3, h*0.55);
+  ctx.closePath();
+  ctx.fill();
+
+  // 엘리베이터 문
+  const ex = w/2, ey = h*0.08, ew = w*0.22, eh = h*0.65;
+  ctx.fillStyle = '#b0a080';
+  ctx.fillRect(ex - ew/2, ey, ew, eh);
+  // 문 테두리
+  ctx.strokeStyle = '#7a6a50';
+  ctx.lineWidth = 6;
+  ctx.strokeRect(ex - ew/2, ey, ew, eh);
+  // 문 가운데 선
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = '#8a7a60';
+  ctx.beginPath();
+  ctx.moveTo(ex, ey + 20);
+  ctx.lineTo(ex, ey + eh - 20);
+  ctx.stroke();
+  // 문 패널
+  [[ex-ew*0.35, ey+eh*0.1, ew*0.28, eh*0.35],[ex+ew*0.07, ey+eh*0.1, ew*0.28, eh*0.35],
+   [ex-ew*0.35, ey+eh*0.52, ew*0.28, eh*0.35],[ex+ew*0.07, ey+eh*0.52, ew*0.28, eh*0.35]].forEach(([px,py,pw,ph]) => {
+    ctx.fillStyle = 'rgba(100,90,70,0.2)';
+    ctx.fillRect(px, py, pw, ph);
+    ctx.strokeStyle = 'rgba(80,70,50,0.3)'; ctx.lineWidth = 1;
+    ctx.strokeRect(px, py, pw, ph);
+  });
+
+  // 버튼 패널 (우측)
+  ctx.fillStyle = '#c0b090';
+  ctx.fillRect(ex + ew/2 + 20, ey + eh*0.25, 50, 80);
+  ctx.strokeStyle = '#8a7a60'; ctx.lineWidth = 2;
+  ctx.strokeRect(ex + ew/2 + 20, ey + eh*0.25, 50, 80);
+  // ▲ 버튼
+  ctx.fillStyle = '#8a7a60';
+  ctx.beginPath(); ctx.arc(ex + ew/2 + 45, ey + eh*0.25 + 22, 12, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#ddd';
+  ctx.font = '14px sans-serif'; ctx.textAlign = 'center';
+  ctx.fillText('▲', ex + ew/2 + 45, ey + eh*0.25 + 27);
+  // ▼ 버튼
+  ctx.fillStyle = '#8a7a60';
+  ctx.beginPath(); ctx.arc(ex + ew/2 + 45, ey + eh*0.25 + 56, 12, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#ddd';
+  ctx.fillText('▼', ex + ew/2 + 45, ey + eh*0.25 + 61);
+
+  // 세피아 오버레이
+  ctx.fillStyle = 'rgba(160,120,60,0.1)';
+  ctx.fillRect(0, 0, w, h);
+}
+
+function drawDoorBg() {
+  const canvas = document.getElementById('door-canvas');
+  if (!canvas) return;
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width, h = canvas.height;
+
+  // 벽
+  ctx.fillStyle = '#c8b890';
+  ctx.fillRect(0, 0, w, h);
+  // 벽 텍스처
+  ctx.fillStyle = '#b8a880';
+  for (let i=0; i<h; i+=40) {
+    ctx.fillRect(0, i, w, 1);
+  }
+
+  // 현관문
+  const dx = w/2, dy = h*0.06, dw = w*0.25, dh = h*0.78;
+  // 문 테두리
+  ctx.fillStyle = '#7a5a30';
+  ctx.fillRect(dx - dw/2 - 8, dy - 8, dw + 16, dh + 16);
+  // 문
+  const doorGrad = ctx.createLinearGradient(dx - dw/2, 0, dx + dw/2, 0);
+  doorGrad.addColorStop(0, '#5a3a18');
+  doorGrad.addColorStop(0.3, '#7a5030');
+  doorGrad.addColorStop(0.7, '#6a4525');
+  doorGrad.addColorStop(1, '#4a2e12');
+  ctx.fillStyle = doorGrad;
+  ctx.fillRect(dx - dw/2, dy, dw, dh);
+
+  // 문 패널
+  const panels = [
+    [dx-dw*0.4, dy+dh*0.04, dw*0.8, dh*0.28],
+    [dx-dw*0.4, dy+dh*0.36, dw*0.8, dh*0.28],
+    [dx-dw*0.4, dy+dh*0.68, dw*0.8, dh*0.26],
+  ];
+  panels.forEach(([px,py,pw,ph]) => {
+    ctx.fillStyle = 'rgba(0,0,0,0.2)';
+    ctx.fillRect(px, py, pw, ph);
+    ctx.strokeStyle = 'rgba(180,140,80,0.4)'; ctx.lineWidth = 2;
+    ctx.strokeRect(px, py, pw, ph);
+    // 패널 안 하이라이트
+    ctx.strokeStyle = 'rgba(200,160,100,0.2)'; ctx.lineWidth = 1;
+    ctx.strokeRect(px+3, py+3, pw-6, ph-6);
+  });
+
+  // 손잡이
+  ctx.fillStyle = '#c8a840';
+  ctx.beginPath(); ctx.arc(dx + dw*0.28, dy + dh*0.52, 12, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#e8c860';
+  ctx.beginPath(); ctx.arc(dx + dw*0.28, dy + dh*0.52, 8, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#c8a840';
+  ctx.fillRect(dx + dw*0.28, dy + dh*0.52, 28, 8);
+  ctx.beginPath(); ctx.arc(dx + dw*0.28 + 28, dy + dh*0.52 + 4, 6, 0, Math.PI*2); ctx.fill();
+
+  // 초인종
+  ctx.fillStyle = '#a89060';
+  ctx.fillRect(dx + dw/2 + 15, dy + dh*0.42, 28, 40);
+  ctx.strokeStyle = '#786040'; ctx.lineWidth = 2;
+  ctx.strokeRect(dx + dw/2 + 15, dy + dh*0.42, 28, 40);
+  ctx.fillStyle = '#c8b080';
+  ctx.beginPath(); ctx.arc(dx + dw/2 + 29, dy + dh*0.42 + 20, 10, 0, Math.PI*2); ctx.fill();
+
+  // 호수 표시 502
+  ctx.fillStyle = '#c8a840';
+  ctx.font = 'bold 22px serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('502', dx, dy + dh*0.12);
+
+  // 문 틈새 빛
+  ctx.fillStyle = 'rgba(255,200,100,0.08)';
+  ctx.fillRect(dx - dw/2, dy, 3, dh);
+
+  // 세피아
+  ctx.fillStyle = 'rgba(160,120,60,0.12)';
+  ctx.fillRect(0, 0, w, h);
+}
+
+
+// 캐릭터 그리기 (서있는 모습)
+function drawCharStanding(canvasId, emotion) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width, h = canvas.height;
+  ctx.clearRect(0, 0, w, h);
+
+  // 감정별 색상/표정
+  const emotions = {
+    normal: { face: '#f5d5a8', eye: 12, mouth: 'smile', eyebrow: 'normal', sweat: false },
+    sleepy: { face: '#e8c898', eye: 6, mouth: 'neutral', eyebrow: 'relaxed', sweat: false },
+    shocked: { face: '#f8d8a8', eye: 18, mouth: 'open', eyebrow: 'raised', sweat: true },
+    scared: { face: '#e8d0a0', eye: 16, mouth: 'tremble', eyebrow: 'worried', sweat: true },
+    awkward: { face: '#f0c890', eye: 10, mouth: 'awkward', eyebrow: 'normal', sweat: true },
+  };
+  const e = emotions[emotion] || emotions.normal;
+
+  const cx = w/2, cy = h*0.12;
+
+  // 그림자
+  ctx.fillStyle = 'rgba(0,0,0,0.2)';
+  ctx.beginPath(); ctx.ellipse(cx, h-8, 30, 8, 0, 0, Math.PI*2); ctx.fill();
+
+  // 다리
+  ctx.fillStyle = '#4a6a8a'; // 바지 (파란색 계열 - 90년대 아동)
+  ctx.fillRect(cx-18, h*0.65, 14, h*0.28);
+  ctx.fillRect(cx+4, h*0.65, 14, h*0.28);
+  // 신발
+  ctx.fillStyle = '#3a3028';
+  ctx.fillRect(cx-22, h*0.91, 20, 9);
+  ctx.fillRect(cx+2, h*0.91, 20, 9);
+
+  // 몸통
+  ctx.fillStyle = '#e87848'; // 주황 티셔츠 - 90년대 느낌
+  ctx.fillRect(cx-22, h*0.4, 44, h*0.28);
+  // 칼라
+  ctx.fillStyle = '#c86030';
+  ctx.beginPath(); ctx.moveTo(cx-8, h*0.4); ctx.lineTo(cx, h*0.43); ctx.lineTo(cx+8, h*0.4); ctx.fill();
+
+  // 팔
+  ctx.fillStyle = '#e87848';
+  // 왼팔
+  ctx.save();
+  ctx.translate(cx-22, h*0.43);
+  if (emotion === 'shocked') ctx.rotate(-0.6);
+  ctx.fillRect(-12, 0, 12, h*0.22);
+  ctx.restore();
+  // 오른팔
+  ctx.save();
+  ctx.translate(cx+22, h*0.43);
+  if (emotion === 'shocked') ctx.rotate(0.5);
+  if (emotion === 'scared') ctx.rotate(0.3);
+  ctx.fillRect(0, 0, 12, h*0.22);
+  ctx.restore();
+
+  // 손
+  ctx.fillStyle = e.face;
+  ctx.beginPath(); ctx.arc(cx-26, h*0.63, 9, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(cx+26, h*0.63, 9, 0, Math.PI*2); ctx.fill();
+
+  // 목
+  ctx.fillStyle = e.face;
+  ctx.fillRect(cx-8, h*0.32, 16, h*0.1);
+
+  // 머리
+  ctx.fillStyle = e.face;
+  ctx.beginPath();
+  ctx.ellipse(cx, cy + h*0.13, 28, 32, 0, 0, Math.PI*2);
+  ctx.fill();
+
+  // 머리카락 (짧은 까만 머리)
+  ctx.fillStyle = '#2a1a08';
+  ctx.beginPath();
+  ctx.ellipse(cx, cy + h*0.1, 28, 20, 0, Math.PI, Math.PI*2);
+  ctx.fill();
+  ctx.fillRect(cx-28, cy+h*0.1, 56, 12);
+  // 앞머리
+  ctx.beginPath();
+  ctx.moveTo(cx-20, cy+h*0.14);
+  ctx.quadraticCurveTo(cx-10, cy+h*0.08, cx, cy+h*0.12);
+  ctx.quadraticCurveTo(cx+10, cy+h*0.08, cx+20, cy+h*0.14);
+  ctx.fill();
+
+  // 귀
+  ctx.fillStyle = e.face;
+  ctx.beginPath(); ctx.arc(cx-27, cy+h*0.16, 10, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(cx+27, cy+h*0.16, 10, 0, Math.PI*2); ctx.fill();
+
+  // 눈썹
+  ctx.strokeStyle = '#2a1a08';
+  ctx.lineWidth = 2.5;
+  ctx.lineCap = 'round';
+  if (e.eyebrow === 'raised') {
+    ctx.beginPath(); ctx.moveTo(cx-18, cy+h*0.11); ctx.lineTo(cx-6, cy+h*0.085); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx+6, cy+h*0.085); ctx.lineTo(cx+18, cy+h*0.11); ctx.stroke();
+  } else if (e.eyebrow === 'worried') {
+    ctx.beginPath(); ctx.moveTo(cx-18, cy+h*0.09); ctx.lineTo(cx-6, cy+h*0.11); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx+6, cy+h*0.11); ctx.lineTo(cx+18, cy+h*0.09); ctx.stroke();
+  } else if (e.eyebrow === 'relaxed') {
+    ctx.beginPath(); ctx.moveTo(cx-16, cy+h*0.13); ctx.lineTo(cx-4, cy+h*0.13); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx+4, cy+h*0.13); ctx.lineTo(cx+16, cy+h*0.13); ctx.stroke();
+  } else {
+    ctx.beginPath(); ctx.moveTo(cx-16, cy+h*0.12); ctx.lineTo(cx-4, cy+h*0.11); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx+4, cy+h*0.11); ctx.lineTo(cx+16, cy+h*0.12); ctx.stroke();
+  }
+
+  // 눈
+  ctx.fillStyle = '#2a1a08';
+  const eyeH = e.eye;
+  if (e.mouth === 'neutral' && eyeH < 10) {
+    // 졸린 눈 (반쯤 감김)
+    ctx.beginPath(); ctx.ellipse(cx-11, cy+h*0.17, 8, eyeH*0.4, 0, 0, Math.PI); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(cx+11, cy+h*0.17, 8, eyeH*0.4, 0, 0, Math.PI); ctx.fill();
+  } else {
+    ctx.beginPath(); ctx.ellipse(cx-11, cy+h*0.17, 7, eyeH*0.55, 0, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(cx+11, cy+h*0.17, 7, eyeH*0.55, 0, 0, Math.PI*2); ctx.fill();
+    // 눈 하이라이트
+    ctx.fillStyle = 'white';
+    ctx.beginPath(); ctx.arc(cx-8, cy+h*0.155, 2.5, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(cx+14, cy+h*0.155, 2.5, 0, Math.PI*2); ctx.fill();
+  }
+
+  // 코
+  ctx.fillStyle = 'rgba(200,130,80,0.5)';
+  ctx.beginPath(); ctx.arc(cx, cy+h*0.2, 4, 0, Math.PI*2); ctx.fill();
+
+  // 입
+  ctx.strokeStyle = '#8a4828';
+  ctx.lineWidth = 2;
+  ctx.lineCap = 'round';
+  if (e.mouth === 'smile') {
+    ctx.beginPath(); ctx.arc(cx, cy+h*0.245, 9, 0.2, Math.PI-0.2); ctx.stroke();
+  } else if (e.mouth === 'open') {
+    ctx.fillStyle = '#3a1808';
+    ctx.beginPath(); ctx.ellipse(cx, cy+h*0.248, 9, 11, 0, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#c85050'; // 혀
+    ctx.beginPath(); ctx.ellipse(cx, cy+h*0.258, 6, 5, 0, 0, Math.PI*2); ctx.fill();
+  } else if (e.mouth === 'tremble') {
+    ctx.beginPath();
+    ctx.moveTo(cx-9, cy+h*0.245);
+    ctx.quadraticCurveTo(cx-4, cy+h*0.26, cx, cy+h*0.248);
+    ctx.quadraticCurveTo(cx+4, cy+h*0.235, cx+9, cy+h*0.245);
+    ctx.stroke();
+  } else if (e.mouth === 'awkward') {
+    ctx.beginPath();
+    ctx.moveTo(cx-8, cy+h*0.248);
+    ctx.quadraticCurveTo(cx-2, cy+h*0.258, cx+2, cy+h*0.248);
+    ctx.lineTo(cx+8, cy+h*0.24);
+    ctx.stroke();
+  } else {
+    ctx.beginPath(); ctx.moveTo(cx-8, cy+h*0.248); ctx.lineTo(cx+8, cy+h*0.248); ctx.stroke();
+  }
+
+  // 땀 (당황할 때)
+  if (e.sweat) {
+    ctx.fillStyle = 'rgba(100,180,255,0.8)';
+    ctx.beginPath(); ctx.moveTo(cx+24, cy+h*0.1); ctx.lineTo(cx+20, cy+h*0.14); ctx.quadraticCurveTo(cx+26, cy+h*0.18, cx+30, cy+h*0.13); ctx.closePath(); ctx.fill();
+  }
+}
+
+function drawCharLying(canvasId) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width, h = canvas.height;
+  ctx.clearRect(0, 0, w, h);
+  const cx = w*0.5, cy = h*0.45;
+
+  // 그림자
+  ctx.fillStyle = 'rgba(0,0,0,0.2)';
+  ctx.beginPath(); ctx.ellipse(cx, cy+32, 85, 14, 0, 0, Math.PI*2); ctx.fill();
+
+  // 몸통 (누운)
+  ctx.fillStyle = '#e87848';
+  ctx.beginPath(); ctx.roundRect(cx-70, cy, 140, 30, 8); ctx.fill();
+
+  // 다리
+  ctx.fillStyle = '#4a6a8a';
+  ctx.beginPath(); ctx.roundRect(cx+20, cy+2, 60, 26, 6); ctx.fill();
+  // 신발
+  ctx.fillStyle = '#3a3028';
+  ctx.beginPath(); ctx.ellipse(cx+84, cy+16, 14, 10, 0.2, 0, Math.PI*2); ctx.fill();
+
+  // 팔 (배 위에 올려둔)
+  ctx.fillStyle = '#e87848';
+  ctx.beginPath(); ctx.roundRect(cx-60, cy-8, 30, 20, 4); ctx.fill();
+  ctx.beginPath(); ctx.roundRect(cx-20, cy-10, 30, 20, 4); ctx.fill();
+
+  // 머리
+  ctx.fillStyle = '#f5d5a8';
+  ctx.beginPath(); ctx.ellipse(cx-72, cy+14, 22, 20, 0, 0, Math.PI*2); ctx.fill();
+  // 머리카락
+  ctx.fillStyle = '#2a1a08';
+  ctx.beginPath(); ctx.ellipse(cx-72, cy+6, 22, 14, 0, Math.PI, Math.PI*2); ctx.fill();
+  ctx.fillRect(cx-94, cy+5, 44, 10);
+
+  // 귀
+  ctx.fillStyle = '#f5d5a8';
+  ctx.beginPath(); ctx.arc(cx-72, cy+24, 9, 0, Math.PI*2); ctx.fill();
+
+  // 졸린 눈 (반쯤 감김)
+  ctx.fillStyle = '#2a1a08';
+  ctx.beginPath(); ctx.ellipse(cx-80, cy+12, 6, 3, 0.1, 0, Math.PI); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(cx-64, cy+12, 6, 3, -0.1, 0, Math.PI); ctx.fill();
+
+  // 졸음 Z Z
+  ctx.font = 'bold 14px serif';
+  ctx.fillStyle = 'rgba(240,234,216,0.5)';
+  ctx.fillText('z', cx-85, cy-8);
+  ctx.font = 'bold 10px serif';
+  ctx.fillStyle = 'rgba(240,234,216,0.3)';
+  ctx.fillText('z', cx-96, cy-20);
+  ctx.fillText('z', cx-80, cy-32);
+}
+
+
+// ═══════════════════════════════════════════
+//  대화 시스템
+// ═══════════════════════════════════════════
+let typewriterTimer = null;
+let isTyping = false;
+
+function showDialog(name, text, callback) {
+  const box = document.getElementById('dialog-box');
+  const nameEl = document.getElementById('dialog-name');
+  const textEl = document.getElementById('dialog-text');
+  box.style.display = 'block';
+  nameEl.textContent = name || '';
+  textEl.innerHTML = '';
+  isTyping = true;
+
+  if (typewriterTimer) clearInterval(typewriterTimer);
+  let i = 0;
+  typewriterTimer = setInterval(() => {
+    if (i < text.length) {
+      textEl.innerHTML = text.slice(0, i+1) + '<span class="dialog-cursor"></span>';
+      i++;
+    } else {
+      textEl.innerHTML = text + '<span class="dialog-cursor"></span>';
+      clearInterval(typewriterTimer);
+      isTyping = false;
+      state.dialogCallback = callback || null;
+    }
+  }, 45);
+
+  // 클릭으로 빠르게 완성
+  box.onclick = () => {
+    if (isTyping) {
+      clearInterval(typewriterTimer);
+      textEl.innerHTML = text + '<span class="dialog-cursor"></span>';
+      isTyping = false;
+      state.dialogCallback = callback || null;
+    }
+  };
+}
+
+function nextDialog() {
+  if (isTyping) {
+    // 타이핑 중이면 즉시 완성
+    if (typewriterTimer) clearInterval(typewriterTimer);
+    const textEl = document.getElementById('dialog-text');
+    const currentText = textEl.textContent.replace('|', '');
+    isTyping = false;
+    return;
+  }
+  if (state.dialogCallback) {
+    const cb = state.dialogCallback;
+    state.dialogCallback = null;
+    cb();
+  }
+}
+
+function hideDialog() {
+  document.getElementById('dialog-box').style.display = 'none';
+  if (typewriterTimer) clearInterval(typewriterTimer);
+  isTyping = false;
+  state.dialogCallback = null;
+}
+
+function showChoices(options) {
+  const choicesEl = document.getElementById('choices');
+  choicesEl.innerHTML = '';
+  choicesEl.style.display = 'flex';
+  hideDialog();
+  options.forEach(opt => {
+    const btn = document.createElement('button');
+    btn.className = 'choice-btn';
+    btn.textContent = opt.text;
+    btn.onclick = () => {
+      choicesEl.style.display = 'none';
+      opt.action();
+    };
+    choicesEl.appendChild(btn);
+  });
+}
+
+function hideChoices() {
+  document.getElementById('choices').style.display = 'none';
+}
+
+// ═══════════════════════════════════════════
+//  씬 전환
+// ═══════════════════════════════════════════
+function goToScene(sceneId, callback) {
+  const overlay = document.getElementById('transition-overlay');
+  overlay.classList.add('fade-in');
+  setTimeout(() => {
+    document.querySelectorAll('.scene').forEach(s => s.classList.remove('active'));
+    document.getElementById(sceneId).classList.add('active');
+    state.currentScene = sceneId;
+    hideDialog();
+    hideChoices();
+    setTimeout(() => {
+      overlay.classList.remove('fade-in');
+      if (callback) callback();
+    }, 300);
+  }, 500);
+}
+
+// ═══════════════════════════════════════════
+//  게임 시작
+// ═══════════════════════════════════════════
+function startGame() {
+  goToScene('scene-playground', () => {
+    drawPlaygroundBg();
+    drawCharStanding('char-canvas', 'sleepy');
+    setTimeout(() => {
+      showDialog('', '오늘도 피아노 학원 가는 날이었다.', () => {
+        showDialog('', '학원은 3시 30분. 아직 두 시간이나 남았다.', () => {
+          showDialog('주인공', '...놀이터나 가야겠다.', () => {
+            showDialog('', '무엇을 할까?', null);
+          });
+        });
+      });
+    }, 600);
+  });
+}
+
+// ═══════════════════════════════════════════
+//  오브젝트 클릭 핸들러
+// ═══════════════════════════════════════════
+function clickObject(id) {
+  if (state.currentScene !== 'scene-playground') return;
+  hideChoices();
+
+  if (id === 'junglegym') {
+    drawCharStanding('char-canvas', 'normal');
+    showDialog('주인공', '정글짐이다. 혼자 놀기엔 너무 높다.', null);
+  }
+  else if (id === 'slide') {
+    drawCharStanding('char-canvas', 'normal');
+    showDialog('주인공', '미끄럼틀. 근데 혼자 타면 어딘가 허전한 거 있잖아.', null);
+  }
+  else if (id === 'sandbox') {
+    drawCharStanding('char-canvas', 'normal');
+    showDialog('주인공', '모래밭. 개미 집이나 있겠지. ...그냥 지나치자.', null);
+  }
+  else if (id === 'seesaw') {
+    if (!state.seesawClicked) {
+      state.seesawClicked = true;
+      drawCharStanding('char-canvas', 'sleepy');
+      showDialog('주인공', '시소다. 혼자서는 탈 수도 없고.', () => {
+        showDialog('주인공', '...근데 그냥 여기 누우면 어떨까.', () => {
+          showChoices([
+            { text: '누워본다.', action: chooseLieDown },
+            { text: '그냥 앉아있는다.', action: chooseSit },
+            { text: '집에 간다.', action: chooseGoHome },
+          ]);
+        });
+      });
+    } else {
+      showDialog('', '이미 누워버렸다...', null);
+    }
+  }
+}
+
+function chooseSit() {
+  drawCharStanding('char-canvas', 'sleepy');
+  showDialog('주인공', '앉아있으니 더 졸리다. 그냥 누울까...', () => {
+    showChoices([
+      { text: '역시 눕는다.', action: chooseLieDown },
+      { text: '아니, 버틴다.', action: () => {
+        showDialog('주인공', '...3분 뒤 나는 누워있었다.', chooseLieDown);
+      }},
+    ]);
+  });
+}
+
+function chooseGoHome() {
+  showDialog('주인공', '집에 가서 뭐 해. 피아노 연습해야 한다고 엄마가 기다리잖아.', () => {
+    showChoices([
+      { text: '역시 시소에 눕는다.', action: chooseLieDown },
+    ]);
+  });
+}
+
+function chooseLieDown() {
+  hideChoices();
+  drawCharLying('char-canvas');
+  showDialog('주인공', '...시소 판자가 생각보다 따뜻했다.', () => {
+    showDialog('주인공', '하늘이 참 파랗다.', () => {
+      goToScene('scene-sky', () => {
+        drawSkyBg();
+        drawCharLying('char-lying-canvas');
+        setTimeout(() => {
+          showDialog('', '시소에 누워서 하늘을 봤다.', () => {
+            showDialog('주인공', '아파트 위로 구름이 흘러가고 있었다.', () => {
+              showDialog('주인공', '피아노 학원... 빠지면 안 되는데.', () => {
+                showDialog('', '그때였다.', () => {
+                  // UFO 등장 강조
+                  const ufoEl = document.getElementById('ufo-element');
+                  ufoEl.style.animation = 'none';
+                  ufoEl.style.filter = 'drop-shadow(0 0 30px rgba(127,212,248,0.9))';
+                  state.ufoPhase = 1;
+                  showDialog('', '저... 저게 뭐지?', () => {
+                    showDialog('주인공', '...UFO다!!', () => {
+                      drawCharStanding('char-lying-canvas', 'shocked');
+                      drawCharLying('char-lying-canvas'); // 다시 눕힌 상태로
+                      document.getElementById('char-lying-canvas').style.filter = 'drop-shadow(0 0 8px rgba(255,200,100,0.4))';
+                      showDialog('', 'UFO를 클릭해보세요.', null);
+                    });
+                  });
+                });
+              });
+            });
+          });
+        }, 600);
+      });
+    });
+  });
+}
+
+function clickUFO() {
+  if (state.ufoPhase !== 1) return;
+  state.ufoPhase = 2;
+  state.ufoClicked = true;
+
+  // 엔딩 분기: 엔딩1을 이미 봤으면 엔딩2 (UFO→비행기)
+  if (state.endingOneVisited) {
+    // 엔딩2: UFO가 비행기로 바뀜
+    ufoToBiplane();
+  } else {
+    // 엔딩1: UFO가 아파트 뒤로 사라짐
+    ufoDisappear();
+  }
+}
+
+function ufoDisappear() {
+  const ufoEl = document.getElementById('ufo-element');
+  hideDialog();
+  // UFO가 아파트 뒤로 날아감
+  ufoEl.style.transition = 'all 1.8s cubic-bezier(0.4, 0, 0.2, 1)';
+  ufoEl.style.transform = 'translate(30vw, 20vh) scale(0.3)';
+  ufoEl.style.opacity = '0';
+
+  drawCharStanding('char-lying-canvas', 'shocked');
+  drawCharLying('char-lying-canvas');
+
+  showDialog('주인공', '아파트 뒤로... 사라졌어.', () => {
+    showDialog('주인공', '나만 본 거야? 아무도 없는데.', () => {
+      showDialog('주인공', '...집에 가야겠다.', () => {
+        // 엘리베이터 씬으로
+        goToScene('scene-elevator', () => {
+          drawElevatorBg();
+          drawCharStanding('char-elevator-canvas', 'scared');
+          setTimeout(() => {
+            showDialog('', '우리 집은 5층이었다.', () => {
+              showDialog('나레이션', '엘리베이터를 누르면 외계인이 날 기다리다 잡아갈 것 같았다.', () => {
+                showDialog('나레이션', '계단으로 가도 외계인이 날 기다릴 것만 같았다.', () => {
+                  showDialog('나레이션', '어른이 올 때까지 기다렸다 엘리베이터를 타고 5층에 내렸다.', () => {
+                    goToScene('scene-door', () => {
+                      drawDoorBg();
+                      setTimeout(() => {
+                        showDialog('', '502호. 우리 집이다.', () => {
+                          showDialog('나레이션', '근데 막상 문 앞에 서니까...', () => {
+                            hideDialog();
+                            // 문 클릭 안내
+                            document.getElementById('obj-door').querySelector('.clickable-label').textContent = '현관문 열기 ▶';
+                          });
+                        });
+                      }, 500);
+                    });
+                  });
+                });
+              });
+            });
+          }, 600);
+        });
+      });
+    });
+  });
+}
+
+function clickElevatorBtn() {
+  // 엘리베이터 버튼은 클릭 안 해도 됨 (자동 진행)
+}
+
+function clickDoor() {
+  if (state.currentScene !== 'scene-door') return;
+  showDialog('주인공', '우리 집에 이미 외계인이 들어와있으면 어떡하지?', () => {
+    showDialog('', '...', () => {
+      showDialog('', '...문을 열지 못하고 5분을 서 있었다.', () => {
+        state.endingOneVisited = true;
+        goToGameOver(1);
+      });
+    });
+  });
+}
+
+function ufoToBiplane() {
+  const ufoEl = document.getElementById('ufo-element');
+  hideDialog();
+
+  // 페이드 아웃 후 비행기로 교체
+  ufoEl.style.transition = 'opacity 0.8s';
+  ufoEl.style.opacity = '0';
+
+  setTimeout(() => {
+    // SVG를 비행기로 교체
+    ufoEl.innerHTML = `
+    <svg width="120" height="60" viewBox="0 0 160 60" xmlns="http://www.w3.org/2000/svg">
+      <!-- 비행기 몸통 -->
+      <ellipse cx="80" cy="32" rx="55" ry="10" fill="#d4c8a8"/>
+      <!-- 기수 -->
+      <path d="M135,32 Q155,32 155,32 L135,24 Z" fill="#c0b498"/>
+      <!-- 날개 -->
+      <path d="M75,32 L40,15 L60,32 Z" fill="#b8ac90"/>
+      <path d="M75,32 L40,49 L60,32 Z" fill="#a8a080"/>
+      <!-- 수직 꼬리날개 -->
+      <path d="M30,32 L25,18 L38,32 Z" fill="#c0b498"/>
+      <!-- 수평 꼬리날개 -->
+      <path d="M30,32 L10,26 L30,32 Z" fill="#b8ac90"/>
+      <path d="M30,32 L10,38 L30,32 Z" fill="#a8a080"/>
+      <!-- 창문 -->
+      <circle cx="95" cy="29" r="5" fill="rgba(180,220,255,0.6)"/>
+      <circle cx="108" cy="29" r="5" fill="rgba(180,220,255,0.6)"/>
+      <!-- 연기 -->
+      <circle cx="148" cy="30" r="6" fill="rgba(220,220,220,0.5)"/>
+      <circle cx="155" cy="28" r="4" fill="rgba(220,220,220,0.4)"/>
+    </svg>`;
+
+    ufoEl.style.opacity = '0';
+    ufoEl.style.transition = 'opacity 0.8s, transform 2.5s ease-in-out';
+    setTimeout(() => {
+      ufoEl.style.opacity = '1';
+    }, 100);
+
+    drawCharStanding('char-lying-canvas', 'awkward');
+    drawCharLying('char-lying-canvas');
+
+    showDialog('주인공', '...아.', () => {
+      showDialog('주인공', '비행기였네.', () => {
+        showDialog('주인공', '멋쩍다...', () => {
+          // 비행기가 날아가며
+          ufoEl.style.transform = 'translate(-60vw, -5vh) scale(0.6)';
+          setTimeout(() => {
+            goToGameOver(2);
+          }, 2000);
+        });
+      });
+    });
+  }, 800);
+}
+
+function goToGameOver(ending) {
+  goToScene('scene-gameover', () => {
+    if (ending === 1) {
+      document.getElementById('go-title').textContent = 'ENDING 1';
+      document.getElementById('go-subtitle').textContent = '어렸을 적 기억.';
+    } else {
+      document.getElementById('go-title').textContent = 'ENDING 2';
+      document.getElementById('go-subtitle').textContent = '이곳엔 공항이 없어.';
+    }
+  });
+}
+
+function retryGame() {
+  // 상태 리셋
+  const wasEnding1 = state.endingOneVisited;
+  Object.assign(state, {
+    currentScene: 'title',
+    dialogQueue: [],
+    dialogIdx: 0,
+    dialogCallback: null,
+    ufoPhase: 0,
+    seesawClicked: false,
+    ufoClicked: false,
+    endingOneVisited: wasEnding1, // 엔딩1 경험 여부는 유지
+  });
+  // UFO 원위치
+  const ufoEl = document.getElementById('ufo-element');
+  ufoEl.style.transition = 'none';
+  ufoEl.style.transform = '';
+  ufoEl.style.opacity = '1';
+  ufoEl.style.filter = '';
+  ufoEl.innerHTML = `<svg class="ufo-svg" viewBox="0 0 160 90" xmlns="http://www.w3.org/2000/svg">
+    <ellipse cx="80" cy="55" rx="55" ry="14" fill="#8ab4cc" opacity="0.9"/>
+    <ellipse cx="80" cy="55" rx="40" ry="10" fill="#b8d4e8"/>
+    <ellipse cx="80" cy="46" rx="28" ry="18" fill="#c8e4f4" opacity="0.85"/>
+    <ellipse cx="80" cy="44" rx="20" ry="14" fill="#dff0fa" opacity="0.7"/>
+    <ellipse cx="72" cy="40" rx="8" ry="6" fill="white" opacity="0.4"/>
+    <ellipse cx="80" cy="70" rx="30" ry="6" fill="#7fd4f8" opacity="0.25"/>
+    <polygon points="60,69 100,69 115,85 45,85" fill="rgba(127,212,248,0.15)"/>
+    <circle cx="55" cy="56" r="4" fill="#ff6b6b" opacity="0.9"><animate attributeName="opacity" values="0.9;0.2;0.9" dur="1.2s" repeatCount="indefinite"/></circle>
+    <circle cx="80" cy="60" r="4" fill="#ffd93d" opacity="0.9"><animate attributeName="opacity" values="0.2;0.9;0.2" dur="1.2s" repeatCount="indefinite"/></circle>
+    <circle cx="105" cy="56" r="4" fill="#6bcb77" opacity="0.9"><animate attributeName="opacity" values="0.9;0.2;0.9" dur="0.8s" repeatCount="indefinite"/></circle>
+  </svg>`;
+
+  goToScene('scene-playground', () => {
+    drawPlaygroundBg();
+    drawCharStanding('char-canvas', 'sleepy');
+    setTimeout(() => {
+      showDialog('', '다시, 그날 오후.', () => {
+        showDialog('', '무엇을 할까?', null);
+        state.seesawClicked = false;
+      });
+    }, 600);
+  });
+}
+
+// 키보드 입력 (엔터/스페이스로 다음)
+window.addEventListener('keydown', e => {
+  if (e.code === 'Space' || e.code === 'Enter') {
+    e.preventDefault();
+    nextDialog();
+  }
+});
+
+// 창 리사이즈
+window.addEventListener('resize', () => {
+  resizeNoise();
+  if (state.currentScene === 'scene-playground') drawPlaygroundBg();
+  else if (state.currentScene === 'scene-sky') drawSkyBg();
+  else if (state.currentScene === 'scene-elevator') drawElevatorBg();
+  else if (state.currentScene === 'scene-door') drawDoorBg();
+});
+
+</script>
+</body>
+</html>
