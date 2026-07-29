@@ -421,7 +421,7 @@ body {
 <div id="transition-overlay"></div>
 
 <!-- 대화창 (공통) -->
-<div id="dialog-box" style="display:none;">
+<div id="dialog-box" style="display:none;" onclick="nextDialog()">
   <div class="dialog-inner">
     <div class="dialog-name" id="dialog-name"></div>
     <div class="dialog-text" id="dialog-text"><span class="dialog-cursor"></span></div>
@@ -1210,6 +1210,7 @@ function showDialog(name, text, callback) {
   nameEl.textContent = name || '';
   textEl.innerHTML = '';
   isTyping = true;
+  state.dialogCallback = null;
 
   if (typewriterTimer) clearInterval(typewriterTimer);
   let i = 0;
@@ -1224,16 +1225,6 @@ function showDialog(name, text, callback) {
       state.dialogCallback = callback || null;
     }
   }, 45);
-
-  // 클릭으로 빠르게 완성
-  box.onclick = () => {
-    if (isTyping) {
-      clearInterval(typewriterTimer);
-      textEl.innerHTML = text + '<span class="dialog-cursor"></span>';
-      isTyping = false;
-      state.dialogCallback = callback || null;
-    }
-  };
 }
 
 function nextDialog() {
@@ -1241,7 +1232,8 @@ function nextDialog() {
     // 타이핑 중이면 즉시 완성
     if (typewriterTimer) clearInterval(typewriterTimer);
     const textEl = document.getElementById('dialog-text');
-    const currentText = textEl.textContent.replace('|', '');
+    const fullText = textEl.textContent.replace(/[▌]/g, '');
+    textEl.innerHTML = fullText + '<span class="dialog-cursor"></span>';
     isTyping = false;
     return;
   }
@@ -1262,8 +1254,6 @@ function hideDialog() {
 function showChoices(options) {
   const choicesEl = document.getElementById('choices');
   choicesEl.innerHTML = '';
-  choicesEl.style.display = 'flex';
-  hideDialog();
   options.forEach(opt => {
     const btn = document.createElement('button');
     btn.className = 'choice-btn';
@@ -1274,6 +1264,9 @@ function showChoices(options) {
     };
     choicesEl.appendChild(btn);
   });
+  choicesEl.style.display = 'flex';
+  hideDialog();
+}
 }
 
 function hideChoices() {
