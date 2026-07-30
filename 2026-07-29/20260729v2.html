@@ -169,15 +169,22 @@ function drawChar(imgName, x, y, w, alpha) {
 function drawUFOSwarm() {
   const img = IMGS['ufo'];
   if (!img) return;
-  const uw = W * 0.08; // 작은 UFO들
+  const uw = W * 0.06;
   const uh = img.height * (uw / img.width);
+  // offscreen 캐시 — 처음 한 번만 렌더
+  if (!drawUFOSwarm._cache || drawUFOSwarm._cacheW !== uw) {
+    const oc = document.createElement('canvas');
+    oc.width = Math.ceil(uw); oc.height = Math.ceil(uh);
+    oc.getContext('2d').drawImage(img, 0, 0, oc.width, oc.height);
+    drawUFOSwarm._cache = oc;
+    drawUFOSwarm._cacheW = uw;
+  }
+  const cached = drawUFOSwarm._cache;
   state.ufoSwarm.forEach(u => {
-    ctx.save();
     ctx.globalAlpha = u.alpha;
-    ctx.filter = 'drop-shadow(0 0 8px rgba(127,212,248,0.8))';
-    ctx.drawImage(img, u.x * W, u.y * H, uw, uh);
-    ctx.restore();
+    ctx.drawImage(cached, u.x * W, u.y * H);
   });
+  ctx.globalAlpha = 1;
 }
 
 
@@ -930,7 +937,7 @@ function chooseLieDownEnding3() {
       setTimeout(() =>
         showDialog('', '...오늘도 하늘은 파랗다.', () =>
           showDialog('주인공', '그런데.', () => {
-            // UFO 50개 등장
+            // "저게 뭐야" 대사와 동시에 UFO 떼 등장
             startUFOSwarm();
             showDialog('주인공', '저게 뭐야...', () =>
               showDialog('주인공', '저게 뭐야!! 저게 뭐야!!!', () => {
@@ -952,20 +959,19 @@ function chooseLieDownEnding3() {
 
 function startUFOSwarm() {
   state.ufoSwarm = [];
-  // UFO 50개 생성 — 각자 다른 y높이, 속도, 딜레이로 좌→우 무한 루프
-  for (let i = 0; i < 50; i++) {
+  for (let i = 0; i < 20; i++) {
     state.ufoSwarm.push({
-      x: -0.1 - Math.random() * 1.5,  // 시작 위치 (화면 밖)
-      y: 0.02 + Math.random() * 0.55,  // y 높이
-      speed: 0.0008 + Math.random() * 0.0012, // 속도
-      alpha: 0.7 + Math.random() * 0.3,
+      x: -0.05 - Math.random() * 1.2,
+      y: 0.02 + Math.random() * 0.50,
+      speed: 0.004 + Math.random() * 0.004, // 빠른 속도
+      alpha: 0.85 + Math.random() * 0.15,
     });
   }
   function animSwarm() {
     if (state.ufoSwarm.length === 0) return;
     state.ufoSwarm.forEach(u => {
       u.x += u.speed;
-      if (u.x > 1.1) u.x = -0.1 - Math.random() * 0.3; // 다시 좌측으로
+      if (u.x > 1.05) u.x = -0.05 - Math.random() * 0.2;
     });
     requestAnimationFrame(animSwarm);
   }
@@ -1006,7 +1012,7 @@ function chooseLieDown() {
                   function moveUFO(now) {
                     const t = Math.min((now - ufoStartTime) / UFO_DURATION, 1);
                     state.ufoX = -0.2 + (ufoTarget + 0.2) * t;
-                    if (t < 1 && state.ufoPhase < 2) {
+                    if (t < 1) {
                       requestAnimationFrame(moveUFO);
                     } else {
                       // 이동 완료 — 목적지에 고정
@@ -1103,25 +1109,47 @@ function clickDoor() {
 
 function ufoToBiplane() {
   hideDialog();
-  // UFO 페이드아웃 후 비행기로 교체 (UFO를 그냥 숨기고 텍스트로 처리)
+  // 1단계: UFO 페이드아웃 + 비행기 페이드인 동시 진행 (크로스페이드)
+  state.biplaneVisible = true;
+  state.biplaneAlpha = 0;
   const start = performance.now();
-  function fadeOut(now) {
-    state.ufoAlpha = Math.max(0, 1 - (now - start)/800);
-    if (state.ufoAlpha > 0) requestAnimationFrame(fadeOut);
-    else {
+  const FADE_DURATION = 1200;
+
+  function crossfade(now) {
+    const t = Math.min((now - start) / FADE_DURATION, 1);
+    state.ufoAlpha = 1 - t;
+    state.biplaneAlpha = t;
+    if (t < 1) {
+      requestAnimationFrame(crossfade);
+    } else {
+      // 크로스페이드 완료
       state.ufoVisible = false;
+      state.ufoAlpha = 1; // 나중 재사용을 위해 리셋
       state.charEmotion = 'awkward';
       showDialog('주인공', '...아.', () =>
         showDialog('주인공', '비행기였네.', () =>
           showDialog('주인공', '멋쩍다...', () => {
             state.endingTwoVisited = true;
-            setTimeout(() => goToGameOver(2), 1500);
+            // 비행기 날아가기
+            const flyStart = performance.now();
+            function flyAway(now2) {
+              const ft = Math.min((now2 - flyStart) / 1500, 1);
+              state.ufoX = 0.62 + ft * 0.6;  // 우측으로
+              state.ufoY = 0.08 + ft * 0.5;  // 하단으로
+              state.biplaneAlpha = 1 - ft;
+              if (ft < 1) requestAnimationFrame(flyAway);
+              else {
+                state.biplaneVisible = false;
+                setTimeout(() => goToGameOver(2), 300);
+              }
+            }
+            requestAnimationFrame(flyAway);
           })
         )
       );
     }
   }
-  requestAnimationFrame(fadeOut);
+  requestAnimationFrame(crossfade);
 }
 
 function goToGameOver(ending) {
@@ -1233,6 +1261,7 @@ function retryGame() {
     endingOneVisited: fullyReset ? false : wasEnding1,
     endingTwoVisited: fullyReset ? false : wasEnding2,
     ufoSwarm: [], flashAlpha: 0,
+    biplaneVisible: false, biplaneAlpha: 0,
   });
   goToScene('playground', () => {
     state.seesawClicked = false;
