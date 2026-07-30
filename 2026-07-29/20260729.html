@@ -369,22 +369,111 @@ body {
   z-index:3;
 }
 
-/* ── CRT 효과 ── */
-#crt-scanlines {
-  position:fixed; inset:0;
-  pointer-events:none; z-index:1001;
-  background:repeating-linear-gradient(
-    to bottom,
-    transparent 0px, transparent 3px,
-    rgba(0,0,0,0.15) 3px, rgba(0,0,0,0.15) 4px
-  );
+/* ── CRT 효과 (aleclownes.com 원작 기반) ── */
+
+/* 640×480 저해상도 느낌 — 게임 뷰포트 */
+#crt-viewport {
+  position:fixed;
+  inset:0;
+  pointer-events:none;
+  z-index:1005;
+  /* 실제 렌더를 blurry하게 만들어 저해상도 CRT 인상 */
+  filter:blur(0.45px) contrast(1.08) brightness(0.97);
+  /* 미세한 RGB 색수차 */
+  mix-blend-mode:normal;
 }
+
+/* 스캔라인 + RGB 서브픽셀 — 검증된 CSS */
+#crt-viewport::before {
+  content:" ";
+  display:block;
+  position:fixed;
+  top:0; left:0; bottom:0; right:0;
+  background:
+    linear-gradient(rgba(18,16,16,0) 50%, rgba(0,0,0,0.22) 50%),
+    linear-gradient(90deg, rgba(255,0,0,0.03), rgba(0,255,0,0.01), rgba(0,0,255,0.03));
+  background-size:100% 3px, 4px 100%;
+  pointer-events:none;
+  z-index:2;
+}
+
+/* 화면 깜빡임 — 아주 약하게 */
+#crt-viewport::after {
+  content:" ";
+  display:block;
+  position:fixed;
+  top:0; left:0; bottom:0; right:0;
+  background:rgba(18,16,16,0.06);
+  opacity:0;
+  pointer-events:none;
+  z-index:2;
+  animation:crt-flicker 0.12s infinite;
+}
+
+@keyframes crt-flicker {
+  0%   { opacity:0.08; }
+  5%   { opacity:0.04; }
+  10%  { opacity:0.12; }
+  15%  { opacity:0.02; }
+  20%  { opacity:0.06; }
+  25%  { opacity:0.10; }
+  30%  { opacity:0.03; }
+  35%  { opacity:0.09; }
+  40%  { opacity:0.05; }
+  45%  { opacity:0.11; }
+  50%  { opacity:0.01; }
+  55%  { opacity:0.07; }
+  60%  { opacity:0.13; }
+  65%  { opacity:0.04; }
+  70%  { opacity:0.08; }
+  75%  { opacity:0.02; }
+  80%  { opacity:0.10; }
+  85%  { opacity:0.06; }
+  90%  { opacity:0.03; }
+  95%  { opacity:0.09; }
+  100% { opacity:0.07; }
+}
+
+/* rolling sweep — 위→아래로 훑는 밝은 띠 */
+#crt-sweep {
+  position:fixed;
+  inset:0;
+  pointer-events:none;
+  z-index:1006;
+  overflow:hidden;
+}
+#crt-sweep::after {
+  content:" ";
+  position:absolute;
+  left:0; right:0;
+  height:80px;
+  background:linear-gradient(
+    to bottom,
+    transparent 0%,
+    rgba(255,255,255,0.04) 30%,
+    rgba(255,255,255,0.07) 50%,
+    rgba(255,255,255,0.04) 70%,
+    transparent 100%
+  );
+  animation:crt-sweep 5s linear infinite;
+  top:-80px;
+}
+
+@keyframes crt-sweep {
+  0%   { top:-80px; }
+  100% { top:calc(100vh + 80px); }
+}
+
+/* CRT 화면 굴곡 비네팅 */
 #crt-bend {
   position:fixed; inset:0;
-  pointer-events:none; z-index:1002;
-  background:radial-gradient(ellipse 110% 110% at 50% 50%, transparent 55%, rgba(0,0,0,0.65) 100%);
+  pointer-events:none; z-index:1007;
+  background:radial-gradient(ellipse 100% 100% at 50% 50%, transparent 60%, rgba(0,0,0,0.55) 100%);
 }
-#crt-glitch { position:fixed; inset:0; pointer-events:none; z-index:1003; }
+
+/* 기존 레이어 정리 */
+#crt-scanlines { display:none; }
+#crt-glitch { display:none; }
 
 /* 오프닝 텍스트 */
 #opening-overlay {
@@ -539,11 +628,10 @@ body {
 
 <canvas id="noise-canvas"></canvas>
 <div id="vignette"></div>
-<div id="scanlines"></div>
 <!-- CRT 효과 레이어 -->
-<div id="crt-scanlines"></div>
+<div id="crt-viewport"></div>
+<div id="crt-sweep"></div>
 <div id="crt-bend"></div>
-<canvas id="crt-glitch"></canvas>
 <div class="date-stamp">1999.06 — 서울</div>
 
 <!-- 전환 오버레이 -->
@@ -738,74 +826,7 @@ function drawNoise() {
 }
 drawNoise();
 
-// ═══════════════════════════════════════════
-//  CRT sweep 효과 — 밝은 띠가 위→아래로 훑음
-// ═══════════════════════════════════════════
-const glitchCanvas = document.getElementById('crt-glitch');
-const gCtx = glitchCanvas.getContext('2d');
-
-function resizeGlitch() {
-  glitchCanvas.width = window.innerWidth;
-  glitchCanvas.height = window.innerHeight;
-}
-resizeGlitch();
-window.addEventListener('resize', resizeGlitch);
-
-// sweep 상태
-const sweep = {
-  active: false,
-  y: -80,          // 현재 띠 위치
-  speed: 1.8,      // px/frame
-  bandH: 80,       // 띠 높이
-  alpha: 0.06,     // 최대 밝기
-};
-
-function scheduleSweep() {
-  // 3~6초마다 한 번 실행
-  const delay = 3000 + Math.random() * 3000;
-  setTimeout(() => {
-    sweep.active = true;
-    sweep.y = -sweep.bandH;
-    scheduleSweep();
-  }, delay);
-}
-
-function drawSweep() {
-  const w = glitchCanvas.width;
-  const h = glitchCanvas.height;
-  gCtx.clearRect(0, 0, w, h);
-
-  if (sweep.active) {
-    sweep.y += sweep.speed;
-
-    // 부드러운 그라데이션 띠 (위아래로 페이드)
-    const grad = gCtx.createLinearGradient(0, sweep.y, 0, sweep.y + sweep.bandH);
-    grad.addColorStop(0,   'rgba(255,255,255,0)');
-    grad.addColorStop(0.2, `rgba(255,255,255,${sweep.alpha})`);
-    grad.addColorStop(0.5, `rgba(255,255,240,${sweep.alpha * 1.4})`);
-    grad.addColorStop(0.8, `rgba(255,255,255,${sweep.alpha})`);
-    grad.addColorStop(1,   'rgba(255,255,255,0)');
-
-    gCtx.fillStyle = grad;
-    gCtx.fillRect(0, sweep.y, w, sweep.bandH);
-
-    // 띠 중앙에 얇은 밝은 선 하나 추가
-    gCtx.fillStyle = `rgba(255,255,255,${sweep.alpha * 0.8})`;
-    gCtx.fillRect(0, sweep.y + sweep.bandH * 0.45, w, 1);
-
-    // 화면 아래를 벗어나면 종료
-    if (sweep.y > h + sweep.bandH) {
-      sweep.active = false;
-      gCtx.clearRect(0, 0, w, h);
-    }
-  }
-
-  requestAnimationFrame(drawSweep);
-}
-
-scheduleSweep();
-drawSweep();
-
+// CRT sweep은 CSS animation으로 처리됨
 
 //  캐릭터 표정 교체
 // ═══════════════════════════════════════════
