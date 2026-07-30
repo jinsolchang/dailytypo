@@ -1,0 +1,1200 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>그날 오후 — 피아노 학원 가기 싫은 날</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#000;overflow:hidden;width:100vw;height:100vh;cursor:default;}
+#game{display:block;position:fixed;top:0;left:0;}
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<script>
+
+// ═══════════════════════════════════════════
+//  CANVAS SETUP
+// ═══════════════════════════════════════════
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d', { willReadFrequently: true });
+let W = window.innerWidth, H = window.innerHeight;
+
+function resize() {
+  W = window.innerWidth; H = window.innerHeight;
+  canvas.width = W; canvas.height = H;
+}
+resize();
+window.addEventListener('resize', resize);
+
+// ═══════════════════════════════════════════
+//  이미지 로더
+// ═══════════════════════════════════════════
+const IMGS = {};
+const IMG_LIST = [
+  'title_bg','playground','sky','elevator','door',
+  'char_normal','char_shocked','char_scared','char_awkward','char_lying','ufo'
+];
+
+function loadImages() {
+  return Promise.all(IMG_LIST.map(name =>
+    new Promise(res => {
+      const img = new Image();
+      img.onload = () => { IMGS[name] = img; res(); };
+      img.onerror = () => { IMGS[name] = null; res(); };
+      img.src = `./${name}.png`;
+    })
+  ));
+}
+
+// 폰트 로드
+const FONT_SERIF = "'Noto Serif KR', serif";
+const FONT_SANS  = "'Noto Sans KR', sans-serif";
+
+// ═══════════════════════════════════════════
+//  게임 상태
+// ═══════════════════════════════════════════
+const state = {
+  scene: 'loading',       // loading | title | playground | sky | elevator | door | gameover
+  endingOneVisited: false,
+  seesawClicked: false,
+  ufoPhase: 0,            // 0:없음 1:클릭가능 2:클릭됨
+  charEmotion: 'normal',  // normal|sleepy|shocked|scared|awkward
+  ufoVisible: true,
+  ufoX: 0, ufoY: 0,       // UFO 현재 위치 (비율)
+  ufoAlpha: 1,
+  fadeAlpha: 0,           // 씬 전환 페이드
+  fadeDir: 0,             // 0:없음 1:페이드아웃 -1:페이드인
+  fadeCb: null,
+  // 타이틀
+  titleLogoAlpha: 0,
+  titlePressAlpha: 0,
+  titlePhase: 0,          // 0:로고등장 1:클릭대기
+  // 오프닝
+  openingAlpha: 0,
+  openingText: '',
+  // 대화
+  dialogVisible: false,
+  dialogName: '',
+  dialogFull: '',
+  dialogShown: '',
+  dialogTyping: false,
+  dialogCallback: null,
+  dialogTimer: null,
+  // 선택지
+  choicesVisible: false,
+  choices: [],            // [{text, action}]
+  choiceHover: -1,
+  // 게임오버
+  goTitle: '',
+  goSub: '',
+};
+
+// ═══════════════════════════════════════════
+//  씬 히트 영역 (비율 기준)
+// ═══════════════════════════════════════════
+const HOTSPOTS = {
+  playground: [
+    { id:'junglegym', x:0.06, y:0.20, w:0.20, h:0.45, label:'정글짐' },
+    { id:'slide',     x:0.78, y:0.22, w:0.16, h:0.42, label:'미끄럼틀' },
+    { id:'seesaw',    x:0.30, y:0.65, w:0.32, h:0.08, label:'시소 ▶ 클릭' },
+    { id:'sandbox',   x:0.62, y:0.65, w:0.14, h:0.07, label:'모래밭' },
+  ],
+  sky: [
+    { id:'ufo', x:0.70, y:0.05, w:0.18, h:0.22, label:'???클릭' },
+  ],
+  elevator: [
+    { id:'elevator-btn', x:0.78, y:0.38, w:0.08, h:0.14, label:'▲▼ 버튼' },
+  ],
+  door: [
+    { id:'door', x:0.38, y:0.08, w:0.24, h:0.72, label:'현관문 열기' },
+  ],
+};
+
+let hoveredHotspot = null;
+
+
+// ═══════════════════════════════════════════
+//  씬 렌더러
+// ═══════════════════════════════════════════
+
+function drawBg(imgName, filters) {
+  const img = IMGS[imgName];
+  if (!img) { ctx.fillStyle='#0a0806'; ctx.fillRect(0,0,W,H); return; }
+  // sepia/contrast/brightness는 CSS filter를 canvas filter로 적용
+  ctx.filter = filters || 'sepia(0.35) contrast(1.05) brightness(0.88) saturate(0.8)';
+  const scale = Math.max(W/img.width, H/img.height);
+  const dw = img.width*scale, dh = img.height*scale;
+  ctx.drawImage(img, (W-dw)/2, (H-dh)/2, dw, dh);
+  ctx.filter = 'none';
+}
+
+function drawChar(imgName, x, y, w, alpha) {
+  const img = IMGS[imgName];
+  if (!img) return;
+  const h = img.height * (w / img.width);
+  ctx.globalAlpha = alpha !== undefined ? alpha : 1;
+  ctx.filter = 'drop-shadow(0 12px 40px rgba(0,0,0,0.7))';
+  ctx.drawImage(img, x - w/2, y - h, w, h);
+  ctx.filter = 'none';
+  ctx.globalAlpha = 1;
+}
+
+function drawUFO() {
+  if (!state.ufoVisible) return;
+  const img = IMGS['ufo'];
+  if (!img) return;
+  const uw = W * 0.14;
+  const uh = img.height * (uw / img.width);
+  const ux = W * state.ufoX;
+  const uy = H * state.ufoY;
+  ctx.globalAlpha = state.ufoAlpha;
+  if (state.ufoPhase === 1) {
+    ctx.filter = 'drop-shadow(0 0 18px rgba(127,212,248,0.9))';
+  } else {
+    ctx.filter = 'drop-shadow(0 0 12px rgba(127,212,248,0.5))';
+  }
+  ctx.drawImage(img, ux, uy, uw, uh);
+  ctx.filter = 'none';
+  ctx.globalAlpha = 1;
+}
+
+function getCharImg() {
+  const map = {
+    normal:'char_normal', sleepy:'char_normal',
+    shocked:'char_shocked', scared:'char_scared', awkward:'char_awkward'
+  };
+  return map[state.charEmotion] || 'char_normal';
+}
+
+// 씬별 그리기
+const SCENE_RENDERERS = {
+  title: drawSceneTitle,
+  playground: drawScenePlayground,
+  sky: drawSceneSky,
+  elevator: drawSceneElevator,
+  door: drawSceneDoor,
+  gameover: drawSceneGameover,
+};
+
+function drawSceneTitle() {
+  // 배경
+  const img = IMGS['title_bg'];
+  if (img) {
+    ctx.filter = 'brightness(0.55) saturate(0.8)';
+    const scale = Math.max(W/img.width, H/img.height);
+    const dw = img.width*scale, dh = img.height*scale;
+    ctx.drawImage(img, (W-dw)/2, (H-dh)/2, dw, dh);
+    ctx.filter = 'none';
+  } else {
+    ctx.fillStyle = '#0d0a0e';
+    ctx.fillRect(0,0,W,H);
+  }
+  // 그라데이션 오버레이
+  const grd = ctx.createRadialGradient(W/2,H/2,0,W/2,H/2,Math.max(W,H)*0.6);
+  grd.addColorStop(0.3,'rgba(13,10,14,0)');
+  grd.addColorStop(1,'rgba(13,10,14,0.6)');
+  ctx.fillStyle = grd;
+  ctx.fillRect(0,0,W,H);
+  const bot = ctx.createLinearGradient(0,0,0,H);
+  bot.addColorStop(0,'rgba(13,10,14,0.3)');
+  bot.addColorStop(0.4,'rgba(13,10,14,0)');
+  bot.addColorStop(1,'rgba(13,10,14,0.7)');
+  ctx.fillStyle = bot;
+  ctx.fillRect(0,0,W,H);
+
+  if (state.titleLogoAlpha <= 0) return;
+  ctx.globalAlpha = state.titleLogoAlpha;
+
+  const cx = W/2, cy = H/2;
+  // VISUAL NOVEL
+  ctx.fillStyle = 'rgba(180,150,220,0.45)';
+  ctx.font = `${W*0.008}px ${FONT_SANS}`;
+  ctx.textAlign = 'center';
+  ctx.letterSpacing = '0.55em';
+  ctx.fillText('V I S U A L   N O V E L', cx, cy - H*0.15);
+  ctx.letterSpacing = '0';
+
+  // 그날 오후 — 메인 타이틀
+  const fs = Math.min(W*0.08, H*0.12, 80);
+  ctx.font = `900 ${fs}px ${FONT_SERIF}`;
+  ctx.textAlign = 'center';
+  // 색수차 효과
+  ctx.fillStyle = 'rgba(255,60,60,0.18)';
+  ctx.fillText('그날 오후', cx-3, cy);
+  ctx.fillStyle = 'rgba(60,180,255,0.12)';
+  ctx.fillText('그날 오후', cx+3, cy);
+  // 그림자
+  ctx.fillStyle = 'rgba(120,80,200,0.55)';
+  ctx.fillText('그날 오후', cx+3, cy+3);
+  ctx.fillStyle = 'rgba(80,40,160,0.28)';
+  ctx.fillText('그날 오후', cx+5, cy+5);
+  // 메인
+  ctx.fillStyle = '#e8ddf8';
+  ctx.fillText('그날 오후', cx, cy);
+
+  // 구분선
+  ctx.strokeStyle = 'rgba(180,150,220,0.35)';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(cx-60, cy+H*0.04); ctx.lineTo(cx-12, cy+H*0.04); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(cx+12, cy+H*0.04); ctx.lineTo(cx+60, cy+H*0.04); ctx.stroke();
+  ctx.fillStyle = 'rgba(200,170,255,0.5)';
+  ctx.beginPath(); ctx.rect(cx-4, cy+H*0.035, 8, 8);
+  ctx.save(); ctx.translate(cx, cy+H*0.04+4); ctx.rotate(Math.PI/4); ctx.fillRect(-4,-4,8,8); ctx.restore();
+
+  // 서브타이틀
+  ctx.font = `${W*0.009}px ${FONT_SANS}`;
+  ctx.fillStyle = 'rgba(180,150,220,0.5)';
+  ctx.letterSpacing = '0.3em';
+  ctx.fillText('피아노 학원 가기 싫은 날', cx, cy + H*0.07);
+  ctx.letterSpacing = '0';
+
+  // CLICK TO START
+  if (state.titlePressAlpha > 0) {
+    ctx.globalAlpha = state.titleLogoAlpha * state.titlePressAlpha;
+    ctx.font = `${W*0.008}px ${FONT_SANS}`;
+    ctx.fillStyle = 'rgba(220,200,255,1)';
+    ctx.fillText('─  CLICK TO START  ─', cx, cy + H*0.16);
+  }
+
+  // 연도
+  ctx.globalAlpha = state.titleLogoAlpha * 0.25;
+  ctx.font = `${W*0.007}px ${FONT_SANS}`;
+  ctx.fillStyle = 'rgba(180,150,220,1)';
+  ctx.fillText('1999 · EPISODE 1 · © 그날오후제작위원회', cx, H - 20);
+
+  ctx.globalAlpha = 1;
+}
+
+function drawScenePlayground() {
+  drawBg('playground', 'sepia(0.3) contrast(1.05) brightness(0.9) saturate(0.85)');
+  // 캐릭터 (화면 하단 중앙)
+  const charW = W * 0.28;
+  drawChar(getCharImg(), W*0.5, H - 190, charW);
+  drawHotspots('playground');
+  drawDateStamp();
+}
+
+function drawSceneSky() {
+  drawBg('sky', 'sepia(0.2) contrast(1.02) brightness(0.95) saturate(0.9)');
+  // 캐릭터 누운 (좌측 하단)
+  const lyingImg = IMGS['char_lying'];
+  if (lyingImg) {
+    const lw = W * 0.28;
+    const lh = lyingImg.height * (lw / lyingImg.width);
+    ctx.filter = 'drop-shadow(0 6px 24px rgba(0,0,0,0.5))';
+    ctx.drawImage(lyingImg, W*0.18, H - 210 - lh, lw, lh);
+    ctx.filter = 'none';
+  }
+  // UFO
+  if (state.ufoVisible) drawUFO();
+  drawHotspots('sky');
+  drawDateStamp();
+}
+
+function drawSceneElevator() {
+  drawBg('elevator', 'sepia(0.25) contrast(1.04) brightness(0.85) saturate(0.8)');
+  const charW = W * 0.24;
+  const charImg = IMGS[state.charEmotion === 'scared' ? 'char_scared' : getCharImg()];
+  if (charImg) {
+    const ch = charImg.height * (charW / charImg.width);
+    ctx.filter = 'drop-shadow(0 8px 30px rgba(0,0,0,0.7))';
+    ctx.drawImage(charImg, W*0.28, H - 200 - ch, charW, ch);
+    ctx.filter = 'none';
+  }
+  drawHotspots('elevator');
+  drawDateStamp();
+}
+
+function drawSceneDoor() {
+  drawBg('door', 'sepia(0.3) contrast(1.05) brightness(0.82) saturate(0.75)');
+  drawHotspots('door');
+  drawDateStamp();
+}
+
+function drawSceneGameover() {
+  ctx.fillStyle = '#0a0806';
+  ctx.fillRect(0,0,W,H);
+  ctx.textAlign = 'center';
+  const cx = W/2, cy = H/2;
+  ctx.font = `${W*0.008}px ${FONT_SANS}`;
+  ctx.fillStyle = 'rgba(200,168,122,0.5)';
+  ctx.letterSpacing = '0.5em';
+  ctx.fillText('G A M E   O V E R', cx, cy - 80);
+  ctx.letterSpacing = '0';
+  const fs = Math.min(W*0.06, 60);
+  ctx.font = `900 ${fs}px ${FONT_SERIF}`;
+  ctx.fillStyle = '#f0ead8';
+  ctx.fillText(state.goTitle, cx, cy - 20);
+  ctx.font = `${W*0.012}px ${FONT_SERIF}`;
+  ctx.fillStyle = '#c8a87a';
+  ctx.fillText(state.goSub, cx, cy + 30);
+  // RETRY 버튼
+  const bw = 180, bh = 42;
+  const bx = cx - bw/2, by = cy + 70;
+  ctx.strokeStyle = 'rgba(240,234,216,0.3)';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(bx, by, bw, bh);
+  ctx.font = `${W*0.009}px ${FONT_SANS}`;
+  ctx.fillStyle = 'rgba(240,234,216,0.6)';
+  ctx.fillText('[ RETRY ]', cx, by + bh*0.65);
+  // 히트영역 등록
+  HOTSPOTS._gameover = [{ id:'retry', x:bx/W, y:by/H, w:bw/W, h:bh/H, label:'' }];
+}
+
+
+// ═══════════════════════════════════════════
+//  대화창 렌더링
+// ═══════════════════════════════════════════
+const DIALOG_H = 160;
+const MENUBAR_H = 44;
+
+function drawDialog() {
+  if (!state.dialogVisible) return;
+  const dy = H - DIALOG_H - MENUBAR_H;
+  const dw = W;
+
+  // 배경
+  ctx.fillStyle = 'rgba(20,10,40,0.86)';
+  ctx.fillRect(0, dy, dw, DIALOG_H + MENUBAR_H);
+  ctx.strokeStyle = 'rgba(200,180,255,0.15)';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(0, dy); ctx.lineTo(W, dy); ctx.stroke();
+
+  // 이름 태그
+  if (state.dialogName) {
+    const nw = ctx.measureText(state.dialogName).width + 40;
+    ctx.fillStyle = 'rgba(40,20,80,0.95)';
+    ctx.fillRect(32, dy - 28, nw, 28);
+    ctx.strokeStyle = 'rgba(200,180,255,0.25)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(32, dy - 28, nw, 28);
+    ctx.font = `700 ${W*0.013}px ${FONT_SANS}`;
+    ctx.fillStyle = '#d8c8ff';
+    ctx.textAlign = 'left';
+    ctx.fillText(state.dialogName, 52, dy - 8);
+  }
+
+  // 본문
+  ctx.font = `${W*0.015}px ${FONT_SERIF}`;
+  ctx.fillStyle = '#f0ead8';
+  ctx.textAlign = 'left';
+  const lineH = W*0.015 * 1.9;
+  const maxW = W - 80;
+  const lines = wrapText(state.dialogShown, maxW);
+  lines.forEach((line, i) => ctx.fillText(line, 40, dy + 32 + i * lineH));
+
+  // 커서 (타이핑 완료 시 깜빡임)
+  if (!state.dialogTyping && Math.floor(Date.now()/500)%2 === 0) {
+    ctx.fillStyle = 'rgba(200,180,255,0.7)';
+    // 삼각형 커서
+    const lx = 40 + ctx.measureText(lines[lines.length-1]||'').width + 6;
+    const ly = dy + 32 + (lines.length-1)*lineH - W*0.012;
+    ctx.beginPath();
+    ctx.moveTo(lx, ly+W*0.012);
+    ctx.lineTo(lx+10, ly+W*0.012);
+    ctx.lineTo(lx+5, ly+W*0.012+8);
+    ctx.closePath();
+    ctx.fill();
+  }
+}
+
+function wrapText(text, maxWidth) {
+  if (!text) return [''];
+  const words = text.split('');
+  const lines = [];
+  let cur = '';
+  for (const ch of words) {
+    const test = cur + ch;
+    if (ctx.measureText(test).width > maxWidth && cur) {
+      lines.push(cur); cur = ch;
+    } else { cur = test; }
+  }
+  if (cur) lines.push(cur);
+  return lines.length ? lines : [''];
+}
+
+// ═══════════════════════════════════════════
+//  선택지 렌더링
+// ═══════════════════════════════════════════
+const CHOICE_BH = 50;
+const CHOICE_GAP = 10;
+const CHOICE_W = 320;
+
+function drawChoices() {
+  if (!state.choicesVisible) return;
+  const totalH = state.choices.length * (CHOICE_BH + CHOICE_GAP) - CHOICE_GAP;
+  const cy = H - MENUBAR_H - 20 - totalH;
+  const cx = W/2 - CHOICE_W/2;
+
+  state.choices.forEach((c, i) => {
+    const by = cy + i * (CHOICE_BH + CHOICE_GAP);
+    const hover = state.choiceHover === i;
+    ctx.fillStyle = hover ? 'rgba(200,168,122,0.18)' : 'rgba(8,6,4,0.95)';
+    ctx.strokeStyle = hover ? 'rgba(200,168,122,0.6)' : 'rgba(240,234,216,0.25)';
+    ctx.lineWidth = 1;
+    ctx.fillRect(cx, by, CHOICE_W, CHOICE_BH);
+    ctx.strokeRect(cx, by, CHOICE_W, CHOICE_BH);
+    if (hover) {
+      ctx.fillStyle = '#c8a87a';
+      ctx.font = `${W*0.009}px ${FONT_SANS}`;
+      ctx.textAlign = 'left';
+      ctx.fillText('▶', cx + 10, by + CHOICE_BH*0.65);
+    }
+    ctx.font = `${W*0.013}px ${FONT_SERIF}`;
+    ctx.fillStyle = '#f0ead8';
+    ctx.textAlign = 'left';
+    ctx.fillText(c.text, cx + (hover ? 28 : 20), by + CHOICE_BH*0.65);
+  });
+}
+
+// ═══════════════════════════════════════════
+//  메뉴바 렌더링
+// ═══════════════════════════════════════════
+const MENU_ITEMS = ['TITLE','SAVE','LOAD','SKIP','AUTO','LOG'];
+
+function drawMenubar() {
+  if (state.scene === 'title' || state.scene === 'gameover' || state.scene === 'loading') return;
+  const my = H - MENUBAR_H;
+  ctx.fillStyle = 'rgba(10,5,20,0.92)';
+  ctx.fillRect(0, my, W, MENUBAR_H);
+  ctx.strokeStyle = 'rgba(200,180,255,0.1)';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(0, my); ctx.lineTo(W, my); ctx.stroke();
+  ctx.font = `${W*0.007}px ${FONT_SANS}`;
+  ctx.textAlign = 'center';
+  const gap = W / (MENU_ITEMS.length + 1);
+  MENU_ITEMS.forEach((label, i) => {
+    ctx.fillStyle = 'rgba(200,180,255,0.35)';
+    ctx.fillText(label, gap * (i+1), my + MENUBAR_H*0.65);
+  });
+}
+
+// ═══════════════════════════════════════════
+//  핫스팟 렌더링
+// ═══════════════════════════════════════════
+function drawHotspots(sceneName) {
+  const hs = HOTSPOTS[sceneName];
+  if (!hs) return;
+  hs.forEach(h => {
+    if (h === hoveredHotspot) {
+      // 호버 시 레이블
+      const hx = h.x*W + h.w*W*0.5;
+      const hy = h.y*H - 10;
+      ctx.font = `${W*0.009}px ${FONT_SANS}`;
+      const tw = ctx.measureText(h.label).width + 20;
+      ctx.fillStyle = 'rgba(8,6,4,0.9)';
+      ctx.fillRect(hx - tw/2, hy - 20, tw, 22);
+      ctx.strokeStyle = 'rgba(240,234,216,0.3)';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(hx - tw/2, hy - 20, tw, 22);
+      ctx.fillStyle = '#c8a87a';
+      ctx.textAlign = 'center';
+      ctx.fillText(h.label, hx, hy - 4);
+      // 영역 하이라이트
+      ctx.strokeStyle = 'rgba(255,220,100,0.3)';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(h.x*W, h.y*H, h.w*W, h.h*H);
+    }
+  });
+}
+
+function drawDateStamp() {
+  ctx.font = `${W*0.009}px ${FONT_SANS}`;
+  ctx.fillStyle = 'rgba(240,234,216,0.2)';
+  ctx.textAlign = 'left';
+  ctx.fillText('1999.06 — 서울', 20, 32);
+}
+
+// ═══════════════════════════════════════════
+//  오프닝 오버레이
+// ═══════════════════════════════════════════
+function drawOpening() {
+  if (state.openingAlpha <= 0) return;
+  ctx.globalAlpha = state.openingAlpha;
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0,0,W,H);
+  if (state.openingText) {
+    const fs = Math.min(W*0.016, 18);
+    ctx.font = `${fs}px ${FONT_SERIF}`;
+    ctx.fillStyle = 'rgba(220,210,240,0.88)';
+    ctx.textAlign = 'center';
+    ctx.fillText(state.openingText, W/2, H/2);
+  }
+  ctx.globalAlpha = 1;
+}
+
+// ═══════════════════════════════════════════
+//  씬 전환 페이드
+// ═══════════════════════════════════════════
+function drawFade() {
+  if (state.fadeAlpha <= 0) return;
+  ctx.globalAlpha = state.fadeAlpha;
+  ctx.fillStyle = '#0a0806';
+  ctx.fillRect(0,0,W,H);
+  ctx.globalAlpha = 1;
+}
+
+
+// ═══════════════════════════════════════════
+//  메인 렌더 루프
+// ═══════════════════════════════════════════
+function render() {
+  ctx.clearRect(0,0,W,H);
+  const renderer = SCENE_RENDERERS[state.scene];
+  if (renderer) renderer();
+  drawDialog();
+  drawChoices();
+  drawMenubar();
+  drawOpening();
+  drawFade();
+  requestAnimationFrame(render);
+}
+
+// ═══════════════════════════════════════════
+//  대화 시스템
+// ═══════════════════════════════════════════
+function showDialog(name, text, callback) {
+  if (state.dialogTimer) clearInterval(state.dialogTimer);
+  state.dialogVisible = true;
+  state.dialogName = name || '';
+  state.dialogFull = text;
+  state.dialogShown = '';
+  state.dialogTyping = true;
+  state.dialogCallback = callback || null;
+  let i = 0;
+  state.dialogTimer = setInterval(() => {
+    if (i < text.length) {
+      state.dialogShown = text.slice(0, ++i);
+    } else {
+      clearInterval(state.dialogTimer);
+      state.dialogTimer = null;
+      state.dialogTyping = false;
+    }
+  }, 45);
+}
+
+function nextDialog() {
+  if (state.dialogTyping) {
+    if (state.dialogTimer) clearInterval(state.dialogTimer);
+    state.dialogTimer = null;
+    state.dialogShown = state.dialogFull;
+    state.dialogTyping = false;
+    return;
+  }
+  if (state.dialogCallback) {
+    const cb = state.dialogCallback;
+    state.dialogCallback = null;
+    cb();
+  }
+}
+
+function hideDialog() {
+  if (state.dialogTimer) clearInterval(state.dialogTimer);
+  state.dialogTimer = null;
+  state.dialogVisible = false;
+  state.dialogTyping = false;
+  state.dialogCallback = null;
+}
+
+function showChoices(options) {
+  hideDialog();
+  state.choices = options;
+  state.choicesVisible = true;
+  state.choiceHover = -1;
+}
+
+function hideChoices() {
+  state.choicesVisible = false;
+  state.choices = [];
+}
+
+// ═══════════════════════════════════════════
+//  씬 전환
+// ═══════════════════════════════════════════
+function goToScene(sceneName, callback) {
+  // 페이드 아웃
+  animateFade(0, 1, 500, () => {
+    state.scene = sceneName;
+    hideDialog(); hideChoices();
+    // 페이드 인
+    setTimeout(() => animateFade(1, 0, 300, callback), 50);
+  });
+}
+
+function animateFade(from, to, duration, callback) {
+  const start = performance.now();
+  function step(now) {
+    const t = Math.min((now - start) / duration, 1);
+    state.fadeAlpha = from + (to - from) * t;
+    if (t < 1) requestAnimationFrame(step);
+    else { state.fadeAlpha = to; if (callback) callback(); }
+  }
+  requestAnimationFrame(step);
+}
+
+// ═══════════════════════════════════════════
+//  마우스 이벤트
+// ═══════════════════════════════════════════
+canvas.addEventListener('mousemove', e => {
+  const mx = e.clientX / W, my = e.clientY / H;
+  hoveredHotspot = null;
+
+  // 선택지 호버
+  if (state.choicesVisible) {
+    const totalH = state.choices.length * (CHOICE_BH + CHOICE_GAP) - CHOICE_GAP;
+    const cy = H - MENUBAR_H - 20 - totalH;
+    const cx = W/2 - CHOICE_W/2;
+    state.choiceHover = -1;
+    state.choices.forEach((c, i) => {
+      const by = cy + i * (CHOICE_BH + CHOICE_GAP);
+      if (e.clientX >= cx && e.clientX <= cx+CHOICE_W &&
+          e.clientY >= by && e.clientY <= by+CHOICE_BH) {
+        state.choiceHover = i;
+      }
+    });
+    return;
+  }
+
+  // 핫스팟 호버
+  const hs = HOTSPOTS[state.scene] || HOTSPOTS['_'+state.scene];
+  if (hs) {
+    for (const h of hs) {
+      if (mx >= h.x && mx <= h.x+h.w && my >= h.y && my <= h.y+h.h) {
+        hoveredHotspot = h;
+        canvas.style.cursor = 'pointer';
+        return;
+      }
+    }
+  }
+  canvas.style.cursor = state.dialogVisible ? 'pointer' : 'default';
+});
+
+canvas.addEventListener('click', e => {
+  const mx = e.clientX / W, my = e.clientY / H;
+
+  // 타이틀 클릭
+  if (state.scene === 'title' && state.titlePhase === 1) {
+    onTitleClick(); return;
+  }
+
+  // 게임오버 RETRY
+  if (state.scene === 'gameover') {
+    const bw=180/W, bh=42/H;
+    const bx=0.5-bw/2, by=(H/2+70)/H;
+    if (mx>=bx && mx<=bx+bw && my>=by && my<=by+bh) retryGame();
+    return;
+  }
+
+  // 선택지
+  if (state.choicesVisible) {
+    const totalH = state.choices.length * (CHOICE_BH + CHOICE_GAP) - CHOICE_GAP;
+    const cy = H - MENUBAR_H - 20 - totalH;
+    const cx = W/2 - CHOICE_W/2;
+    state.choices.forEach((c, i) => {
+      const by = cy + i * (CHOICE_BH + CHOICE_GAP);
+      if (e.clientX >= cx && e.clientX <= cx+CHOICE_W &&
+          e.clientY >= by && e.clientY <= by+CHOICE_BH) {
+        hideChoices();
+        c.action();
+      }
+    });
+    return;
+  }
+
+  // 대화창 클릭
+  if (state.dialogVisible) { nextDialog(); return; }
+
+  // 핫스팟 클릭
+  const hs = HOTSPOTS[state.scene];
+  if (hs) {
+    for (const h of hs) {
+      if (mx >= h.x && mx <= h.x+h.w && my >= h.y && my <= h.y+h.h) {
+        onHotspot(h.id); return;
+      }
+    }
+  }
+
+  // 메뉴바 클릭
+  if (e.clientY >= H - MENUBAR_H) {
+    const gap = W / (MENU_ITEMS.length + 1);
+    MENU_ITEMS.forEach((label, i) => {
+      const bx = gap*(i+1);
+      if (Math.abs(e.clientX - bx) < gap/2) {
+        if (label === 'TITLE') goToTitle();
+        else if (label === 'SKIP') nextDialog();
+      }
+    });
+  }
+});
+
+// 키보드
+window.addEventListener('keydown', e => {
+  if (e.code === 'Space' || e.code === 'Enter') {
+    e.preventDefault(); nextDialog();
+  }
+});
+
+
+// ═══════════════════════════════════════════
+//  게임 로직
+// ═══════════════════════════════════════════
+function onHotspot(id) {
+  if (id === 'junglegym') {
+    state.charEmotion = 'normal';
+    showDialog('주인공', '정글짐이다. 혼자 놀기엔 너무 높다.', null);
+  } else if (id === 'slide') {
+    state.charEmotion = 'normal';
+    showDialog('주인공', '미끄럼틀. 근데 혼자 타면 어딘가 허전한 거 있잖아.', null);
+  } else if (id === 'sandbox') {
+    state.charEmotion = 'normal';
+    showDialog('주인공', '모래밭. 개미 집이나 있겠지. ...그냥 지나치자.', null);
+  } else if (id === 'seesaw') {
+    if (!state.seesawClicked) {
+      state.seesawClicked = true;
+      state.charEmotion = 'sleepy';
+      showDialog('주인공', '시소다. 혼자서는 탈 수도 없고.', () =>
+        showDialog('주인공', '...근데 그냥 여기 누우면 어떨까.', () =>
+          showChoices([
+            { text: '누워본다.', action: chooseLieDown },
+            { text: '그냥 앉아있는다.', action: chooseSit },
+            { text: '집에 간다.', action: chooseGoHome },
+          ])
+        )
+      );
+    } else {
+      showDialog('', '이미 누워버렸다...', null);
+    }
+  } else if (id === 'ufo') {
+    if (state.ufoPhase === 1) clickUFO();
+  } else if (id === 'elevator-btn') {
+    // 버튼 클릭해도 자동 진행
+  } else if (id === 'door') {
+    clickDoor();
+  } else if (id === 'retry') {
+    retryGame();
+  }
+}
+
+function chooseSit() {
+  state.charEmotion = 'sleepy';
+  showDialog('주인공', '앉아있으니 더 졸리다. 그냥 누울까...', () =>
+    showChoices([
+      { text: '역시 눕는다.', action: chooseLieDown },
+      { text: '아니, 버틴다.', action: () =>
+        showDialog('주인공', '...3분 뒤 나는 누워있었다.', chooseLieDown)
+      },
+    ])
+  );
+}
+
+function chooseGoHome() {
+  showDialog('주인공', '집에 가서 뭐 해. 피아노 연습해야 한다고 엄마가 기다리잖아.', () =>
+    showChoices([{ text: '역시 시소에 눕는다.', action: chooseLieDown }])
+  );
+}
+
+function chooseLieDown() {
+  hideChoices();
+  state.charEmotion = 'sleepy';
+  showDialog('주인공', '...시소 판자가 생각보다 따뜻했다.', () =>
+    showDialog('주인공', '하늘이 참 파랗다.', () =>
+      goToScene('sky', () => {
+        state.ufoVisible = true;
+        state.ufoX = 0.70; state.ufoY = 0.06; state.ufoAlpha = 1;
+        setTimeout(() =>
+          showDialog('', '시소에 누워서 하늘을 봤다.', () =>
+            showDialog('주인공', '아파트 위로 구름이 흘러가고 있었다.', () =>
+              showDialog('주인공', '피아노 학원... 빠지면 안 되는데.', () =>
+                showDialog('', '그때였다.', () => {
+                  state.ufoPhase = 1;
+                  showDialog('', '저... 저게 뭐지?', () =>
+                    showDialog('주인공', '...UFO다!!', () => {
+                      state.charEmotion = 'shocked';
+                      showDialog('', 'UFO를 클릭해보세요.', null);
+                    })
+                  );
+                })
+              )
+            )
+          )
+        , 600);
+      })
+    )
+  );
+}
+
+function clickUFO() {
+  if (state.ufoPhase !== 1) return;
+  state.ufoPhase = 2;
+  if (state.endingOneVisited) ufoToBiplane();
+  else ufoDisappear();
+}
+
+function ufoDisappear() {
+  hideDialog();
+  // UFO 날아가는 애니메이션
+  const startX = state.ufoX, startY = state.ufoY;
+  const start = performance.now();
+  function anim(now) {
+    const t = Math.min((now - start) / 1800, 1);
+    const ease = t < 0.5 ? 2*t*t : -1+(4-2*t)*t;
+    state.ufoX = startX + 0.3 * ease;
+    state.ufoY = startY + 0.2 * ease;
+    state.ufoAlpha = 1 - ease;
+    if (t < 1) requestAnimationFrame(anim);
+    else {
+      state.ufoVisible = false;
+      state.charEmotion = 'shocked';
+      showDialog('주인공', '아파트 뒤로... 사라졌어.', () =>
+        showDialog('주인공', '나만 본 거야? 아무도 없는데.', () =>
+          showDialog('주인공', '...집에 가야겠다.', () =>
+            goToScene('elevator', () => {
+              state.charEmotion = 'scared';
+              setTimeout(() =>
+                showDialog('', '우리 집은 5층이었다.', () =>
+                  showDialog('나레이션', '엘리베이터를 누르면 외계인이 날 기다리다 잡아갈 것 같았다.', () =>
+                    showDialog('나레이션', '계단으로 가도 외계인이 날 기다릴 것만 같았다.', () =>
+                      showDialog('나레이션', '어른이 올 때까지 기다렸다 엘리베이터를 타고 5층에 내렸다.', () =>
+                        goToScene('door', () =>
+                          setTimeout(() =>
+                            showDialog('', '502호. 우리 집이다.', () =>
+                              showDialog('나레이션', '근데 막상 문 앞에 서니까...', () =>
+                                hideDialog()
+                              )
+                            )
+                          , 500)
+                        )
+                      )
+                    )
+                  )
+                )
+              , 600);
+            })
+          )
+        )
+      );
+    }
+  }
+  requestAnimationFrame(anim);
+}
+
+function clickDoor() {
+  if (state.scene !== 'door') return;
+  showDialog('주인공', '우리 집에 이미 외계인이 들어와있으면 어떡하지?', () =>
+    showDialog('', '...', () =>
+      showDialog('', '...문을 열지 못하고 5분을 서 있었다.', () => {
+        state.endingOneVisited = true;
+        goToGameOver(1);
+      })
+    )
+  );
+}
+
+function ufoToBiplane() {
+  hideDialog();
+  // UFO 페이드아웃 후 비행기로 교체 (UFO를 그냥 숨기고 텍스트로 처리)
+  const start = performance.now();
+  function fadeOut(now) {
+    state.ufoAlpha = Math.max(0, 1 - (now - start)/800);
+    if (state.ufoAlpha > 0) requestAnimationFrame(fadeOut);
+    else {
+      state.ufoVisible = false;
+      state.charEmotion = 'awkward';
+      showDialog('주인공', '...아.', () =>
+        showDialog('주인공', '비행기였네.', () =>
+          showDialog('주인공', '멋쩍다...', () =>
+            setTimeout(() => goToGameOver(2), 1500)
+          )
+        )
+      );
+    }
+  }
+  requestAnimationFrame(fadeOut);
+}
+
+function goToGameOver(ending) {
+  state.goTitle = ending === 1 ? 'ENDING 1' : 'ENDING 2';
+  state.goSub   = ending === 1 ? '어렸을 적 기억.' : '이곳엔 공항이 없어.';
+  goToScene('gameover', null);
+}
+
+// ═══════════════════════════════════════════
+//  타이틀 & 오프닝
+// ═══════════════════════════════════════════
+const OPENING_LINES = ['1999년 6월.','피아노 학원 가는 게 세상에서 제일 싫었다.','오늘은 어떻게든 버텨봐야지.'];
+
+function startTitleSequence() {
+  state.scene = 'title';
+  state.titleLogoAlpha = 0;
+  state.titlePressAlpha = 0;
+  state.titlePhase = 0;
+  // 로고 페이드인
+  animateValue(v => state.titleLogoAlpha = v, 0, 1, 1400, 600, () => {
+    setTimeout(() => {
+      state.titlePhase = 1;
+      // PRESS 깜빡임은 render에서 처리
+      animateValue(v => state.titlePressAlpha = v, 0, 1, 800, 0);
+    }, 400);
+  });
+}
+
+function animateValue(setter, from, to, duration, delay, callback) {
+  setTimeout(() => {
+    const start = performance.now();
+    function step(now) {
+      const t = Math.min((now - start) / duration, 1);
+      setter(from + (to - from) * t);
+      if (t < 1) requestAnimationFrame(step);
+      else { setter(to); if (callback) callback(); }
+    }
+    requestAnimationFrame(step);
+  }, delay);
+}
+
+function onTitleClick() {
+  if (state.titlePhase !== 1) return;
+  state.titlePhase = 2;
+  runOpeningSequence();
+}
+
+function runOpeningSequence() {
+  state.openingAlpha = 0;
+  animateValue(v => state.openingAlpha = v, 0, 1, 600, 0, () => {
+    let i = 0;
+    function showNext() {
+      if (i >= OPENING_LINES.length) {
+        setTimeout(() =>
+          animateValue(v => state.openingAlpha = v, 1, 0, 800, 0, () => {
+            state.openingText = '';
+            startGame();
+          })
+        , 1200);
+        return;
+      }
+      state.openingText = '';
+      setTimeout(() => {
+        state.openingText = OPENING_LINES[i++];
+        setTimeout(showNext, 2000);
+      }, 500);
+    }
+    showNext();
+  });
+}
+
+function startGame() {
+  goToScene('playground', () => {
+    state.charEmotion = 'sleepy';
+    setTimeout(() =>
+      showDialog('', '오늘도 피아노 학원 가는 날이었다.', () =>
+        showDialog('', '학원은 3시 30분. 아직 두 시간이나 남았다.', () =>
+          showDialog('주인공', '...놀이터나 가야겠다.', () =>
+            showDialog('', '무엇을 할까?', null)
+          )
+        )
+      )
+    , 600);
+  });
+}
+
+function goToTitle() {
+  goToScene('title', () => startTitleSequence());
+}
+
+function retryGame() {
+  const wasEnding1 = state.endingOneVisited;
+  Object.assign(state, {
+    seesawClicked: false, ufoPhase: 0,
+    ufoVisible: true, ufoX: 0.70, ufoY: 0.06, ufoAlpha: 1,
+    charEmotion: 'sleepy', endingOneVisited: wasEnding1,
+  });
+  goToScene('playground', () => {
+    state.seesawClicked = false;
+    setTimeout(() =>
+      showDialog('', '다시, 그날 오후.', () =>
+        showDialog('', '무엇을 할까?', null)
+      )
+    , 600);
+  });
+}
+
+
+// ═══════════════════════════════════════════
+//  CRTFilter WebGL (MIT License, github.com/Ichiaka/CRTFilter)
+// ═══════════════════════════════════════════
+class CRTFilterWebGL {
+  constructor(canvas, config={}) {
+    this.sourceCanvas = canvas;
+    this.glcanvas = document.createElement('canvas');
+    this.glcanvas.width = canvas.width;
+    this.glcanvas.height = canvas.height;
+    this.gl = this.glcanvas.getContext('webgl2') || this.glcanvas.getContext('webgl');
+    if (!this.gl) { console.error('WebGL not supported'); return; }
+    this.config = Object.assign({
+      barrelDistortion:0.001,curvature:0.002,chromaticAberration:0.0005,
+      staticNoise:0.001,horizontalTearing:0.00012,glowBloom:0.001,
+      verticalJitter:0.001,retraceLines:true,scanlineIntensity:0.6,
+      dotMask:false,brightness:0.9,contrast:1.0,desaturation:0.2,
+      flicker:0.0,signalLoss:0.05
+    }, config);
+    this._initShaders(); this._initBuffers(); this._initTexture();
+    this.raf = null;
+  }
+  _initBuffers() {
+    const gl = this.gl;
+    const buf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1,1,-1,-1,1,-1,1,1,-1,1,1]), gl.STATIC_DRAW);
+    const loc = gl.getAttribLocation(this.prog, 'a_pos');
+    gl.enableVertexAttribArray(loc);
+    gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+  }
+  _initTexture() {
+    const gl = this.gl;
+    this.tex = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, this.tex);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  }
+  _mk(type, src) {
+    const gl = this.gl;
+    const s = gl.createShader(type);
+    gl.shaderSource(s, src); gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) { console.error(gl.getShaderInfoLog(s)); return null; }
+    return s;
+  }
+  _initShaders() {
+    const gl = this.gl;
+    const vs = `attribute vec2 a_pos;varying vec2 vUV;
+      void main(){vUV=vec2(a_pos.x*.5+.5,1.-(a_pos.y*.5+.5));gl_Position=vec4(a_pos,0,1);}`;
+    const fs = `precision mediump float;
+      varying vec2 vUV;uniform sampler2D uTex;uniform float uTime;
+      uniform float uBarrel,uCurv,uAber,uNoise,uTear,uGlow,uJit;
+      uniform bool uRetrace,uDotMask;
+      uniform float uBright,uContrast,uDesat,uFlicker,uScanline,uSigLoss;
+      vec2 barrel(vec2 uv,float a){vec2 c=uv-.5;return uv+c*dot(c,c)*a;}
+      void main(){
+        vec2 uv=barrel(vUV,uBarrel+uCurv);
+        vec3 col;
+        col.r=texture2D(uTex,uv+vec2(uAber,0)).r;
+        col.g=texture2D(uTex,uv).g;
+        col.b=texture2D(uTex,uv-vec2(uAber,0)).b;
+        col+=(fract(sin(dot(uv,vec2(12.9898,78.233)))*43758.5453)-.5)*uNoise;
+        uv.x+=sin(uv.y*10.+uTime*2.)*uTear;
+        col*=texture2D(uTex,uv).rgb;
+        col+=uGlow*smoothstep(.5,1.,col);
+        uv.y+=sin(uTime*5.)*uJit;
+        col*=1.-(uSigLoss*abs(sin(uv.y*50.+uTime*10.)));
+        if(uRetrace)col*=1.9+uScanline*sin(uv.y*800.+uTime*10.);
+        if(uDotMask)col*=vec3(1.,.9+.1*mod(uv.x*100.,2.),.9+.1*mod(uv.y*100.,2.));
+        col=mix(vec3(dot(col,vec3(.299,.587,.114))),col,1.-uDesat);
+        col=(col-.5)*uContrast+.5;
+        col*=uBright;
+        col*=1.+uFlicker*sin(uTime*60.);
+        gl_FragColor=vec4(col,1.);
+      }`;
+    const v=this._mk(gl.VERTEX_SHADER,vs), f=this._mk(gl.FRAGMENT_SHADER,fs);
+    this.prog=gl.createProgram();
+    gl.attachShader(this.prog,v); gl.attachShader(this.prog,f); gl.linkProgram(this.prog);
+    gl.useProgram(this.prog);
+  }
+  _render() {
+    const gl=this.gl, cfg=this.config;
+    const src=this.sourceCanvas;
+    this.glcanvas.width=src.width; this.glcanvas.height=src.height;
+    gl.viewport(0,0,src.width,src.height);
+    gl.bindTexture(gl.TEXTURE_2D,this.tex);
+    gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,src);
+    gl.useProgram(this.prog);
+    const u=(n,v)=>gl.uniform1f(gl.getUniformLocation(this.prog,n),v);
+    const ui=(n,v)=>gl.uniform1i(gl.getUniformLocation(this.prog,n),v);
+    u('uTime',performance.now()/1000); u('uBarrel',cfg.barrelDistortion);
+    u('uCurv',cfg.curvature); u('uAber',cfg.chromaticAberration);
+    u('uNoise',cfg.staticNoise); u('uTear',cfg.horizontalTearing);
+    u('uGlow',cfg.glowBloom); u('uJit',cfg.verticalJitter);
+    u('uBright',cfg.brightness); u('uContrast',cfg.contrast);
+    u('uDesat',cfg.desaturation); u('uFlicker',cfg.flicker);
+    u('uScanline',cfg.scanlineIntensity); u('uSigLoss',cfg.signalLoss);
+    ui('uRetrace',cfg.retraceLines?1:0); ui('uDotMask',cfg.dotMask?1:0);
+    gl.drawArrays(gl.TRIANGLES,0,6);
+    // glcanvas를 원본 위에 덮어 그림
+    this.displayCtx.clearRect(0,0,src.width,src.height);
+    this.displayCtx.drawImage(this.glcanvas,0,0);
+    this.raf=requestAnimationFrame(()=>this._render());
+  }
+  start(displayCanvas) {
+    // displayCanvas: CRT 결과를 출력할 별도 캔버스
+    this.displayCanvas = displayCanvas;
+    this.displayCtx = displayCanvas.getContext('2d');
+    this._render();
+  }
+  stop() { if(this.raf){cancelAnimationFrame(this.raf);this.raf=null;} }
+}
+
+// ═══════════════════════════════════════════
+//  CRT 출력 캔버스 + 초기화
+// ═══════════════════════════════════════════
+const crtCanvas = document.createElement('canvas');
+crtCanvas.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;pointer-events:none;z-index:9999;';
+document.body.appendChild(crtCanvas);
+
+function syncCrtSize() {
+  crtCanvas.width = canvas.width;
+  crtCanvas.height = canvas.height;
+}
+syncCrtSize();
+window.addEventListener('resize', syncCrtSize);
+
+// ═══════════════════════════════════════════
+//  진입점
+// ═══════════════════════════════════════════
+async function main() {
+  state.scene = 'loading';
+  await loadImages();
+
+  // 폰트 로드 대기
+  await document.fonts.load(`900 40px 'Noto Serif KR'`).catch(()=>{});
+  await document.fonts.load(`700 16px 'Noto Sans KR'`).catch(()=>{});
+
+  // 렌더 시작
+  render();
+
+  // CRTFilter 시작 — sourceCanvas: game canvas, display: crtCanvas
+  const crt = new CRTFilterWebGL(canvas, {
+    barrelDistortion:   0.05,
+    curvature:          0.03,
+    chromaticAberration:0.002,
+    staticNoise:        0.055,
+    horizontalTearing:  0.0002,
+    glowBloom:          0.002,
+    verticalJitter:     0.003,
+    retraceLines:       true,
+    scanlineIntensity:  0.55,
+    dotMask:            false,
+    brightness:         0.92,
+    contrast:           1.08,
+    desaturation:       0.22,
+    flicker:            0.0,
+    signalLoss:         0.025,
+  });
+  crt.start(crtCanvas);
+
+  // 타이틀 시작
+  startTitleSequence();
+}
+
+// 구글 폰트 로드
+const fontLink = document.createElement('link');
+fontLink.rel = 'stylesheet';
+fontLink.href = 'https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;700;900&family=Noto+Sans+KR:wght@400;700;900&display=swap';
+document.head.appendChild(fontLink);
+fontLink.onload = main;
+// 폰트 로드 실패해도 시작
+setTimeout(main, 2000);
+
+</script>
+</body>
+</html>
