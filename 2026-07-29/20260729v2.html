@@ -375,14 +375,14 @@ function drawDialog() {
     ctx.strokeStyle = 'rgba(200,180,255,0.25)';
     ctx.lineWidth = 1;
     ctx.strokeRect(32, dy - 28, nw, 28);
-    ctx.font = `700 ${18px ${FONT_SANS}`;
+    ctx.font = `700 18px ${FONT_SANS}`;
     ctx.fillStyle = '#d8c8ff';
     ctx.textAlign = 'left';
     ctx.fillText(state.dialogName, 52, dy - 8);
   }
 
   // 본문
-  ctx.font = `${22px ${FONT_SERIF}`;
+  ctx.font = `22px ${FONT_SERIF}`;
   ctx.fillStyle = '#f0ead8';
   ctx.textAlign = 'left';
   const lineH = 22 * 1.9;
