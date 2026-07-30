@@ -212,15 +212,15 @@ function drawSceneTitle() {
 
   const cx = W/2, cy = H/2;
   // VISUAL NOVEL
-  ctx.fillStyle = 'rgba(180,150,220,0.45)';
-  ctx.font = `${W*0.008}px ${FONT_SANS}`;
+  ctx.fillStyle = 'rgba(180,150,220,0.85)';
+  ctx.font = `${14px ${FONT_SANS}`;
   ctx.textAlign = 'center';
   ctx.letterSpacing = '0.55em';
   ctx.fillText('V I S U A L   N O V E L', cx, cy - H*0.15);
   ctx.letterSpacing = '0';
 
   // 그날 오후 — 메인 타이틀
-  const fs = Math.min(W*0.08, H*0.12, 80);
+  const fs = Math.min(W*0.1, H*0.15, 110);
   ctx.font = `900 ${fs}px ${FONT_SERIF}`;
   ctx.textAlign = 'center';
   // 색수차 효과
@@ -247,8 +247,8 @@ function drawSceneTitle() {
   ctx.save(); ctx.translate(cx, cy+H*0.04+4); ctx.rotate(Math.PI/4); ctx.fillRect(-4,-4,8,8); ctx.restore();
 
   // 서브타이틀
-  ctx.font = `${W*0.009}px ${FONT_SANS}`;
-  ctx.fillStyle = 'rgba(180,150,220,0.5)';
+  ctx.font = `${15px ${FONT_SANS}`;
+  ctx.fillStyle = 'rgba(180,150,220,0.8)';
   ctx.letterSpacing = '0.3em';
   ctx.fillText('피아노 학원 가기 싫은 날', cx, cy + H*0.07);
   ctx.letterSpacing = '0';
@@ -256,14 +256,14 @@ function drawSceneTitle() {
   // CLICK TO START
   if (state.titlePressAlpha > 0) {
     ctx.globalAlpha = state.titleLogoAlpha * state.titlePressAlpha;
-    ctx.font = `${W*0.008}px ${FONT_SANS}`;
+    ctx.font = `${14px ${FONT_SANS}`;
     ctx.fillStyle = 'rgba(220,200,255,1)';
     ctx.fillText('─  CLICK TO START  ─', cx, cy + H*0.16);
   }
 
   // 연도
-  ctx.globalAlpha = state.titleLogoAlpha * 0.25;
-  ctx.font = `${W*0.007}px ${FONT_SANS}`;
+  ctx.globalAlpha = state.titleLogoAlpha * 0.45;
+  ctx.font = `${13px ${FONT_SANS}`;
   ctx.fillStyle = 'rgba(180,150,220,1)';
   ctx.fillText('1999 · EPISODE 1 · © 그날오후제작위원회', cx, H - 20);
 
@@ -323,7 +323,7 @@ function drawSceneGameover() {
   ctx.fillRect(0,0,W,H);
   ctx.textAlign = 'center';
   const cx = W/2, cy = H/2;
-  ctx.font = `${W*0.008}px ${FONT_SANS}`;
+  ctx.font = `${14px ${FONT_SANS}`;
   ctx.fillStyle = 'rgba(200,168,122,0.5)';
   ctx.letterSpacing = '0.5em';
   ctx.fillText('G A M E   O V E R', cx, cy - 80);
@@ -332,7 +332,7 @@ function drawSceneGameover() {
   ctx.font = `900 ${fs}px ${FONT_SERIF}`;
   ctx.fillStyle = '#f0ead8';
   ctx.fillText(state.goTitle, cx, cy - 20);
-  ctx.font = `${W*0.012}px ${FONT_SERIF}`;
+  ctx.font = `${20px ${FONT_SERIF}`;
   ctx.fillStyle = '#c8a87a';
   ctx.fillText(state.goSub, cx, cy + 30);
   // RETRY 버튼
@@ -341,7 +341,7 @@ function drawSceneGameover() {
   ctx.strokeStyle = 'rgba(240,234,216,0.3)';
   ctx.lineWidth = 1;
   ctx.strokeRect(bx, by, bw, bh);
-  ctx.font = `${W*0.009}px ${FONT_SANS}`;
+  ctx.font = `${15px ${FONT_SANS}`;
   ctx.fillStyle = 'rgba(240,234,216,0.6)';
   ctx.fillText('[ RETRY ]', cx, by + bh*0.65);
   // 히트영역 등록
@@ -375,17 +375,17 @@ function drawDialog() {
     ctx.strokeStyle = 'rgba(200,180,255,0.25)';
     ctx.lineWidth = 1;
     ctx.strokeRect(32, dy - 28, nw, 28);
-    ctx.font = `700 ${Math.max(W*0.018, 16)}px ${FONT_SANS}`;
+    ctx.font = `700 ${18px ${FONT_SANS}`;
     ctx.fillStyle = '#d8c8ff';
     ctx.textAlign = 'left';
     ctx.fillText(state.dialogName, 52, dy - 8);
   }
 
   // 본문
-  ctx.font = `${Math.max(W*0.02, 18)}px ${FONT_SERIF}`;
+  ctx.font = `${22px ${FONT_SERIF}`;
   ctx.fillStyle = '#f0ead8';
   ctx.textAlign = 'left';
-  const lineH = Math.max(W*0.02, 18) * 1.9;
+  const lineH = 22 * 1.9;
   const maxW = W - 80;
   const lines = wrapText(state.dialogShown, maxW);
   lines.forEach((line, i) => ctx.fillText(line, 40, dy + 32 + i * lineH));
@@ -443,11 +443,11 @@ function drawChoices() {
     ctx.strokeRect(cx, by, CHOICE_W, CHOICE_BH);
     if (hover) {
       ctx.fillStyle = '#c8a87a';
-      ctx.font = `${W*0.009}px ${FONT_SANS}`;
+      ctx.font = `${15px ${FONT_SANS}`;
       ctx.textAlign = 'left';
       ctx.fillText('▶', cx + 10, by + CHOICE_BH*0.65);
     }
-    ctx.font = `${W*0.013}px ${FONT_SERIF}`;
+    ctx.font = `${20px ${FONT_SERIF}`;
     ctx.fillStyle = '#f0ead8';
     ctx.textAlign = 'left';
     ctx.fillText(c.text, cx + (hover ? 28 : 20), by + CHOICE_BH*0.65);
@@ -467,7 +467,7 @@ function drawMenubar() {
   ctx.strokeStyle = 'rgba(200,180,255,0.1)';
   ctx.lineWidth = 1;
   ctx.beginPath(); ctx.moveTo(0, my); ctx.lineTo(W, my); ctx.stroke();
-  ctx.font = `${W*0.007}px ${FONT_SANS}`;
+  ctx.font = `${13px ${FONT_SANS}`;
   ctx.textAlign = 'center';
   const gap = W / (MENU_ITEMS.length + 1);
   MENU_ITEMS.forEach((label, i) => {
@@ -487,7 +487,7 @@ function drawHotspots(sceneName) {
       // 호버 시 레이블
       const hx = h.x*W + h.w*W*0.5;
       const hy = h.y*H - 10;
-      ctx.font = `${W*0.009}px ${FONT_SANS}`;
+      ctx.font = `${15px ${FONT_SANS}`;
       const tw = ctx.measureText(h.label).width + 20;
       ctx.fillStyle = 'rgba(8,6,4,0.9)';
       ctx.fillRect(hx - tw/2, hy - 20, tw, 22);
@@ -506,7 +506,7 @@ function drawHotspots(sceneName) {
 }
 
 function drawDateStamp() {
-  ctx.font = `${Math.max(W*0.012, 13)}px ${FONT_SANS}`;
+  ctx.font = `${14px ${FONT_SANS}`;
   ctx.fillStyle = 'rgba(240,234,216,0.25)';
   ctx.textAlign = 'left';
   ctx.fillText('1999.06 — 서울', 20, 36);
@@ -1180,7 +1180,7 @@ async function main() {
     retraceLines:       true,
     scanlineIntensity:  0.55,
     dotMask:            false,
-    brightness:         0.92,
+    brightness:         0.97,
     contrast:           1.08,
     desaturation:       0.22,
     flicker:            0.0,
