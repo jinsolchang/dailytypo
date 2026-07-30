@@ -21,13 +21,26 @@ const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d', { willReadFrequently: true });
 let W = window.innerWidth, H = window.innerHeight;
 
+// CRT 출력 캔버스 — 선언을 최상단으로 이동 (초기화 순서 문제 방지)
+const crtCanvas = document.createElement('canvas');
+crtCanvas.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;pointer-events:none;z-index:9999;';
+document.body.appendChild(crtCanvas);
+
+function syncCrtSize() {
+  crtCanvas.width = canvas.width;
+  crtCanvas.height = canvas.height;
+}
+
 function resize() {
   W = window.innerWidth; H = window.innerHeight;
   canvas.width = W; canvas.height = H;
-  if (typeof syncCrtSize === 'function') syncCrtSize();
+  syncCrtSize();
 }
 resize();
-window.addEventListener('resize', resize);
+window.addEventListener('resize', () => {
+  resize();
+  if (typeof crtCanvas !== 'undefined') syncCrtSize();
+});
 
 // ═══════════════════════════════════════════
 //  이미지 로더
@@ -1159,20 +1172,6 @@ class CRTFilterWebGL {
   }
   stop() { if(this.raf){cancelAnimationFrame(this.raf);this.raf=null;} }
 }
-
-// ═══════════════════════════════════════════
-//  CRT 출력 캔버스 + 초기화
-// ═══════════════════════════════════════════
-const crtCanvas = document.createElement('canvas');
-crtCanvas.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;pointer-events:none;z-index:9999;';
-document.body.appendChild(crtCanvas);
-
-function syncCrtSize() {
-  crtCanvas.width = canvas.width;
-  crtCanvas.height = canvas.height;
-}
-syncCrtSize();
-window.addEventListener('resize', syncCrtSize);
 
 // ═══════════════════════════════════════════
 //  진입점
