@@ -36,19 +36,8 @@ body {
   background:radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.7) 100%);
 }
 
-/* 스캔라인 */
-#scanlines {
-  position:fixed;
-  inset:0;
-  pointer-events:none;
-  z-index:998;
-  background:repeating-linear-gradient(
-    transparent,
-    transparent 2px,
-    rgba(0,0,0,0.12) 2px,
-    rgba(0,0,0,0.12) 4px
-  );
-}
+/* 스캔라인 — crt-scanlines로 대체됨 */
+#scanlines { display:none; }
 
 /* 씬 컨테이너 */
 .scene {
@@ -278,77 +267,132 @@ body {
   flex-direction:column;
   align-items:center;
   justify-content:center;
-  background:#000;
+  background:#0d0a0e;
   cursor:pointer;
   z-index:50;
+  overflow:hidden;
+}
+#scene-title::before {
+  content:'';
+  position:absolute;
+  inset:0;
+  background-image:
+    linear-gradient(rgba(80,60,120,0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(80,60,120,0.07) 1px, transparent 1px);
+  background-size:32px 32px;
+  pointer-events:none;
 }
 .title-logo {
   opacity:0;
   text-align:center;
-  transition:opacity 1.2s ease;
+  transition:opacity 1.4s ease;
+  position:relative;
+  z-index:2;
 }
 .title-logo.show { opacity:1; }
+.title-eyecatch {
+  font-size:0.55rem;
+  color:rgba(180,150,220,0.45);
+  letter-spacing:0.55em;
+  margin-bottom:24px;
+  font-family:'Noto Sans KR', sans-serif;
+}
+.title-wrapper { position:relative; display:inline-block; }
 .title-main {
-  font-size:clamp(2.2rem, 6vw, 3.8rem);
+  font-size:clamp(2.8rem, 8vw, 5rem);
   font-weight:900;
-  letter-spacing:0.18em;
-  color:#f0ead8;
-  text-shadow:0 0 60px rgba(200,168,122,0.4);
-  margin-bottom:14px;
+  letter-spacing:0.1em;
+  color:#e8ddf8;
+  line-height:1;
+  margin-bottom:6px;
+  text-shadow:
+    2px 2px 0 rgba(120,80,200,0.55),
+    4px 4px 0 rgba(80,40,160,0.28),
+    0 0 50px rgba(180,140,255,0.2);
+  font-family:'Noto Serif KR', serif;
+}
+.title-main-ghost {
+  position:absolute;
+  top:0; left:3px;
+  font-size:clamp(2.8rem, 8vw, 5rem);
+  font-weight:900;
+  letter-spacing:0.1em;
+  color:rgba(255,80,80,0.12);
+  line-height:1;
+  pointer-events:none;
+  font-family:'Noto Serif KR', serif;
+}
+.title-deco {
+  display:flex;
+  align-items:center;
+  gap:10px;
+  margin:14px 0 10px;
+  opacity:0.35;
+}
+.title-deco-line { width:50px; height:1px; background:rgba(180,150,220,0.7); }
+.title-deco-diamond {
+  width:5px; height:5px;
+  background:rgba(200,170,255,0.8);
+  transform:rotate(45deg);
 }
 .title-sub {
-  font-size:0.8rem;
-  color:rgba(200,168,122,0.65);
-  letter-spacing:0.35em;
+  font-size:0.68rem;
+  color:rgba(180,150,220,0.5);
+  letter-spacing:0.3em;
   font-family:'Noto Sans KR', sans-serif;
 }
 .title-press {
-  margin-top:60px;
-  font-size:0.7rem;
-  color:rgba(240,234,216,0.0);
-  letter-spacing:0.25em;
+  margin-top:50px;
+  font-size:0.6rem;
+  color:rgba(220,200,255,0.0);
+  letter-spacing:0.3em;
   font-family:'Noto Sans KR', sans-serif;
   transition:color 0.8s;
-  animation:none;
 }
 .title-press.show {
-  color:rgba(240,234,216,0.4);
+  color:rgba(220,200,255,0.42);
   animation:blink 1.4s ease-in-out infinite;
 }
 .title-year {
   position:absolute;
   bottom:22px;
-  font-size:0.6rem;
-  color:rgba(240,234,216,0.12);
-  letter-spacing:0.15em;
+  font-size:0.52rem;
+  color:rgba(180,150,220,0.15);
+  letter-spacing:0.2em;
   font-family:'Noto Sans KR', sans-serif;
 }
 
-/* 오프닝 텍스트 시퀀스 */
+/* ── CRT 효과 ── */
+#crt-scanlines {
+  position:fixed; inset:0;
+  pointer-events:none; z-index:1001;
+  background:repeating-linear-gradient(
+    to bottom,
+    transparent 0px, transparent 3px,
+    rgba(0,0,0,0.15) 3px, rgba(0,0,0,0.15) 4px
+  );
+}
+#crt-bend {
+  position:fixed; inset:0;
+  pointer-events:none; z-index:1002;
+  background:radial-gradient(ellipse 110% 110% at 50% 50%, transparent 55%, rgba(0,0,0,0.65) 100%);
+}
+#crt-glitch { position:fixed; inset:0; pointer-events:none; z-index:1003; opacity:0; }
+
+/* 오프닝 텍스트 */
 #opening-overlay {
-  position:fixed;
-  inset:0;
-  background:#000;
-  z-index:800;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  pointer-events:none;
-  opacity:0;
-  transition:opacity 1s ease;
+  position:fixed; inset:0; background:#000; z-index:800;
+  display:flex; align-items:center; justify-content:center;
+  pointer-events:none; opacity:0; transition:opacity 1s ease;
 }
 #opening-overlay.active { opacity:1; pointer-events:all; }
 .opening-text {
-  font-size:clamp(0.9rem,2.5vw,1.15rem);
-  color:rgba(240,234,216,0.9);
-  letter-spacing:0.06em;
-  line-height:2.2;
-  text-align:center;
+  font-size:clamp(0.85rem,2.2vw,1.05rem);
+  color:rgba(220,210,240,0.88);
+  letter-spacing:0.08em; line-height:2.4; text-align:center;
   font-family:'Noto Serif KR', serif;
-  opacity:0;
-  transition:opacity 0.8s ease;
-  max-width:640px;
-  padding:0 32px;
+  opacity:0; transition:opacity 0.8s ease;
+  max-width:560px; padding:0 32px;
 }
 .opening-text.show { opacity:1; }
 
@@ -489,6 +533,10 @@ body {
 <canvas id="noise-canvas"></canvas>
 <div id="vignette"></div>
 <div id="scanlines"></div>
+<!-- CRT 효과 레이어 -->
+<div id="crt-scanlines"></div>
+<div id="crt-bend"></div>
+<canvas id="crt-glitch"></canvas>
 <div class="date-stamp">1993.09 — 서울</div>
 
 <!-- 전환 오버레이 -->
@@ -527,11 +575,20 @@ body {
 ═══════════════════════════════════════════ -->
 <div id="scene-title" class="scene active">
   <div class="title-logo" id="title-logo">
-    <div class="title-main">그날 오후</div>
+    <div class="title-eyecatch">V I S U A L &nbsp; N O V E L</div>
+    <div class="title-wrapper">
+      <div class="title-main-ghost" aria-hidden="true">그날 오후</div>
+      <div class="title-main">그날 오후</div>
+    </div>
+    <div class="title-deco">
+      <div class="title-deco-line"></div>
+      <div class="title-deco-diamond"></div>
+      <div class="title-deco-line"></div>
+    </div>
     <div class="title-sub">피아노 학원 가기 싫은 날</div>
-    <div class="title-press" id="title-press">[ 화면을 클릭하여 시작 ]</div>
+    <div class="title-press" id="title-press">─ &nbsp; CLICK TO START &nbsp; ─</div>
   </div>
-  <div class="title-year">1993 · EPISODE 1</div>
+  <div class="title-year">1993 · EPISODE 1 · © 그날오후제작위원회</div>
 </div>
 
 <!-- ═══════════════════════════════════════════
@@ -673,8 +730,67 @@ function drawNoise() {
 }
 drawNoise();
 
-
 // ═══════════════════════════════════════════
+//  CRT 글리치 효과
+// ═══════════════════════════════════════════
+const glitchCanvas = document.getElementById('crt-glitch');
+const gCtx = glitchCanvas.getContext('2d');
+
+function resizeGlitch() {
+  glitchCanvas.width = window.innerWidth;
+  glitchCanvas.height = window.innerHeight;
+}
+resizeGlitch();
+window.addEventListener('resize', resizeGlitch);
+
+// 불규칙 글리치 라인 — 가끔씩 수평 밴드가 어긋남
+let glitchTimer = 0;
+function runGlitch() {
+  const now = Date.now();
+  // 3~8초마다 한 번씩 짧게 글리치
+  if (now - glitchTimer > (3000 + Math.random() * 5000)) {
+    glitchTimer = now;
+    doGlitch();
+  }
+  requestAnimationFrame(runGlitch);
+}
+
+function doGlitch() {
+  const w = glitchCanvas.width;
+  const h = glitchCanvas.height;
+  glitchCanvas.style.opacity = '1';
+  gCtx.clearRect(0, 0, w, h);
+
+  // 2~5개의 수평 밴드 어긋남
+  const bands = 2 + Math.floor(Math.random() * 4);
+  for (let i = 0; i < bands; i++) {
+    const y = Math.random() * h;
+    const bh = 1 + Math.random() * 6;
+    const shift = (Math.random() - 0.5) * 20;
+    // 희미한 수평 라인
+    gCtx.fillStyle = `rgba(${180+Math.random()*75|0},${180+Math.random()*75|0},${200+Math.random()*55|0},${0.06 + Math.random()*0.1})`;
+    gCtx.fillRect(0, y, w, bh);
+    // 색수차 어긋남
+    gCtx.fillStyle = `rgba(255,0,0,0.04)`;
+    gCtx.fillRect(shift, y, w, bh);
+    gCtx.fillStyle = `rgba(0,200,255,0.04)`;
+    gCtx.fillRect(-shift, y, w, bh);
+  }
+
+  // 전체 화면 순간 밝기 흔들림
+  gCtx.fillStyle = 'rgba(255,255,255,0.015)';
+  gCtx.fillRect(0, 0, w, h);
+
+  // 40~120ms 후 사라짐
+  setTimeout(() => {
+    gCtx.clearRect(0, 0, w, h);
+    glitchCanvas.style.opacity = '0';
+  }, 40 + Math.random() * 80);
+}
+
+runGlitch();
+
+
 //  캐릭터 표정 교체
 // ═══════════════════════════════════════════
 const CHAR_IMGS = {
