@@ -278,39 +278,80 @@ body {
   flex-direction:column;
   align-items:center;
   justify-content:center;
-  background:#0a0806;
+  background:#000;
   cursor:pointer;
+  z-index:50;
 }
+.title-logo {
+  opacity:0;
+  text-align:center;
+  transition:opacity 1.2s ease;
+}
+.title-logo.show { opacity:1; }
 .title-main {
-  font-size:clamp(2rem, 6vw, 3.5rem);
+  font-size:clamp(2.2rem, 6vw, 3.8rem);
   font-weight:900;
-  letter-spacing:0.15em;
+  letter-spacing:0.18em;
   color:#f0ead8;
-  text-shadow:0 0 60px rgba(200,168,122,0.3);
-  margin-bottom:12px;
+  text-shadow:0 0 60px rgba(200,168,122,0.4);
+  margin-bottom:14px;
 }
 .title-sub {
-  font-size:0.85rem;
-  color:rgba(200,168,122,0.7);
-  letter-spacing:0.3em;
-  margin-bottom:60px;
+  font-size:0.8rem;
+  color:rgba(200,168,122,0.65);
+  letter-spacing:0.35em;
   font-family:'Noto Sans KR', sans-serif;
 }
-.title-start {
-  font-size:0.75rem;
-  color:rgba(240,234,216,0.35);
-  letter-spacing:0.2em;
-  animation:blink 1.2s ease-in-out infinite;
+.title-press {
+  margin-top:60px;
+  font-size:0.7rem;
+  color:rgba(240,234,216,0.0);
+  letter-spacing:0.25em;
   font-family:'Noto Sans KR', sans-serif;
+  transition:color 0.8s;
+  animation:none;
+}
+.title-press.show {
+  color:rgba(240,234,216,0.4);
+  animation:blink 1.4s ease-in-out infinite;
 }
 .title-year {
   position:absolute;
-  bottom:28px;
-  font-size:0.65rem;
-  color:rgba(240,234,216,0.15);
+  bottom:22px;
+  font-size:0.6rem;
+  color:rgba(240,234,216,0.12);
   letter-spacing:0.15em;
   font-family:'Noto Sans KR', sans-serif;
 }
+
+/* 오프닝 텍스트 시퀀스 */
+#opening-overlay {
+  position:fixed;
+  inset:0;
+  background:#000;
+  z-index:800;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  pointer-events:none;
+  opacity:0;
+  transition:opacity 1s ease;
+}
+#opening-overlay.active { opacity:1; pointer-events:all; }
+.opening-text {
+  font-size:clamp(0.9rem,2.5vw,1.15rem);
+  color:rgba(240,234,216,0.9);
+  letter-spacing:0.06em;
+  line-height:2.2;
+  text-align:center;
+  font-family:'Noto Serif KR', serif;
+  opacity:0;
+  transition:opacity 0.8s ease;
+  max-width:640px;
+  padding:0 32px;
+}
+.opening-text.show { opacity:1; }
+
 
 /* GAME OVER 화면 */
 #scene-gameover {
@@ -465,7 +506,7 @@ body {
 
 <!-- 하단 메뉴바 -->
 <div id="menubar" style="display:none;">
-  <button class="menu-btn" onclick="retryGame()">TITLE</button>
+  <button class="menu-btn" onclick="goToTitle()">TITLE</button>
   <button class="menu-btn" disabled style="cursor:default">SAVE</button>
   <button class="menu-btn" disabled style="cursor:default">LOAD</button>
   <button class="menu-btn" onclick="nextDialog()">SKIP</button>
@@ -476,13 +517,20 @@ body {
 <!-- 선택지 -->
 <div id="choices"></div>
 
+<!-- 오프닝 오버레이 (검은 화면 텍스트) -->
+<div id="opening-overlay">
+  <div class="opening-text" id="opening-text"></div>
+</div>
+
 <!-- ═══════════════════════════════════════════
   씬 1: 타이틀
 ═══════════════════════════════════════════ -->
-<div id="scene-title" class="scene active" onclick="startGame()">
-  <div class="title-main">그날 오후</div>
-  <div class="title-sub">피아노 학원 가기 싫은 날</div>
-  <div class="title-start">[ 화면을 클릭하여 시작 ]</div>
+<div id="scene-title" class="scene active">
+  <div class="title-logo" id="title-logo">
+    <div class="title-main">그날 오후</div>
+    <div class="title-sub">피아노 학원 가기 싫은 날</div>
+    <div class="title-press" id="title-press">[ 화면을 클릭하여 시작 ]</div>
+  </div>
   <div class="title-year">1993 · EPISODE 1</div>
 </div>
 
@@ -905,6 +953,66 @@ function goToScene(sceneId, callback) {
 // ═══════════════════════════════════════════
 //  게임 시작
 // ═══════════════════════════════════════════
+// ═══════════════════════════════════════════
+//  타이틀 초기화 & 오프닝
+// ═══════════════════════════════════════════
+
+// 타이틀 로고 페이드인
+window.addEventListener('load', () => {
+  setTimeout(() => {
+    document.getElementById('title-logo').classList.add('show');
+  }, 600);
+  setTimeout(() => {
+    document.getElementById('title-press').classList.add('show');
+  }, 1800);
+  // 타이틀 클릭 리스너 (body 전체로 잡아서 z-index 무관하게)
+  document.getElementById('scene-title').addEventListener('click', onTitleClick);
+});
+
+let titleReady = false;
+function onTitleClick() {
+  if (titleReady) return;
+  titleReady = true;
+  document.getElementById('scene-title').removeEventListener('click', onTitleClick);
+  runOpeningSequence();
+}
+
+// 오프닝 시퀀스: 검은 화면에 텍스트 몇 줄 → 게임 시작
+const OPENING_LINES = [
+  '1993년 9월.',
+  '피아노 학원 가는 게 세상에서 제일 싫었다.',
+  '오늘은 어떻게든 버텨봐야지.',
+];
+
+function runOpeningSequence() {
+  const overlay = document.getElementById('opening-overlay');
+  const textEl = document.getElementById('opening-text');
+  overlay.classList.add('active');
+
+  let i = 0;
+  function showNext() {
+    if (i >= OPENING_LINES.length) {
+      // 마지막 줄 잠깐 보여주고 게임 시작
+      setTimeout(() => {
+        textEl.classList.remove('show');
+        setTimeout(() => {
+          overlay.classList.remove('active');
+          startGame();
+        }, 900);
+      }, 1400);
+      return;
+    }
+    textEl.classList.remove('show');
+    setTimeout(() => {
+      textEl.textContent = OPENING_LINES[i];
+      textEl.classList.add('show');
+      i++;
+      setTimeout(showNext, 2000);
+    }, 600);
+  }
+  setTimeout(showNext, 400);
+}
+
 function startGame() {
   goToScene('scene-playground', () => {
     setCharEmotion('char-img', 'sleepy');
@@ -1155,6 +1263,15 @@ function goToGameOver(ending) {
   });
 }
 
+function goToTitle() {
+  titleReady = false;
+  goToScene('scene-title', () => {
+    document.getElementById('title-logo').classList.add('show');
+    document.getElementById('title-press').classList.add('show');
+    document.getElementById('scene-title').addEventListener('click', onTitleClick);
+  });
+}
+
 function retryGame() {
   // 상태 리셋
   const wasEnding1 = state.endingOneVisited;
@@ -1183,8 +1300,7 @@ function retryGame() {
         showDialog('', '무엇을 할까?', null);
         state.seesawClicked = false;
       });
-    }, 600);
-  });
+    }, 600);  });
 }
 
 // 키보드 입력 (엔터/스페이스로 다음)
