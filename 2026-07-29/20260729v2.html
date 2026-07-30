@@ -861,7 +861,7 @@ function chooseLieDown() {
             showDialog('주인공', '아파트 위로 구름이 흘러가고 있었다.', () =>
               showDialog('주인공', '피아노 학원... 빠지면 안 되는데.', () =>
                 showDialog('', '그때였다.', () => {
-                  // UFO 좌→우 등장 애니메이션 (8초)
+                  // UFO 좌→우 등장 애니메이션 (8초) — 완료 시 자동 멈춤
                   state.ufoVisible = true;
                   state.ufoX = -0.2;
                   const ufoTarget = 0.62;
@@ -869,10 +869,12 @@ function chooseLieDown() {
                   const UFO_DURATION = 8000;
                   function moveUFO(now) {
                     const t = Math.min((now - ufoStartTime) / UFO_DURATION, 1);
-                    // 느리게 등속 이동
                     state.ufoX = -0.2 + (ufoTarget + 0.2) * t;
-                    if (t < 1 && state.ufoPhase === 0) {
+                    if (t < 1 && state.ufoPhase < 2) {
                       requestAnimationFrame(moveUFO);
+                    } else {
+                      // 이동 완료 — 목적지에 고정
+                      state.ufoX = ufoTarget;
                     }
                   }
                   requestAnimationFrame(moveUFO);
@@ -952,11 +954,13 @@ function ufoDisappear() {
 function clickDoor() {
   if (state.scene !== 'door') return;
   showDialog('주인공', '우리 집에 이미 외계인이 들어와있으면 어떡하지?', () =>
-    showDialog('', '...', () =>
-      showDialog('', '...문을 열지 못하고 5분을 서 있었다.', () => {
-        state.endingOneVisited = true;
-        goToGameOver(1);
-      })
+    showDialog('', '...5분을 서 있었다.', () =>
+      showDialog('나레이션', '어른이 지나갈 때까지 기다리다, 결국 문을 열었다.', () =>
+        showDialog('', '다행히, 아무 일도 없었다.', () => {
+          state.endingOneVisited = true;
+          goToGameOver(1);
+        })
+      )
     )
   );
 }
@@ -985,7 +989,7 @@ function ufoToBiplane() {
 
 function goToGameOver(ending) {
   state.goTitle = ending === 1 ? 'ENDING 1' : 'ENDING 2';
-  state.goSub   = ending === 1 ? '어렸을 적 기억.' : '이곳엔 공항이 없어.';
+  state.goSub   = ending === 1 ? '다행히, 아무 일도 없었다.' : '이곳엔 공항이 없어.';
   goToScene('gameover', null);
 }
 
