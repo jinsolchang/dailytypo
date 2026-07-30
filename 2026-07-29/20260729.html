@@ -925,13 +925,18 @@ function goToScene(sceneId, callback) {
 
 // 타이틀 로고 페이드인
 window.addEventListener('load', () => {
+  // 혹시 남아있을 대화창/선택지 초기화
+  hideDialog();
+  hideChoices();
+  const menubar = document.getElementById('menubar');
+  if (menubar) menubar.style.display = 'none';
+
   setTimeout(() => {
     document.getElementById('title-logo').classList.add('show');
   }, 600);
   setTimeout(() => {
     document.getElementById('title-press').classList.add('show');
   }, 1800);
-  // 타이틀 클릭 리스너 (body 전체로 잡아서 z-index 무관하게)
   document.getElementById('scene-title').addEventListener('click', onTitleClick);
 });
 
