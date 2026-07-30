@@ -272,14 +272,26 @@ body {
   z-index:50;
   overflow:hidden;
 }
-#scene-title::before {
+/* 타이틀 배경 이미지 */
+#scene-title .title-bg {
+  position:absolute;
+  inset:0;
+  width:100%;
+  height:100%;
+  object-fit:cover;
+  object-position:center bottom;
+  filter:brightness(0.55) saturate(0.8);
+  z-index:0;
+}
+/* 배경 위 어두운 그라데이션 — 하단(텍스트 영역) 강조 */
+#scene-title::after {
   content:'';
   position:absolute;
   inset:0;
-  background-image:
-    linear-gradient(rgba(80,60,120,0.07) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(80,60,120,0.07) 1px, transparent 1px);
-  background-size:32px 32px;
+  background:
+    radial-gradient(ellipse 80% 60% at 50% 50%, transparent 30%, rgba(13,10,14,0.55) 100%),
+    linear-gradient(to bottom, rgba(13,10,14,0.3) 0%, transparent 40%, rgba(13,10,14,0.7) 100%);
+  z-index:1;
   pointer-events:none;
 }
 .title-logo {
@@ -287,7 +299,7 @@ body {
   text-align:center;
   transition:opacity 1.4s ease;
   position:relative;
-  z-index:2;
+  z-index:3;
 }
 .title-logo.show { opacity:1; }
 .title-eyecatch {
@@ -357,9 +369,10 @@ body {
   position:absolute;
   bottom:22px;
   font-size:0.52rem;
-  color:rgba(180,150,220,0.15);
+  color:rgba(180,150,220,0.25);
   letter-spacing:0.2em;
   font-family:'Noto Sans KR', sans-serif;
+  z-index:3;
 }
 
 /* ── CRT 효과 ── */
@@ -537,7 +550,7 @@ body {
 <div id="crt-scanlines"></div>
 <div id="crt-bend"></div>
 <canvas id="crt-glitch"></canvas>
-<div class="date-stamp">1993.09 — 서울</div>
+<div class="date-stamp">1999.06 — 서울</div>
 
 <!-- 전환 오버레이 -->
 <div id="transition-overlay"></div>
@@ -574,6 +587,7 @@ body {
   씬 1: 타이틀
 ═══════════════════════════════════════════ -->
 <div id="scene-title" class="scene active">
+  <img class="title-bg" src="./title_bg.png" alt="">
   <div class="title-logo" id="title-logo">
     <div class="title-eyecatch">V I S U A L &nbsp; N O V E L</div>
     <div class="title-wrapper">
@@ -588,7 +602,7 @@ body {
     <div class="title-sub">피아노 학원 가기 싫은 날</div>
     <div class="title-press" id="title-press">─ &nbsp; CLICK TO START &nbsp; ─</div>
   </div>
-  <div class="title-year">1993 · EPISODE 1 · © 그날오후제작위원회</div>
+  <div class="title-year">1999 · EPISODE 1 · © 그날오후제작위원회</div>
 </div>
 
 <!-- ═══════════════════════════════════════════
@@ -931,7 +945,7 @@ function onTitleClick() {
 
 // 오프닝 시퀀스: 검은 화면에 텍스트 몇 줄 → 게임 시작
 const OPENING_LINES = [
-  '1993년 9월.',
+  '1999년 6월.',
   '피아노 학원 가는 게 세상에서 제일 싫었다.',
   '오늘은 어떻게든 버텨봐야지.',
 ];
