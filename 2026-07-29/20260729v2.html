@@ -7,7 +7,7 @@
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#000;overflow:hidden;width:100vw;height:100vh;cursor:default;}
-#game{display:block;position:fixed;top:0;left:0;}
+#game{display:block;position:fixed;top:0;left:0;width:100%;height:100%;}
 </style>
 </head>
 <body>
@@ -24,6 +24,7 @@ let W = window.innerWidth, H = window.innerHeight;
 function resize() {
   W = window.innerWidth; H = window.innerHeight;
   canvas.width = W; canvas.height = H;
+  if (typeof syncCrtSize === 'function') syncCrtSize();
 }
 resize();
 window.addEventListener('resize', resize);
@@ -270,10 +271,9 @@ function drawSceneTitle() {
 
 function drawScenePlayground() {
   drawBg('playground', 'sepia(0.3) contrast(1.05) brightness(0.9) saturate(0.85)');
-  // 캐릭터: 우측, 대화창 위까지 꽉 채움
+  // 캐릭터: 우측, 화면 바닥 기준
   const charW = W * 0.72;
-  const charBottom = H - DIALOG_H - MENUBAR_H - 10;
-  drawChar(getCharImg(), W * 0.68, charBottom, charW);
+  drawChar(getCharImg(), W * 0.68, H, charW);
   drawHotspots('playground');
   drawDateStamp();
 }
@@ -284,10 +284,9 @@ function drawSceneSky() {
   if (lyingImg) {
     const lw = W * 0.65;
     const lh = lyingImg.height * (lw / lyingImg.width);
-    const charBottom = H - DIALOG_H - MENUBAR_H - 10;
     ctx.save();
     ctx.filter = 'drop-shadow(0 8px 32px rgba(0,0,0,0.7))';
-    ctx.drawImage(lyingImg, W*0.05, charBottom - lh, lw, lh);
+    ctx.drawImage(lyingImg, W*0.05, H - lh, lw, lh);
     ctx.restore();
   }
   if (state.ufoVisible) drawUFO();
@@ -301,10 +300,9 @@ function drawSceneElevator() {
   const charImg = IMGS[state.charEmotion === 'scared' ? 'char_scared' : getCharImg()];
   if (charImg) {
     const ch = charImg.height * (charW / charImg.width);
-    const charBottom = H - DIALOG_H - MENUBAR_H - 10;
     ctx.save();
     ctx.filter = 'drop-shadow(0 12px 40px rgba(0,0,0,0.8))';
-    ctx.drawImage(charImg, W*0.55, charBottom - ch, charW, ch);
+    ctx.drawImage(charImg, W*0.55, H - ch, charW, ch);
     ctx.restore();
   }
   drawHotspots('elevator');
@@ -656,7 +654,11 @@ function animateFade(from, to, duration, callback) {
 //  마우스 이벤트
 // ═══════════════════════════════════════════
 canvas.addEventListener('mousemove', e => {
-  const mx = e.clientX / W, my = e.clientY / H;
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+  const mx = (e.clientX - rect.left) * scaleX / W;
+  const my = (e.clientY - rect.top) * scaleY / H;
   hoveredHotspot = null;
 
   // 선택지 호버
@@ -690,7 +692,11 @@ canvas.addEventListener('mousemove', e => {
 });
 
 canvas.addEventListener('click', e => {
-  const mx = e.clientX / W, my = e.clientY / H;
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+  const mx = (e.clientX - rect.left) * scaleX / W;
+  const my = (e.clientY - rect.top) * scaleY / H;
 
   // 타이틀 클릭
   if (state.scene === 'title' && state.titlePhase === 1) {
@@ -1211,9 +1217,16 @@ const fontLink = document.createElement('link');
 fontLink.rel = 'stylesheet';
 fontLink.href = 'https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;700;900&family=Noto+Sans+KR:wght@400;700;900&display=swap';
 document.head.appendChild(fontLink);
-fontLink.onload = main;
-// 폰트 로드 실패해도 시작
-setTimeout(main, 2000);
+
+let mainStarted = false;
+function startMain() {
+  if (mainStarted) return;
+  mainStarted = true;
+  main();
+}
+fontLink.onload = startMain;
+// 폰트 로드 실패해도 시작 (2초 후)
+setTimeout(startMain, 2000);
 
 </script>
 </body>
