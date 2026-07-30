@@ -617,6 +617,9 @@ function nextDialog() {
     const cb = state.dialogCallback;
     state.dialogCallback = null;
     cb();
+  } else {
+    // callback 없으면 대화창 닫기 → 핫스팟 클릭 가능 상태로
+    hideDialog();
   }
 }
 
@@ -729,10 +732,11 @@ canvas.addEventListener('click', e => {
     const totalH = state.choices.length * (CHOICE_BH + CHOICE_GAP) - CHOICE_GAP;
     const cy = H - MENUBAR_H - 20 - totalH;
     const cx = W/2 - CHOICE_W/2;
+    // mx/my는 0~1 비율, 픽셀 좌표로 변환
+    const px = mx * W, py = my * H;
     state.choices.forEach((c, i) => {
       const by = cy + i * (CHOICE_BH + CHOICE_GAP);
-      if (e.clientX >= cx && e.clientX <= cx+CHOICE_W &&
-          e.clientY >= by && e.clientY <= by+CHOICE_BH) {
+      if (px >= cx && px <= cx+CHOICE_W && py >= by && py <= by+CHOICE_BH) {
         hideChoices();
         c.action();
       }
@@ -753,12 +757,14 @@ canvas.addEventListener('click', e => {
     }
   }
 
-  // 메뉴바 클릭
-  if (e.clientY >= H - MENUBAR_H) {
+  // 메뉴바 클릭 (픽셀 기준)
+  const py2 = my * H;
+  if (py2 >= H - MENUBAR_H) {
     const gap = W / (MENU_ITEMS.length + 1);
+    const px2 = mx * W;
     MENU_ITEMS.forEach((label, i) => {
       const bx = gap*(i+1);
-      if (Math.abs(e.clientX - bx) < gap/2) {
+      if (Math.abs(px2 - bx) < gap/2) {
         if (label === 'TITLE') goToTitle();
         else if (label === 'SKIP') nextDialog();
       }
