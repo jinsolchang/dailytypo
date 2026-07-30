@@ -82,20 +82,20 @@ body {
 /* 캐릭터 */
 .character-layer {
   position:absolute;
-  bottom:180px;
+  bottom:160px; /* 대화창 위로 */
   left:50%;
   transform:translateX(-50%);
   display:flex;
   flex-direction:column;
   align-items:center;
   z-index:10;
+  pointer-events:none;
 }
 .character-img {
-  width:160px;
+  width:340px; /* 미연시처럼 크게 */
   height:auto;
-  image-rendering:pixelated;
-  filter:drop-shadow(0 8px 24px rgba(0,0,0,0.6));
-  transition:transform 0.3s;
+  filter:drop-shadow(0 12px 40px rgba(0,0,0,0.7));
+  transition:filter 0.3s, transform 0.3s;
 }
 
 /* 감정 상태 */
@@ -110,61 +110,94 @@ body {
   80%{transform:translateX(4px)}
 }
 
-/* 말풍선/대화창 */
+/* 대화창 — 미연시 스타일 */
 #dialog-box {
+  position:fixed;
+  bottom:44px; /* 메뉴바 위 */
+  left:0;
+  right:0;
+  z-index:200;
+  padding:0 0 0;
+  pointer-events:all;
+  cursor:pointer;
+}
+.dialog-inner {
+  background:rgba(20,10,40,0.82);
+  border-top:1px solid rgba(200,180,255,0.18);
+  padding:0;
+  position:relative;
+  box-shadow:0 -8px 60px rgba(0,0,0,0.6);
+  min-height:130px;
+}
+.dialog-name-tag {
+  display:inline-block;
+  background:rgba(40,20,80,0.95);
+  border:1px solid rgba(200,180,255,0.25);
+  border-bottom:none;
+  padding:5px 20px 4px;
+  font-size:0.85rem;
+  font-weight:700;
+  color:#d8c8ff;
+  letter-spacing:0.12em;
+  font-family:'Noto Sans KR', sans-serif;
+  position:relative;
+  top:0;
+  left:32px;
+  margin-bottom:-1px;
+  border-radius:3px 3px 0 0;
+}
+.dialog-name-tag:empty { display:none; }
+.dialog-body {
+  padding:18px 40px 22px;
+}
+.dialog-text {
+  font-size:1.05rem;
+  line-height:1.9;
+  color:#f0ead8;
+  min-height:3em;
+  font-family:'Noto Serif KR', serif;
+}
+.dialog-cursor {
+  display:inline-block;
+  width:0;
+  height:0;
+  border-left:7px solid transparent;
+  border-right:7px solid transparent;
+  border-top:9px solid rgba(200,180,255,0.7);
+  vertical-align:middle;
+  margin-left:4px;
+  animation:blink 0.8s step-end infinite;
+}
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+.dialog-next { display:none; } /* 클릭 전체로 처리 */
+
+/* 하단 메뉴바 */
+#menubar {
   position:fixed;
   bottom:0;
   left:0;
   right:0;
-  z-index:200;
-  padding:0 32px 28px;
-  pointer-events:none;
+  height:44px;
+  background:rgba(10,5,20,0.92);
+  border-top:1px solid rgba(200,180,255,0.1);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:32px;
+  z-index:300;
 }
-.dialog-inner {
-  background:rgba(8,6,4,0.92);
-  border:2px solid rgba(240,234,216,0.25);
-  border-radius:4px;
-  padding:20px 28px 18px;
-  position:relative;
-  box-shadow:0 -4px 40px rgba(0,0,0,0.8), inset 0 1px 0 rgba(240,234,216,0.08);
-  min-height:100px;
-}
-.dialog-name {
-  font-size:0.8rem;
-  font-weight:700;
-  color:#c8a87a;
-  letter-spacing:0.12em;
-  margin-bottom:8px;
-  font-family:'Noto Sans KR', sans-serif;
-}
-.dialog-text {
-  font-size:1rem;
-  line-height:1.75;
-  color:#f0ead8;
-  min-height:2.5em;
-}
-.dialog-cursor {
-  display:inline-block;
-  width:10px;
-  height:1.1em;
-  background:#f0ead8;
-  vertical-align:text-bottom;
-  margin-left:2px;
-  animation:blink 0.8s step-end infinite;
-}
-@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
-.dialog-next {
-  position:absolute;
-  bottom:14px;
-  right:20px;
-  font-size:0.7rem;
-  color:rgba(240,234,216,0.4);
-  letter-spacing:0.1em;
-  pointer-events:all;
+.menu-btn {
+  font-size:0.6rem;
+  color:rgba(200,180,255,0.35);
+  letter-spacing:0.18em;
   cursor:pointer;
   font-family:'Noto Sans KR', sans-serif;
+  transition:color 0.15s;
+  background:none;
+  border:none;
+  padding:0;
 }
-.dialog-next:hover { color:rgba(240,234,216,0.8); }
+.menu-btn:hover { color:rgba(200,180,255,0.8); }
 
 /* 클릭 힌트 (화면의 오브젝트) */
 .clickable {
@@ -200,7 +233,7 @@ body {
 /* 선택지 */
 #choices {
   position:fixed;
-  bottom:160px;
+  bottom:240px; /* 대화창+메뉴바 위 */
   left:50%;
   transform:translateX(-50%);
   z-index:300;
@@ -423,10 +456,21 @@ body {
 <!-- 대화창 (공통) -->
 <div id="dialog-box" style="display:none;" onclick="nextDialog()">
   <div class="dialog-inner">
-    <div class="dialog-name" id="dialog-name"></div>
-    <div class="dialog-text" id="dialog-text"><span class="dialog-cursor"></span></div>
-    <div class="dialog-next" id="dialog-next" onclick="nextDialog()">▼ 다음</div>
+    <div class="dialog-name-tag" id="dialog-name"></div>
+    <div class="dialog-body">
+      <div class="dialog-text" id="dialog-text"><span class="dialog-cursor"></span></div>
+    </div>
   </div>
+</div>
+
+<!-- 하단 메뉴바 -->
+<div id="menubar" style="display:none;">
+  <button class="menu-btn" onclick="retryGame()">TITLE</button>
+  <button class="menu-btn" disabled style="cursor:default">SAVE</button>
+  <button class="menu-btn" disabled style="cursor:default">LOAD</button>
+  <button class="menu-btn" onclick="nextDialog()">SKIP</button>
+  <button class="menu-btn" disabled style="cursor:default">AUTO</button>
+  <button class="menu-btn" disabled style="cursor:default">LOG</button>
 </div>
 
 <!-- 선택지 -->
@@ -452,23 +496,23 @@ body {
 
   <!-- 캐릭터 -->
   <div class="character-layer" id="char-playground">
-    <img id="char-img" class="character-img" src="./char_normal.png" alt="주인공" style="width:160px;height:auto;filter:drop-shadow(0 8px 24px rgba(0,0,0,0.5));">
+    <img id="char-img" class="character-img" src="./char_normal.png" alt="주인공" style="width:340px;height:auto;filter:drop-shadow(0 12px 40px rgba(0,0,0,0.6));">
   </div>
 
-  <!-- 클릭 오브젝트들 -->
-  <div class="clickable" id="obj-junglegym" style="left:8%; top:30%; width:18%; height:40%;" onclick="clickObject('junglegym')">
+  <!-- 클릭 오브젝트들 (대화창+메뉴바 높이 ~230px 위로 기준) -->
+  <div class="clickable" id="obj-junglegym" style="left:6%; top:20%; width:20%; height:45%;" onclick="clickObject('junglegym')">
     <div class="clickable-label">정글짐</div>
   </div>
 
-  <div class="clickable" id="obj-slide" style="right:10%; top:35%; width:14%; height:35%;" onclick="clickObject('slide')">
+  <div class="clickable" id="obj-slide" style="right:6%; top:22%; width:16%; height:42%;" onclick="clickObject('slide')">
     <div class="clickable-label">미끄럼틀</div>
   </div>
 
-  <div class="clickable" id="obj-seesaw" style="left:35%; bottom:120px; width:28%; height:80px;" onclick="clickObject('seesaw')">
+  <div class="clickable" id="obj-seesaw" style="left:30%; bottom:240px; width:32%; height:70px;" onclick="clickObject('seesaw')">
     <div class="clickable-label">시소 ▶ 클릭</div>
   </div>
 
-  <div class="clickable" id="obj-sandbox" style="right:28%; bottom:120px; width:12%; height:60px;" onclick="clickObject('sandbox')">
+  <div class="clickable" id="obj-sandbox" style="right:24%; bottom:240px; width:14%; height:55px;" onclick="clickObject('sandbox')">
     <div class="clickable-label">모래밭</div>
   </div>
 </div>
@@ -482,13 +526,13 @@ body {
   </div>
 
   <!-- UFO -->
-  <div id="ufo-element" style="right:15%; top:12%;" onclick="clickUFO()">
-    <img id="ufo-img" src="./ufo.png" alt="UFO" style="width:140px;height:auto;filter:drop-shadow(0 0 12px rgba(127,212,248,0.5));">
+  <div id="ufo-element" style="right:12%; top:8%; cursor:pointer;" onclick="clickUFO()">
+    <img id="ufo-img" src="./ufo.png" alt="UFO" style="width:180px;height:auto;filter:drop-shadow(0 0 18px rgba(127,212,248,0.6));">
   </div>
 
   <!-- 캐릭터 (누운 모습) -->
-  <div class="character-layer" id="char-sky" style="bottom:160px; transform:translateX(-50%) translateX(-80px);">
-    <img id="char-lying-img" src="./char_lying.png" alt="주인공 누운 모습" style="width:220px;height:auto;filter:drop-shadow(0 4px 16px rgba(0,0,0,0.4));">
+  <div class="character-layer" id="char-sky" style="bottom:200px; left:30%; transform:none;">
+    <img id="char-lying-img" src="./char_lying.png" alt="주인공 누운 모습" style="width:320px;height:auto;filter:drop-shadow(0 6px 24px rgba(0,0,0,0.5));">
   </div>
 </div>
 
@@ -501,13 +545,13 @@ body {
   </div>
 
   <!-- 캐릭터 (서있는 모습) -->
-  <div class="character-layer" id="char-elevator" style="bottom:160px; left:32%; transform:none;">
-    <img id="char-elevator-img" src="./char_scared.png" alt="주인공" style="width:140px;height:auto;filter:drop-shadow(0 6px 20px rgba(0,0,0,0.6));">
+  <div class="character-layer" id="char-elevator" style="bottom:190px; left:28%; transform:none;">
+    <img id="char-elevator-img" src="./char_scared.png" alt="주인공" style="width:300px;height:auto;filter:drop-shadow(0 8px 30px rgba(0,0,0,0.7));">
   </div>
 
   <!-- 엘리베이터 버튼 클릭 오브젝트 -->
-  <div class="clickable" id="obj-elevator-btn" style="right:22%; top:40%; width:6%; height:10%;" onclick="clickElevatorBtn()">
-    <div class="clickable-label">버튼</div>
+  <div class="clickable" id="obj-elevator-btn" style="right:18%; top:38%; width:8%; height:12%;" onclick="clickElevatorBtn()">
+    <div class="clickable-label">▲▼ 버튼</div>
   </div>
 </div>
 
@@ -848,6 +892,9 @@ function goToScene(sceneId, callback) {
     state.currentScene = sceneId;
     hideDialog();
     hideChoices();
+    // 타이틀·게임오버에선 메뉴바 숨김
+    const menubar = document.getElementById('menubar');
+    if (menubar) menubar.style.display = (sceneId === 'scene-title' || sceneId === 'scene-gameover') ? 'none' : 'flex';
     setTimeout(() => {
       overlay.classList.remove('fade-in');
       if (callback) callback();
@@ -1127,7 +1174,7 @@ function retryGame() {
   ufoEl.style.transform = '';
   ufoEl.style.opacity = '1';
   ufoEl.style.filter = '';
-  ufoEl.innerHTML = '<img id="ufo-img" src="./ufo.png" alt="UFO" style="width:140px;height:auto;filter:drop-shadow(0 0 12px rgba(127,212,248,0.5));">';
+  ufoEl.innerHTML = '<img id="ufo-img" src="./ufo.png" alt="UFO" style="width:180px;height:auto;filter:drop-shadow(0 0 18px rgba(127,212,248,0.6));">';
 
   goToScene('scene-playground', () => {
     setCharEmotion('char-img', 'sleepy');
