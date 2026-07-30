@@ -297,9 +297,11 @@ function drawSceneSky() {
   if (lyingImg) {
     const lw = W * 0.65;
     const lh = lyingImg.height * (lw / lyingImg.width);
+    // 대화창 바로 위에 보이도록 — 발끝이 대화창 상단에 맞게
+    const footY = H - DIALOG_H - MENUBAR_H - 20;
     ctx.save();
     ctx.filter = 'drop-shadow(0 8px 32px rgba(0,0,0,0.7))';
-    ctx.drawImage(lyingImg, W*0.05, H - lh, lw, lh);
+    ctx.drawImage(lyingImg, W*0.05, footY - lh, lw, lh);
     ctx.restore();
   }
   if (state.ufoVisible) drawUFO();
@@ -694,10 +696,15 @@ canvas.addEventListener('mousemove', e => {
   }
 
   // 핫스팟 호버
-  const hs = HOTSPOTS[state.scene] || HOTSPOTS['_'+state.scene];
+  const hs = state.scene === 'sky'
+    ? (HOTSPOTS.sky.map(h => h.id === 'ufo'
+        ? {...h, x: state.ufoX, y: state.ufoY, w: 0.16, h2: 0.18}
+        : h))
+    : (HOTSPOTS[state.scene] || HOTSPOTS['_'+state.scene]);
   if (hs) {
     for (const h of hs) {
-      if (mx >= h.x && mx <= h.x+h.w && my >= h.y && my <= h.y+h.h) {
+      const hw = h.w, hh = h.h2 || h.h;
+      if (mx >= h.x && mx <= h.x+hw && my >= h.y && my <= h.y+hh) {
         hoveredHotspot = h;
         canvas.style.cursor = 'pointer';
         return;
@@ -748,7 +755,9 @@ canvas.addEventListener('click', e => {
   if (state.dialogVisible) { nextDialog(); return; }
 
   // 핫스팟 클릭
-  const hs = HOTSPOTS[state.scene];
+  const hs = state.scene === 'sky'
+    ? HOTSPOTS.sky.map(h => h.id === 'ufo' ? {...h, x: state.ufoX, y: state.ufoY, w: 0.16, h: 0.18} : h)
+    : HOTSPOTS[state.scene];
   if (hs) {
     for (const h of hs) {
       if (mx >= h.x && mx <= h.x+h.w && my >= h.y && my <= h.y+h.h) {
@@ -844,16 +853,33 @@ function chooseLieDown() {
   showDialog('주인공', '...시소 판자가 생각보다 따뜻했다.', () =>
     showDialog('주인공', '하늘이 참 파랗다.', () =>
       goToScene('sky', () => {
-        state.ufoVisible = true;
-        state.ufoX = 0.70; state.ufoY = 0.06; state.ufoAlpha = 1;
+        // UFO는 처음엔 숨겨두고, "그때였다" 이후 좌→우 이동으로 등장
+        state.ufoVisible = false;
+        state.ufoX = -0.2; state.ufoY = 0.08; state.ufoAlpha = 1;
         setTimeout(() =>
           showDialog('', '시소에 누워서 하늘을 봤다.', () =>
             showDialog('주인공', '아파트 위로 구름이 흘러가고 있었다.', () =>
               showDialog('주인공', '피아노 학원... 빠지면 안 되는데.', () =>
                 showDialog('', '그때였다.', () => {
-                  state.ufoPhase = 1;
+                  // UFO 좌→우 등장 애니메이션 (8초)
+                  state.ufoVisible = true;
+                  state.ufoX = -0.2;
+                  const ufoTarget = 0.62;
+                  const ufoStartTime = performance.now();
+                  const UFO_DURATION = 8000;
+                  function moveUFO(now) {
+                    const t = Math.min((now - ufoStartTime) / UFO_DURATION, 1);
+                    // 느리게 등속 이동
+                    state.ufoX = -0.2 + (ufoTarget + 0.2) * t;
+                    if (t < 1 && state.ufoPhase === 0) {
+                      requestAnimationFrame(moveUFO);
+                    }
+                  }
+                  requestAnimationFrame(moveUFO);
+
                   showDialog('', '저... 저게 뭐지?', () =>
                     showDialog('주인공', '...UFO다!!', () => {
+                      state.ufoPhase = 1;
                       state.charEmotion = 'shocked';
                       showDialog('', 'UFO를 클릭해보세요.', null);
                     })
@@ -1051,7 +1077,7 @@ function retryGame() {
   const wasEnding1 = state.endingOneVisited;
   Object.assign(state, {
     seesawClicked: false, ufoPhase: 0,
-    ufoVisible: true, ufoX: 0.70, ufoY: 0.06, ufoAlpha: 1,
+    ufoVisible: false, ufoX: -0.2, ufoY: 0.08, ufoAlpha: 1,
     charEmotion: 'sleepy', endingOneVisited: wasEnding1,
   });
   goToScene('playground', () => {
