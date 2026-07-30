@@ -311,7 +311,7 @@ function drawSceneTitle() {
 function drawScenePlayground() {
   drawBg('playground', 'sepia(0.3) contrast(1.05) brightness(0.9) saturate(0.85)');
   // 캐릭터: 우측, 화면 바닥 기준
-  const charW = W * 0.72;
+  const charW = W * 0.45;
   drawChar(getCharImg(), W * 0.68, H, charW);
   drawHotspots('playground');
   drawDateStamp();
@@ -321,7 +321,7 @@ function drawSceneSky() {
   drawBg('sky', 'sepia(0.2) contrast(1.02) brightness(0.95) saturate(0.9)');
   const lyingImg = IMGS['char_lying'];
   if (lyingImg) {
-    const lw = W * 0.65;
+    const lw = W * 0.42;
     const lh = lyingImg.height * (lw / lyingImg.width);
     // 대화창 바로 위에 보이도록 — 발끝이 대화창 상단에 맞게
     const footY = H - DIALOG_H - MENUBAR_H - 20;
@@ -371,7 +371,7 @@ function drawSceneSky() {
 
 function drawSceneElevator() {
   drawBg('elevator', 'sepia(0.25) contrast(1.04) brightness(0.85) saturate(0.8)');
-  const charW = W * 0.62;
+  const charW = W * 0.40;
   const charImg = IMGS[state.charEmotion === 'scared' ? 'char_scared' : getCharImg()];
   if (charImg) {
     const ch = charImg.height * (charW / charImg.width);
