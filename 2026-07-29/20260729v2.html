@@ -136,9 +136,7 @@ function drawChar(imgName, x, y, w, alpha) {
   const h = img.height * (w / img.width);
   ctx.save();
   ctx.globalAlpha = alpha !== undefined ? alpha : 1;
-  // 흰 배경 제거: multiply 블렌드
-  ctx.globalCompositeOperation = 'multiply';
-  ctx.filter = 'drop-shadow(0 12px 40px rgba(0,0,0,0.7))';
+  ctx.filter = 'drop-shadow(0 16px 48px rgba(0,0,0,0.8))';
   ctx.drawImage(img, x - w/2, y - h, w, h);
   ctx.restore();
 }
@@ -272,23 +270,24 @@ function drawSceneTitle() {
 
 function drawScenePlayground() {
   drawBg('playground', 'sepia(0.3) contrast(1.05) brightness(0.9) saturate(0.85)');
-  const charW = W * 0.45;
-  drawChar(getCharImg(), W*0.5, H - 190, charW);
+  // 캐릭터: 우측, 대화창 위까지 꽉 채움
+  const charW = W * 0.72;
+  const charBottom = H - DIALOG_H - MENUBAR_H - 10;
+  drawChar(getCharImg(), W * 0.68, charBottom, charW);
   drawHotspots('playground');
   drawDateStamp();
 }
 
 function drawSceneSky() {
   drawBg('sky', 'sepia(0.2) contrast(1.02) brightness(0.95) saturate(0.9)');
-  // 캐릭터 누운 (좌측 하단)
   const lyingImg = IMGS['char_lying'];
   if (lyingImg) {
-    const lw = W * 0.42;
+    const lw = W * 0.65;
     const lh = lyingImg.height * (lw / lyingImg.width);
+    const charBottom = H - DIALOG_H - MENUBAR_H - 10;
     ctx.save();
-    ctx.globalCompositeOperation = 'multiply';
-    ctx.filter = 'drop-shadow(0 6px 24px rgba(0,0,0,0.5))';
-    ctx.drawImage(lyingImg, W*0.12, H - 210 - lh, lw, lh);
+    ctx.filter = 'drop-shadow(0 8px 32px rgba(0,0,0,0.7))';
+    ctx.drawImage(lyingImg, W*0.05, charBottom - lh, lw, lh);
     ctx.restore();
   }
   if (state.ufoVisible) drawUFO();
@@ -298,14 +297,14 @@ function drawSceneSky() {
 
 function drawSceneElevator() {
   drawBg('elevator', 'sepia(0.25) contrast(1.04) brightness(0.85) saturate(0.8)');
-  const charW = W * 0.38;
+  const charW = W * 0.62;
   const charImg = IMGS[state.charEmotion === 'scared' ? 'char_scared' : getCharImg()];
   if (charImg) {
     const ch = charImg.height * (charW / charImg.width);
+    const charBottom = H - DIALOG_H - MENUBAR_H - 10;
     ctx.save();
-    ctx.globalCompositeOperation = 'multiply';
-    ctx.filter = 'drop-shadow(0 8px 30px rgba(0,0,0,0.7))';
-    ctx.drawImage(charImg, W*0.25, H - 200 - ch, charW, ch);
+    ctx.filter = 'drop-shadow(0 12px 40px rgba(0,0,0,0.8))';
+    ctx.drawImage(charImg, W*0.55, charBottom - ch, charW, ch);
     ctx.restore();
   }
   drawHotspots('elevator');
@@ -350,56 +349,71 @@ function drawSceneGameover() {
 
 
 // ═══════════════════════════════════════════
-//  대화창 렌더링
+//  대화창 렌더링 — 미연시 스타일
 // ═══════════════════════════════════════════
-const DIALOG_H = 160;
+const DIALOG_H = 210;
 const MENUBAR_H = 44;
 
 function drawDialog() {
   if (!state.dialogVisible) return;
   const dy = H - DIALOG_H - MENUBAR_H;
-  const dw = W;
 
-  // 배경
-  ctx.fillStyle = 'rgba(20,10,40,0.86)';
-  ctx.fillRect(0, dy, dw, DIALOG_H + MENUBAR_H);
-  ctx.strokeStyle = 'rgba(200,180,255,0.15)';
+  // 대화창 배경 — 보라빛 반투명
+  ctx.fillStyle = 'rgba(15,8,35,0.88)';
+  ctx.fillRect(0, dy, W, DIALOG_H);
+
+  // 상단 경계선
+  ctx.strokeStyle = 'rgba(180,150,255,0.2)';
   ctx.lineWidth = 1;
   ctx.beginPath(); ctx.moveTo(0, dy); ctx.lineTo(W, dy); ctx.stroke();
 
-  // 이름 태그
+  // 좌우 장식선
+  ctx.strokeStyle = 'rgba(180,150,255,0.08)';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(32, dy+8); ctx.lineTo(32, dy + DIALOG_H - 8); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(W-32, dy+8); ctx.lineTo(W-32, dy + DIALOG_H - 8); ctx.stroke();
+
+  // 이름 태그 (대화창 위에 돌출)
   if (state.dialogName) {
-    const nw = ctx.measureText(state.dialogName).width + 40;
-    ctx.fillStyle = 'rgba(40,20,80,0.95)';
-    ctx.fillRect(32, dy - 28, nw, 28);
-    ctx.strokeStyle = 'rgba(200,180,255,0.25)';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(32, dy - 28, nw, 28);
     ctx.font = `700 18px ${FONT_SANS}`;
+    const nw = ctx.measureText(state.dialogName).width + 44;
+    const nh = 32;
+    const nx = 40, ny = dy - nh;
+    // 이름박스
+    ctx.fillStyle = 'rgba(40,15,90,0.96)';
+    ctx.fillRect(nx, ny, nw, nh);
+    // 테두리
+    ctx.strokeStyle = 'rgba(180,150,255,0.3)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(nx, ny, nw, nh);
+    // 하단 이어지는 선 제거 효과
+    ctx.fillStyle = 'rgba(15,8,35,0.88)';
+    ctx.fillRect(nx+1, ny + nh - 1, nw-2, 2);
+    // 텍스트
     ctx.fillStyle = '#d8c8ff';
     ctx.textAlign = 'left';
-    ctx.fillText(state.dialogName, 52, dy - 8);
+    ctx.fillText(state.dialogName, nx + 22, ny + nh * 0.72);
   }
 
   // 본문
   ctx.font = `22px ${FONT_SERIF}`;
   ctx.fillStyle = '#f0ead8';
   ctx.textAlign = 'left';
-  const lineH = 22 * 1.9;
-  const maxW = W - 80;
+  const lineH = 22 * 1.85;
+  const maxW = W - 100;
   const lines = wrapText(state.dialogShown, maxW);
-  lines.forEach((line, i) => ctx.fillText(line, 40, dy + 32 + i * lineH));
+  lines.forEach((line, i) => ctx.fillText(line, 48, dy + 42 + i * lineH));
 
-  // 커서 (타이핑 완료 시 깜빡임)
-  if (!state.dialogTyping && Math.floor(Date.now()/500)%2 === 0) {
-    ctx.fillStyle = 'rgba(200,180,255,0.7)';
-    // 삼각형 커서
-    const lx = 40 + ctx.measureText(lines[lines.length-1]||'').width + 6;
-    const ly = dy + 32 + (lines.length-1)*lineH - W*0.012;
+  // 커서 ▼ (타이핑 완료 시 깜빡임)
+  if (!state.dialogTyping && Math.floor(Date.now()/600)%2 === 0) {
+    const lastLine = lines[lines.length-1] || '';
+    const lx = 48 + ctx.measureText(lastLine).width + 10;
+    const ly = dy + 42 + (lines.length-1) * lineH;
+    ctx.fillStyle = 'rgba(180,150,255,0.8)';
     ctx.beginPath();
-    ctx.moveTo(lx, ly+W*0.012);
-    ctx.lineTo(lx+10, ly+W*0.012);
-    ctx.lineTo(lx+5, ly+W*0.012+8);
+    ctx.moveTo(lx, ly - 14);
+    ctx.lineTo(lx + 12, ly - 14);
+    ctx.lineTo(lx + 6, ly - 5);
     ctx.closePath();
     ctx.fill();
   }
