@@ -48,7 +48,8 @@ window.addEventListener('resize', () => {
 const IMGS = {};
 const IMG_LIST = [
   'title_bg','playground','sky','elevator','door',
-  'char_normal','char_shocked','char_scared','char_awkward','char_lying','ufo'
+  'char_normal','char_shocked','char_scared','char_awkward','char_lying','ufo',
+  'biplane','alien'
 ];
 
 function loadImages() {
@@ -82,6 +83,11 @@ const state = {
   // UFO 떼 (엔딩3)
   ufoSwarm: [],
   flashAlpha: 0,         // 화면 밝아짐 효과
+  // 비행기 크로스페이드
+  biplaneVisible: false,
+  biplaneAlpha: 0,
+  // 외계인 오버레이 (엔딩3)
+  alienAlpha: 0,
   ufoAlpha: 1,
   fadeAlpha: 0,           // 씬 전환 페이드
   fadeDir: 0,             // 0:없음 1:페이드아웃 -1:페이드인
@@ -326,8 +332,34 @@ function drawSceneSky() {
   }
   // UFO 단일
   if (state.ufoVisible && state.ufoSwarm.length === 0) drawUFO();
+  // 비행기 크로스페이드
+  if (state.biplaneVisible) {
+    const bimg = IMGS['biplane'];
+    if (bimg) {
+      const bw = W * 0.14;
+      const bh = bimg.height * (bw / bimg.width);
+      ctx.save();
+      ctx.globalAlpha = state.biplaneAlpha;
+      ctx.filter = 'drop-shadow(0 0 10px rgba(200,190,160,0.4))';
+      ctx.drawImage(bimg, state.ufoX * W, state.ufoY * H, bw, bh);
+      ctx.restore();
+    }
+  }
   // UFO 떼 (엔딩3)
   if (state.ufoSwarm.length > 0) drawUFOSwarm();
+  // 외계인 오버레이 (엔딩3 flash 중)
+  if (state.alienAlpha > 0) {
+    const aimg = IMGS['alien'];
+    if (aimg) {
+      const aw = W * 0.35;
+      const ah = aimg.height * (aw / aimg.width);
+      ctx.save();
+      ctx.globalAlpha = state.alienAlpha;
+      ctx.filter = `blur(${(1 - state.alienAlpha) * 8}px)`;
+      ctx.drawImage(aimg, W/2 - aw/2, H/2 - ah/2 - 40, aw, ah);
+      ctx.restore();
+    }
+  }
   // 화면 밝아짐
   if (state.flashAlpha > 0) {
     ctx.fillStyle = `rgba(255,255,255,${state.flashAlpha})`;
