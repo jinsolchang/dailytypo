@@ -134,11 +134,13 @@ function drawChar(imgName, x, y, w, alpha) {
   const img = IMGS[imgName];
   if (!img) return;
   const h = img.height * (w / img.width);
+  ctx.save();
   ctx.globalAlpha = alpha !== undefined ? alpha : 1;
+  // 흰 배경 제거: multiply 블렌드
+  ctx.globalCompositeOperation = 'multiply';
   ctx.filter = 'drop-shadow(0 12px 40px rgba(0,0,0,0.7))';
   ctx.drawImage(img, x - w/2, y - h, w, h);
-  ctx.filter = 'none';
-  ctx.globalAlpha = 1;
+  ctx.restore();
 }
 
 function drawUFO() {
@@ -171,6 +173,7 @@ function getCharImg() {
 // 씬별 그리기
 const SCENE_RENDERERS = {
   title: drawSceneTitle,
+  black: () => { ctx.fillStyle='#000'; ctx.fillRect(0,0,W,H); },
   playground: drawScenePlayground,
   sky: drawSceneSky,
   elevator: drawSceneElevator,
@@ -269,8 +272,7 @@ function drawSceneTitle() {
 
 function drawScenePlayground() {
   drawBg('playground', 'sepia(0.3) contrast(1.05) brightness(0.9) saturate(0.85)');
-  // 캐릭터 (화면 하단 중앙)
-  const charW = W * 0.28;
+  const charW = W * 0.45;
   drawChar(getCharImg(), W*0.5, H - 190, charW);
   drawHotspots('playground');
   drawDateStamp();
@@ -281,13 +283,14 @@ function drawSceneSky() {
   // 캐릭터 누운 (좌측 하단)
   const lyingImg = IMGS['char_lying'];
   if (lyingImg) {
-    const lw = W * 0.28;
+    const lw = W * 0.42;
     const lh = lyingImg.height * (lw / lyingImg.width);
+    ctx.save();
+    ctx.globalCompositeOperation = 'multiply';
     ctx.filter = 'drop-shadow(0 6px 24px rgba(0,0,0,0.5))';
-    ctx.drawImage(lyingImg, W*0.18, H - 210 - lh, lw, lh);
-    ctx.filter = 'none';
+    ctx.drawImage(lyingImg, W*0.12, H - 210 - lh, lw, lh);
+    ctx.restore();
   }
-  // UFO
   if (state.ufoVisible) drawUFO();
   drawHotspots('sky');
   drawDateStamp();
@@ -295,13 +298,15 @@ function drawSceneSky() {
 
 function drawSceneElevator() {
   drawBg('elevator', 'sepia(0.25) contrast(1.04) brightness(0.85) saturate(0.8)');
-  const charW = W * 0.24;
+  const charW = W * 0.38;
   const charImg = IMGS[state.charEmotion === 'scared' ? 'char_scared' : getCharImg()];
   if (charImg) {
     const ch = charImg.height * (charW / charImg.width);
+    ctx.save();
+    ctx.globalCompositeOperation = 'multiply';
     ctx.filter = 'drop-shadow(0 8px 30px rgba(0,0,0,0.7))';
-    ctx.drawImage(charImg, W*0.28, H - 200 - ch, charW, ch);
-    ctx.filter = 'none';
+    ctx.drawImage(charImg, W*0.25, H - 200 - ch, charW, ch);
+    ctx.restore();
   }
   drawHotspots('elevator');
   drawDateStamp();
@@ -370,17 +375,17 @@ function drawDialog() {
     ctx.strokeStyle = 'rgba(200,180,255,0.25)';
     ctx.lineWidth = 1;
     ctx.strokeRect(32, dy - 28, nw, 28);
-    ctx.font = `700 ${W*0.013}px ${FONT_SANS}`;
+    ctx.font = `700 ${Math.max(W*0.018, 16)}px ${FONT_SANS}`;
     ctx.fillStyle = '#d8c8ff';
     ctx.textAlign = 'left';
     ctx.fillText(state.dialogName, 52, dy - 8);
   }
 
   // 본문
-  ctx.font = `${W*0.015}px ${FONT_SERIF}`;
+  ctx.font = `${Math.max(W*0.02, 18)}px ${FONT_SERIF}`;
   ctx.fillStyle = '#f0ead8';
   ctx.textAlign = 'left';
-  const lineH = W*0.015 * 1.9;
+  const lineH = Math.max(W*0.02, 18) * 1.9;
   const maxW = W - 80;
   const lines = wrapText(state.dialogShown, maxW);
   lines.forEach((line, i) => ctx.fillText(line, 40, dy + 32 + i * lineH));
@@ -501,10 +506,10 @@ function drawHotspots(sceneName) {
 }
 
 function drawDateStamp() {
-  ctx.font = `${W*0.009}px ${FONT_SANS}`;
-  ctx.fillStyle = 'rgba(240,234,216,0.2)';
+  ctx.font = `${Math.max(W*0.012, 13)}px ${FONT_SANS}`;
+  ctx.fillStyle = 'rgba(240,234,216,0.25)';
   ctx.textAlign = 'left';
-  ctx.fillText('1999.06 — 서울', 20, 32);
+  ctx.fillText('1999.06 — 서울', 20, 36);
 }
 
 // ═══════════════════════════════════════════
@@ -622,7 +627,6 @@ function goToScene(sceneName, callback) {
     setTimeout(() => animateFade(1, 0, 300, callback), 50);
   });
 }
-
 function animateFade(from, to, duration, callback) {
   const start = performance.now();
   function step(now) {
@@ -965,12 +969,14 @@ function runOpeningSequence() {
     let i = 0;
     function showNext() {
       if (i >= OPENING_LINES.length) {
-        setTimeout(() =>
+        setTimeout(() => {
+          // 씬을 검정으로 먼저 전환 → title 로고 재등장 방지
+          state.scene = 'black';
           animateValue(v => state.openingAlpha = v, 1, 0, 800, 0, () => {
             state.openingText = '';
             startGame();
-          })
-        , 1200);
+          });
+        }, 1200);
         return;
       }
       state.openingText = '';
