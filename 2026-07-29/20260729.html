@@ -384,7 +384,7 @@ body {
   pointer-events:none; z-index:1002;
   background:radial-gradient(ellipse 110% 110% at 50% 50%, transparent 55%, rgba(0,0,0,0.65) 100%);
 }
-#crt-glitch { position:fixed; inset:0; pointer-events:none; z-index:1003; opacity:0; }
+#crt-glitch { position:fixed; inset:0; pointer-events:none; z-index:1003; }
 
 /* 오프닝 텍스트 */
 #opening-overlay {
@@ -739,7 +739,7 @@ function drawNoise() {
 drawNoise();
 
 // ═══════════════════════════════════════════
-//  CRT 글리치 효과
+//  CRT sweep 효과 — 밝은 띠가 위→아래로 훑음
 // ═══════════════════════════════════════════
 const glitchCanvas = document.getElementById('crt-glitch');
 const gCtx = glitchCanvas.getContext('2d');
@@ -751,52 +751,60 @@ function resizeGlitch() {
 resizeGlitch();
 window.addEventListener('resize', resizeGlitch);
 
-// 불규칙 글리치 라인 — 가끔씩 수평 밴드가 어긋남
-let glitchTimer = 0;
-function runGlitch() {
-  const now = Date.now();
-  // 3~8초마다 한 번씩 짧게 글리치
-  if (now - glitchTimer > (3000 + Math.random() * 5000)) {
-    glitchTimer = now;
-    doGlitch();
-  }
-  requestAnimationFrame(runGlitch);
+// sweep 상태
+const sweep = {
+  active: false,
+  y: -80,          // 현재 띠 위치
+  speed: 1.8,      // px/frame
+  bandH: 80,       // 띠 높이
+  alpha: 0.06,     // 최대 밝기
+};
+
+function scheduleSweep() {
+  // 3~6초마다 한 번 실행
+  const delay = 3000 + Math.random() * 3000;
+  setTimeout(() => {
+    sweep.active = true;
+    sweep.y = -sweep.bandH;
+    scheduleSweep();
+  }, delay);
 }
 
-function doGlitch() {
+function drawSweep() {
   const w = glitchCanvas.width;
   const h = glitchCanvas.height;
-  glitchCanvas.style.opacity = '1';
   gCtx.clearRect(0, 0, w, h);
 
-  // 2~5개의 수평 밴드 어긋남
-  const bands = 2 + Math.floor(Math.random() * 4);
-  for (let i = 0; i < bands; i++) {
-    const y = Math.random() * h;
-    const bh = 1 + Math.random() * 6;
-    const shift = (Math.random() - 0.5) * 20;
-    // 희미한 수평 라인
-    gCtx.fillStyle = `rgba(${180+Math.random()*75|0},${180+Math.random()*75|0},${200+Math.random()*55|0},${0.06 + Math.random()*0.1})`;
-    gCtx.fillRect(0, y, w, bh);
-    // 색수차 어긋남
-    gCtx.fillStyle = `rgba(255,0,0,0.04)`;
-    gCtx.fillRect(shift, y, w, bh);
-    gCtx.fillStyle = `rgba(0,200,255,0.04)`;
-    gCtx.fillRect(-shift, y, w, bh);
+  if (sweep.active) {
+    sweep.y += sweep.speed;
+
+    // 부드러운 그라데이션 띠 (위아래로 페이드)
+    const grad = gCtx.createLinearGradient(0, sweep.y, 0, sweep.y + sweep.bandH);
+    grad.addColorStop(0,   'rgba(255,255,255,0)');
+    grad.addColorStop(0.2, `rgba(255,255,255,${sweep.alpha})`);
+    grad.addColorStop(0.5, `rgba(255,255,240,${sweep.alpha * 1.4})`);
+    grad.addColorStop(0.8, `rgba(255,255,255,${sweep.alpha})`);
+    grad.addColorStop(1,   'rgba(255,255,255,0)');
+
+    gCtx.fillStyle = grad;
+    gCtx.fillRect(0, sweep.y, w, sweep.bandH);
+
+    // 띠 중앙에 얇은 밝은 선 하나 추가
+    gCtx.fillStyle = `rgba(255,255,255,${sweep.alpha * 0.8})`;
+    gCtx.fillRect(0, sweep.y + sweep.bandH * 0.45, w, 1);
+
+    // 화면 아래를 벗어나면 종료
+    if (sweep.y > h + sweep.bandH) {
+      sweep.active = false;
+      gCtx.clearRect(0, 0, w, h);
+    }
   }
 
-  // 전체 화면 순간 밝기 흔들림
-  gCtx.fillStyle = 'rgba(255,255,255,0.015)';
-  gCtx.fillRect(0, 0, w, h);
-
-  // 40~120ms 후 사라짐
-  setTimeout(() => {
-    gCtx.clearRect(0, 0, w, h);
-    glitchCanvas.style.opacity = '0';
-  }, 40 + Math.random() * 80);
+  requestAnimationFrame(drawSweep);
 }
 
-runGlitch();
+scheduleSweep();
+drawSweep();
 
 
 //  캐릭터 표정 교체
