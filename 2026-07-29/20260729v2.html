@@ -70,13 +70,18 @@ const FONT_SANS  = "'Noto Sans KR', sans-serif";
 //  게임 상태
 // ═══════════════════════════════════════════
 const state = {
-  scene: 'loading',       // loading | title | playground | sky | elevator | door | gameover
+  scene: 'loading',
   endingOneVisited: false,
+  endingTwoVisited: false,
   seesawClicked: false,
-  ufoPhase: 0,            // 0:없음 1:클릭가능 2:클릭됨
-  charEmotion: 'normal',  // normal|sleepy|shocked|scared|awkward
+  ufoPhase: 0,
+  charEmotion: 'normal',
   ufoVisible: true,
-  ufoX: 0, ufoY: 0,       // UFO 현재 위치 (비율)
+  ufoX: 0, ufoY: 0,
+  ufoAlpha: 1,
+  // UFO 떼 (엔딩3)
+  ufoSwarm: [],
+  flashAlpha: 0,         // 화면 밝아짐 효과
   ufoAlpha: 1,
   fadeAlpha: 0,           // 씬 전환 페이드
   fadeDir: 0,             // 0:없음 1:페이드아웃 -1:페이드인
@@ -155,7 +160,21 @@ function drawChar(imgName, x, y, w, alpha) {
   ctx.restore();
 }
 
-function drawUFO() {
+function drawUFOSwarm() {
+  const img = IMGS['ufo'];
+  if (!img) return;
+  const uw = W * 0.08; // 작은 UFO들
+  const uh = img.height * (uw / img.width);
+  state.ufoSwarm.forEach(u => {
+    ctx.save();
+    ctx.globalAlpha = u.alpha;
+    ctx.filter = 'drop-shadow(0 0 8px rgba(127,212,248,0.8))';
+    ctx.drawImage(img, u.x * W, u.y * H, uw, uh);
+    ctx.restore();
+  });
+}
+
+
   if (!state.ufoVisible) return;
   const img = IMGS['ufo'];
   if (!img) return;
@@ -304,7 +323,15 @@ function drawSceneSky() {
     ctx.drawImage(lyingImg, W*0.05, footY - lh, lw, lh);
     ctx.restore();
   }
-  if (state.ufoVisible) drawUFO();
+  // UFO 단일
+  if (state.ufoVisible && state.ufoSwarm.length === 0) drawUFO();
+  // UFO 떼 (엔딩3)
+  if (state.ufoSwarm.length > 0) drawUFOSwarm();
+  // 화면 밝아짐
+  if (state.flashAlpha > 0) {
+    ctx.fillStyle = `rgba(255,255,255,${state.flashAlpha})`;
+    ctx.fillRect(0, 0, W, H);
+  }
   drawHotspots('sky');
   drawDateStamp();
 }
@@ -806,15 +833,26 @@ function onHotspot(id) {
     if (!state.seesawClicked) {
       state.seesawClicked = true;
       state.charEmotion = 'sleepy';
-      showDialog('주인공', '시소다. 혼자서는 탈 수도 없고.', () =>
-        showDialog('주인공', '...근데 그냥 여기 누우면 어떨까.', () =>
+      // 엔딩2 이후: 엔딩3 루트
+      if (state.endingTwoVisited) {
+        showDialog('주인공', '시소다. 오늘도 혼자.', () =>
           showChoices([
-            { text: '누워본다.', action: chooseLieDown },
+            { text: '누워본다.', action: chooseLieDownEnding3 },
             { text: '그냥 앉아있는다.', action: chooseSit },
             { text: '집에 간다.', action: chooseGoHome },
           ])
-        )
-      );
+        );
+      } else {
+        showDialog('주인공', '시소다. 혼자서는 탈 수도 없고.', () =>
+          showDialog('주인공', '...근데 그냥 여기 누우면 어떨까.', () =>
+            showChoices([
+              { text: '누워본다.', action: chooseLieDown },
+              { text: '그냥 앉아있는다.', action: chooseSit },
+              { text: '집에 간다.', action: chooseGoHome },
+            ])
+          )
+        );
+      }
     } else {
       showDialog('', '이미 누워버렸다...', null);
     }
@@ -845,6 +883,71 @@ function chooseGoHome() {
   showDialog('주인공', '집에 가서 뭐 해. 피아노 연습해야 한다고 엄마가 기다리잖아.', () =>
     showChoices([{ text: '역시 시소에 눕는다.', action: chooseLieDown }])
   );
+}
+
+function chooseLieDownEnding3() {
+  hideChoices();
+  state.charEmotion = 'sleepy';
+  showDialog('주인공', '...또 하늘을 보게 됐다.', () =>
+    goToScene('sky', () => {
+      state.ufoVisible = false;
+      state.ufoSwarm = [];
+      state.flashAlpha = 0;
+      state.charEmotion = 'sleepy';
+      setTimeout(() =>
+        showDialog('', '...오늘도 하늘은 파랗다.', () =>
+          showDialog('주인공', '그런데.', () => {
+            // UFO 50개 등장
+            startUFOSwarm();
+            showDialog('주인공', '저게 뭐야...', () =>
+              showDialog('주인공', '저게 뭐야!! 저게 뭐야!!!', () => {
+                state.charEmotion = 'shocked';
+                showDialog('', '하나, 둘, 셋...', () =>
+                  showDialog('', '...셀 수도 없다.', () => {
+                    // 화면 점점 밝아지며 엔딩3
+                    startFlash(() => goToGameOver(3));
+                  })
+                );
+              })
+            );
+          })
+        )
+      , 600);
+    })
+  );
+}
+
+function startUFOSwarm() {
+  state.ufoSwarm = [];
+  // UFO 50개 생성 — 각자 다른 y높이, 속도, 딜레이로 좌→우 무한 루프
+  for (let i = 0; i < 50; i++) {
+    state.ufoSwarm.push({
+      x: -0.1 - Math.random() * 1.5,  // 시작 위치 (화면 밖)
+      y: 0.02 + Math.random() * 0.55,  // y 높이
+      speed: 0.0008 + Math.random() * 0.0012, // 속도
+      alpha: 0.7 + Math.random() * 0.3,
+    });
+  }
+  function animSwarm() {
+    if (state.ufoSwarm.length === 0) return;
+    state.ufoSwarm.forEach(u => {
+      u.x += u.speed;
+      if (u.x > 1.1) u.x = -0.1 - Math.random() * 0.3; // 다시 좌측으로
+    });
+    requestAnimationFrame(animSwarm);
+  }
+  requestAnimationFrame(animSwarm);
+}
+
+function startFlash(callback) {
+  const start = performance.now();
+  const duration = 3000;
+  function step(now) {
+    state.flashAlpha = Math.min((now - start) / duration, 1);
+    if (state.flashAlpha < 1) requestAnimationFrame(step);
+    else setTimeout(callback, 200);
+  }
+  requestAnimationFrame(step);
 }
 
 function chooseLieDown() {
@@ -899,7 +1002,7 @@ function chooseLieDown() {
 function clickUFO() {
   if (state.ufoPhase !== 1) return;
   state.ufoPhase = 2;
-  if (state.endingOneVisited) ufoToBiplane();
+  if (state.endingOneVisited && !state.endingTwoVisited) ufoToBiplane();
   else ufoDisappear();
 }
 
@@ -977,9 +1080,10 @@ function ufoToBiplane() {
       state.charEmotion = 'awkward';
       showDialog('주인공', '...아.', () =>
         showDialog('주인공', '비행기였네.', () =>
-          showDialog('주인공', '멋쩍다...', () =>
-            setTimeout(() => goToGameOver(2), 1500)
-          )
+          showDialog('주인공', '멋쩍다...', () => {
+            state.endingTwoVisited = true;
+            setTimeout(() => goToGameOver(2), 1500);
+          })
         )
       );
     }
@@ -988,8 +1092,16 @@ function ufoToBiplane() {
 }
 
 function goToGameOver(ending) {
-  state.goTitle = ending === 1 ? 'ENDING 1' : 'ENDING 2';
-  state.goSub   = ending === 1 ? '다행히, 아무 일도 없었다.' : '이곳엔 공항이 없어.';
+  state.ufoSwarm = []; // UFO 떼 정리
+  state.flashAlpha = 0;
+  const texts = {
+    1: ['ENDING 1', '다행히, 아무 일도 없었다.'],
+    2: ['ENDING 2', '이곳엔 공항이 없어.'],
+    3: ['ENDING 3', '지구 멸망.'],
+  };
+  const [title, sub] = texts[ending] || texts[1];
+  state.goTitle = title;
+  state.goSub = sub;
   goToScene('gameover', null);
 }
 
@@ -1079,10 +1191,15 @@ function goToTitle() {
 
 function retryGame() {
   const wasEnding1 = state.endingOneVisited;
+  const wasEnding2 = state.endingTwoVisited;
+  const fullyReset = state.goTitle === 'ENDING 3';
   Object.assign(state, {
     seesawClicked: false, ufoPhase: 0,
     ufoVisible: false, ufoX: -0.2, ufoY: 0.08, ufoAlpha: 1,
-    charEmotion: 'sleepy', endingOneVisited: wasEnding1,
+    charEmotion: 'sleepy',
+    endingOneVisited: fullyReset ? false : wasEnding1,
+    endingTwoVisited: fullyReset ? false : wasEnding2,
+    ufoSwarm: [], flashAlpha: 0,
   });
   goToScene('playground', () => {
     state.seesawClicked = false;
