@@ -16,10 +16,6 @@ body {
   height:100vh;
   overflow:hidden;
   user-select:none;
-  /* 저해상도 + 좌우 흔들림 */
-  filter: blur(1.4px) contrast(1.1) brightness(0.93) saturate(0.65);
-  animation: crt-wobble 0.07s steps(1) infinite;
-  image-rendering: pixelated;
 }
 
 /* 필름 그레인 오버레이 */
@@ -40,8 +36,7 @@ body {
   background:radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.7) 100%);
 }
 
-/* 스캔라인 — crt-scanlines로 대체됨 */
-#scanlines { display:none; }
+
 
 /* 씬 컨테이너 */
 .scene {
@@ -373,120 +368,7 @@ body {
   z-index:3;
 }
 
-/* ── CRT 효과 (aleclownes.com 원작 기반) ── */
-
-/* 좌우 + 약간 위아래 흔들림 */
-@keyframes crt-wobble {
-  0%   { transform: translate(0px, 0px); }
-  10%  { transform: translate(-1.5px, 0px); }
-  20%  { transform: translate(1.5px, 0.5px); }
-  30%  { transform: translate(-1px, 0px); }
-  40%  { transform: translate(0px, -0.5px); }
-  50%  { transform: translate(1.5px, 0px); }
-  60%  { transform: translate(-1.5px, 0.5px); }
-  70%  { transform: translate(0px, 0px); }
-  80%  { transform: translate(1px, -0.5px); }
-  90%  { transform: translate(-1px, 0px); }
-  100% { transform: translate(0px, 0px); }
-}
-
-/* 스캔라인 + RGB 서브픽셀 */
-#crt-viewport::before {
-  content:" ";
-  display:block;
-  position:fixed;
-  top:0; left:0; bottom:0; right:0;
-  background:
-    linear-gradient(rgba(18,16,16,0) 50%, rgba(0,0,0,0.35) 50%),
-    linear-gradient(90deg, rgba(255,0,0,0.05), rgba(0,255,0,0.02), rgba(0,0,255,0.05));
-  background-size:100% 4px, 4px 100%;
-  pointer-events:none;
-  z-index:2;
-}
-
-/* 화면 깜빡임 */
-#crt-viewport::after {
-  content:" ";
-  display:block;
-  position:fixed;
-  top:0; left:0; bottom:0; right:0;
-  background:rgba(18,16,16,0.06);
-  opacity:0;
-  pointer-events:none;
-  z-index:2;
-  animation:crt-flicker 0.12s infinite;
-}
-
-#crt-viewport {
-  position:fixed;
-  inset:0;
-  pointer-events:none;
-  z-index:1005;
-}
-
-@keyframes crt-flicker {
-  0%   { opacity:0.08; }
-  5%   { opacity:0.04; }
-  10%  { opacity:0.12; }
-  15%  { opacity:0.02; }
-  20%  { opacity:0.06; }
-  25%  { opacity:0.10; }
-  30%  { opacity:0.03; }
-  35%  { opacity:0.09; }
-  40%  { opacity:0.05; }
-  45%  { opacity:0.11; }
-  50%  { opacity:0.01; }
-  55%  { opacity:0.07; }
-  60%  { opacity:0.13; }
-  65%  { opacity:0.04; }
-  70%  { opacity:0.08; }
-  75%  { opacity:0.02; }
-  80%  { opacity:0.10; }
-  85%  { opacity:0.06; }
-  90%  { opacity:0.03; }
-  95%  { opacity:0.09; }
-  100% { opacity:0.07; }
-}
-
-/* rolling sweep */
-#crt-sweep {
-  position:fixed;
-  inset:0;
-  pointer-events:none;
-  z-index:1006;
-  overflow:hidden;
-}
-#crt-sweep::after {
-  content:" ";
-  position:absolute;
-  left:0; right:0;
-  height:100px;
-  background:linear-gradient(
-    to bottom,
-    transparent 0%,
-    rgba(255,255,255,0.03) 30%,
-    rgba(255,255,255,0.06) 50%,
-    rgba(255,255,255,0.03) 70%,
-    transparent 100%
-  );
-  animation:crt-sweep 5s linear infinite;
-  top:-100px;
-}
-@keyframes crt-sweep {
-  0%   { top:-100px; }
-  100% { top:calc(100vh + 100px); }
-}
-
-/* CRT 화면 굴곡 비네팅 */
-#crt-bend {
-  position:fixed; inset:0;
-  pointer-events:none; z-index:1007;
-  background:radial-gradient(ellipse 100% 100% at 50% 50%, transparent 60%, rgba(0,0,0,0.6) 100%);
-}
-
-/* 기존 레이어 정리 */
-#crt-scanlines { display:none; }
-#crt-glitch { display:none; }
+/* CRT: CRTFilter.js 사용 */
 
 /* 오프닝 텍스트 */
 #opening-overlay {
@@ -592,14 +474,13 @@ body {
   z-index:500;
 }
 
-/* 흑백 노이즈 캔버스 */
+/* noise-canvas — CRTFilter 소스 캔버스 (투명 오버레이) */
 #noise-canvas {
   position:fixed;
   inset:0;
   z-index:1000;
   pointer-events:none;
-  mix-blend-mode:overlay;
-  opacity:0.35;
+  opacity:0; /* CRTFilter가 glcanvas를 앞에 삽입하므로 원본은 숨김 */
 }
 
 /* 이미지 placeholder 스타일 */
@@ -641,10 +522,6 @@ body {
 
 <canvas id="noise-canvas"></canvas>
 <div id="vignette"></div>
-<!-- CRT 효과 레이어 -->
-<div id="crt-viewport"></div>
-<div id="crt-sweep"></div>
-<div id="crt-bend"></div>
 <div class="date-stamp">1999.06 — 서울</div>
 
 <!-- 전환 오버레이 -->
@@ -812,32 +689,19 @@ const state = {
 // ═══════════════════════════════════════════
 //  필름 노이즈 효과
 // ═══════════════════════════════════════════
+//  CRTFilter.js 초기화
+// ═══════════════════════════════════════════
 const noiseCanvas = document.getElementById('noise-canvas');
 const nCtx = noiseCanvas.getContext('2d');
 
 function resizeNoise() {
   noiseCanvas.width = window.innerWidth;
   noiseCanvas.height = window.innerHeight;
+  // 캔버스를 투명하게 유지 — CRTFilter가 오버레이로만 동작
+  nCtx.clearRect(0, 0, noiseCanvas.width, noiseCanvas.height);
 }
 resizeNoise();
 window.addEventListener('resize', resizeNoise);
-
-function drawNoise() {
-  const w = noiseCanvas.width;
-  const h = noiseCanvas.height;
-  const imageData = nCtx.createImageData(w, h);
-  const data = imageData.data;
-  for (let i = 0; i < data.length; i += 4) {
-    const v = Math.random() * 255;
-    data[i] = v;
-    data[i+1] = v;
-    data[i+2] = v;
-    data[i+3] = Math.random() * 30;
-  }
-  nCtx.putImageData(imageData, 0, 0);
-  requestAnimationFrame(drawNoise);
-}
-drawNoise();
 
 // CRT sweep은 CSS animation으로 처리됨
 
@@ -1321,6 +1185,55 @@ window.addEventListener('keydown', e => {
 // 창 리사이즈 — 이미지 배경은 CSS object-fit으로 처리되므로 별도 작업 불필요
 window.addEventListener('resize', resizeNoise);
 
+</script>
+
+<!-- CRTFilter.js — WebGL CRT 오버레이 -->
+<script type="module">
+import { CRTFilterWebGL } from './CRTFilter.js';
+
+const canvas = document.getElementById('noise-canvas');
+canvas.style.opacity = '1'; // CRTFilter가 glcanvas를 앞에 삽입
+
+// 투명 캔버스를 매 프레임 유지 (CRTFilter의 소스로만 사용)
+function keepTransparent() {
+  const ctx = canvas.getContext('2d');
+  // 투명 배경 — 쉐이더 오버레이만 사용
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  requestAnimationFrame(keepTransparent);
+}
+keepTransparent();
+
+const crt = new CRTFilterWebGL(canvas, {
+  barrelDistortion:   0.06,   // CRT 굴곡
+  curvature:          0.04,
+  chromaticAberration:0.003,  // 색수차
+  staticNoise:        0.06,   // 지지직 노이즈
+  horizontalTearing:  0.0003, // 가로 찢김
+  glowBloom:          0.002,
+  verticalJitter:     0.004,  // 가끔 흔들림
+  retraceLines:       true,
+  scanlineIntensity:  0.5,
+  dotMask:            false,
+  brightness:         1.0,    // 밝기 그대로
+  contrast:           1.05,
+  desaturation:       0.25,   // 채도 살짝 낮춤
+  flicker:            0.0,    // 불투명도 변화 없음
+  signalLoss:         0.03,   // VHS 신호 손실
+});
+
+// glcanvas를 최상위 fixed 오버레이로 설정
+crt.start();
+const glcanvas = canvas.previousSibling || document.querySelector('canvas[style]');
+
+// CRTFilter가 삽입한 glcanvas 찾아서 오버레이로 배치
+setTimeout(() => {
+  const gl = document.querySelectorAll('canvas');
+  gl.forEach(c => {
+    if (c.id !== 'noise-canvas') {
+      c.style.cssText = 'position:fixed;inset:0;width:100%!important;height:100%!important;z-index:2000;pointer-events:none;';
+    }
+  });
+}, 100);
 </script>
 </body>
 </html>
